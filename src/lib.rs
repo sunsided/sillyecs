@@ -1,4 +1,5 @@
 use serde::Deserialize;
+use std::collections::HashMap;
 use std::io;
 use std::io::BufReader;
 
@@ -25,6 +26,8 @@ pub type ComponentRef = String;
 pub enum EcsError {
     #[error("Component '{0}' in archetype '{1}' is not defined in the ECS components.")]
     MissingComponent(String, String),
+    #[error("Duplicate archetype '{0}' and '{1}'")]
+    DuplicateArchetype(String, String),
 }
 
 #[derive(Default)]
@@ -39,6 +42,7 @@ where
 {
     let ecs: Ecs = serde_yaml::from_reader(reader).expect("Failed to deserialize ecs.yaml");
     ensure_component_consistency(&ecs)?;
+    ensure_distinct_archetype_components(&ecs)?;
 
     let component_code = generate_component_code(&ecs);
     let archetype_code = generate_archetype_code(&ecs);
@@ -50,6 +54,23 @@ where
         archetypes: archetype_code,
         ..Code::default()
     })
+}
+
+fn ensure_distinct_archetype_components(ecs: &Ecs) -> Result<(), EcsError> {
+    let mut archetype_component_sets: HashMap<String, String> = HashMap::new();
+    for archetype in &ecs.archetypes {
+        let mut component_set = archetype.components.iter().cloned().collect::<Vec<_>>();
+        component_set.sort_unstable();
+        let component_set = component_set.join("+").to_ascii_lowercase();
+        if let Some(duplicate) = archetype_component_sets.get(&component_set) {
+            return Err(EcsError::DuplicateArchetype(
+                archetype.name.clone(),
+                duplicate.clone(),
+            ));
+        }
+        archetype_component_sets.insert(component_set.clone(), archetype.name.clone());
+    }
+    Ok(())
 }
 
 fn generate_component_code(ecs: &Ecs) -> String {
