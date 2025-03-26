@@ -1,0 +1,15 @@
+components:
+  - name: Position
+  - name: Velocity
+  - name: Health
+
+archetypes:
+  - name: Particle
+    components:
+      - Position
+      - Velocity
+  - name: Player
+    components:
+      - Position
+      - Velocity
+      - Health
