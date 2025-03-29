@@ -8,6 +8,7 @@ use std::ops::Deref;
 pub struct Ecs {
     pub components: Vec<Component>,
     pub archetypes: Vec<Archetype>,
+    pub systems: Vec<System>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -19,6 +20,13 @@ pub struct Archetype {
 #[derive(Debug, Deserialize)]
 pub struct Component {
     pub name: ComponentName,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct System {
+    pub name: SystemName,
+    pub inputs: Vec<ComponentRef>,
+    pub outputs: Vec<ComponentRef>,
 }
 
 pub type ComponentRef = ComponentName;
@@ -35,6 +43,7 @@ pub enum EcsError {
 pub struct Code {
     pub components: String,
     pub archetypes: String,
+    pub systems: String,
     pub world: String,
 }
 
@@ -65,6 +74,9 @@ pub struct ArchetypeName(Name);
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ComponentName(Name);
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct SystemName(Name);
+
 impl Deref for ArchetypeName {
     type Target = Name;
 
@@ -74,6 +86,14 @@ impl Deref for ArchetypeName {
 }
 
 impl Deref for ComponentName {
+    type Target = Name;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl Deref for SystemName {
     type Target = Name;
 
     fn deref(&self) -> &Self::Target {
@@ -101,6 +121,16 @@ impl<'de> Deserialize<'de> for ComponentName {
     }
 }
 
+impl<'de> Deserialize<'de> for SystemName {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let type_name = String::deserialize(deserializer)?;
+        Ok(Self(Name::new(type_name, "System")))
+    }
+}
+
 pub fn build<R>(reader: BufReader<R>) -> Result<Code, EcsError>
 where
     R: io::Read,
@@ -111,6 +141,7 @@ where
 
     let component_code = generate_component_code(&ecs);
     let archetype_code = generate_archetype_code(&ecs);
+    let system_code = generate_system_code(&ecs);
     let world_code = generate_world(&ecs);
 
     println!("{}", component_code);
@@ -119,6 +150,7 @@ where
         components: component_code,
         archetypes: archetype_code,
         world: world_code,
+        systems: system_code,
         ..Code::default()
     })
 }
@@ -158,6 +190,44 @@ fn generate_world(ecs: &Ecs) -> String {
         ));
     }
     generated_code.push_str("}\n\n");
+    generated_code
+}
+
+fn generate_system_code(ecs: &Ecs) -> String {
+    let mut generated_code = String::new();
+
+    generated_code.push_str("/// The ID of a [`System`].\n#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]\npub struct SystemId(u64);\n\n");
+
+    generated_code.push_str(&format!(
+        "/// Marker trait for systems.\npub trait System: 'static + Send + Sync {{\n    const ID: SystemId;\n}}\n\n",
+    ));
+
+    for (id, component) in ecs.systems.iter().enumerate() {
+        generated_code.push_str(&format!(
+            "#[derive(Debug, Clone)]\npub struct {name}({name}Data);\n",
+            name = component.name.type_name,
+        ));
+
+        generated_code.push_str(&format!(
+            "\n#[automatically_derived]\nimpl System for {name} {{\n    const ID: SystemId = SystemId({id});\n}}\n",
+            name = component.name.type_name
+        ));
+
+        generated_code.push_str(&format!(
+            "\n#[automatically_derived]\nimpl From<{name}Data> for {name} {{\n    fn from(data: {name}Data) -> Self {{\n        Self(data)\n    }}\n}}\n",
+            name = component.name.type_name,
+        ));
+
+        generated_code.push_str(&format!(
+            "\n#[automatically_derived]\nimpl std::ops::Deref for {name} {{\n    type Target = {name}Data;\n\n    fn deref(&self) -> &Self::Target {{\n        &self.0\n    }}\n}}\n\n",
+            name = component.name.type_name,
+        ));
+
+        generated_code.push_str(&format!(
+            "#[automatically_derived]\nimpl std::ops::DerefMut for {name} {{\n    fn deref_mut(&mut self) -> &mut Self::Target {{\n        &mut self.0\n    }}\n}}\n\n",
+            name = component.name.type_name
+        ));
+    }
     generated_code
 }
 
