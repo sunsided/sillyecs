@@ -2,6 +2,7 @@ use serde::{Deserialize, Deserializer};
 use std::collections::HashMap;
 use std::io;
 use std::io::BufReader;
+use std::ops::Deref;
 
 #[derive(Debug, Deserialize)]
 pub struct Ecs {
@@ -11,16 +12,16 @@ pub struct Ecs {
 
 #[derive(Debug, Deserialize)]
 pub struct Archetype {
-    pub name: Name,
+    pub name: ArchetypeName,
     pub components: Vec<ComponentRef>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct Component {
-    pub name: Name,
+    pub name: ComponentName,
 }
 
-pub type ComponentRef = Name;
+pub type ComponentRef = ComponentName;
 
 #[derive(thiserror::Error, Debug)]
 pub enum EcsError {
@@ -40,23 +41,63 @@ pub struct Code {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Name {
     pub type_name: String,
+    pub type_name_raw: String,
     pub field_name: String,
     pub field_name_plural: String,
 }
 
-impl<'de> Deserialize<'de> for Name {
+impl Name {
+    pub fn new(type_name: String, type_suffix: &str) -> Self {
+        let field_name = pascal_to_snake(&type_name);
+        let field_name_plural = pluralize_name(field_name.clone());
+        Self {
+            type_name: format!("{type_name}{type_suffix}"),
+            type_name_raw: type_name,
+            field_name,
+            field_name_plural,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ArchetypeName(Name);
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ComponentName(Name);
+
+impl Deref for ArchetypeName {
+    type Target = Name;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl Deref for ComponentName {
+    type Target = Name;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<'de> Deserialize<'de> for ArchetypeName {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
         let type_name = String::deserialize(deserializer)?;
-        let field_name = pascal_to_snake(&type_name);
-        let field_name_plural = pluralize_name(field_name.clone());
-        Ok(Name {
-            type_name,
-            field_name,
-            field_name_plural,
-        })
+        Ok(Self(Name::new(type_name, "Archetype")))
+    }
+}
+
+impl<'de> Deserialize<'de> for ComponentName {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let type_name = String::deserialize(deserializer)?;
+        Ok(Self(Name::new(type_name, "Component")))
     }
 }
 
@@ -131,27 +172,41 @@ fn generate_component_code(ecs: &Ecs) -> String {
 
     for (id, component) in ecs.components.iter().enumerate() {
         generated_code.push_str(&format!(
-            "#[derive(Debug, Clone)]\npub struct {name}Component({name}Data);\n",
+            "#[derive(Debug, Clone)]\npub struct {name}({raw_name}Data);\n",
+            name = component.name.type_name,
+            raw_name = component.name.type_name_raw
+        ));
+
+        generated_code.push_str(&format!(
+            "\nimpl {name} {{\n",
             name = component.name.type_name
         ));
 
         generated_code.push_str(&format!(
-            "\n#[automatically_derived]\nimpl Component for {name}Component {{\n    const ID: ComponentId = ComponentId({id});\n}}\n",
+            "    pub fn into_inner(self) -> {raw_name}Data {{\n        self.0\n    }}\n",
+            raw_name = component.name.type_name_raw
+        ));
+        generated_code.push_str("}\n");
+
+        generated_code.push_str(&format!(
+            "\n#[automatically_derived]\nimpl Component for {name} {{\n    const ID: ComponentId = ComponentId({id});\n}}\n\n",
             name = component.name.type_name
         ));
 
         generated_code.push_str(&format!(
-            "\n#[automatically_derived]\nimpl From<{name}Data> for {name}Component {{\n    fn from(data: {name}Data) -> Self {{\n        Self(data)\n    }}\n}}\n\n",
-            name = component.name.type_name
+            "\n#[automatically_derived]\nimpl From<{raw_name}Data> for {name} {{\n    fn from(data: {raw_name}Data) -> Self {{\n        Self(data)\n    }}\n}}\n\n",
+            name = component.name.type_name,
+            raw_name = component.name.type_name_raw
         ));
 
         generated_code.push_str(&format!(
-            "\n#[automatically_derived]\nimpl std::ops::Deref for {name}Component {{\n    type Target = {name}Data;\n\n    fn deref(&self) -> &Self::Target {{\n        &self.0\n    }}\n}}\n\n",
-            name = component.name.type_name
+            "\n#[automatically_derived]\nimpl std::ops::Deref for {name} {{\n    type Target = {raw_name}Data;\n\n    fn deref(&self) -> &Self::Target {{\n        &self.0\n    }}\n}}\n\n",
+            name = component.name.type_name,
+            raw_name = component.name.type_name_raw
         ));
 
         generated_code.push_str(&format!(
-            "#[automatically_derived]\nimpl std::ops::DerefMut for {name}Component {{\n    fn deref_mut(&mut self) -> &mut Self::Target {{\n        &mut self.0\n    }}\n}}\n\n",
+            "#[automatically_derived]\nimpl std::ops::DerefMut for {name} {{\n    fn deref_mut(&mut self) -> &mut Self::Target {{\n        &mut self.0\n    }}\n}}\n\n",
             name = component.name.type_name
         ));
     }
@@ -168,7 +223,7 @@ fn generate_archetype_code(ecs: &Ecs) -> String {
         generated_code.push_str("    pub entities: Vec<EntityId>,\n");
         for component in &archetype.components {
             generated_code.push_str(&format!(
-                "    pub {field_names}: Vec<{type_name}Component>,\n",
+                "    pub {field_names}: Vec<{type_name}>,\n",
                 field_names = component.field_name_plural,
                 type_name = component.type_name
             ));
