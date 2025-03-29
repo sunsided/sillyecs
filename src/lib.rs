@@ -34,6 +34,7 @@ pub enum EcsError {
 pub struct Code {
     pub components: String,
     pub archetypes: String,
+    pub world: String,
 }
 
 pub fn build<R>(reader: BufReader<R>) -> Result<Code, EcsError>
@@ -46,12 +47,14 @@ where
 
     let component_code = generate_component_code(&ecs);
     let archetype_code = generate_archetype_code(&ecs);
+    let world_code = generate_world(&ecs);
 
     println!("{}", component_code);
     println!("{}", archetype_code);
     Ok(Code {
         components: component_code,
         archetypes: archetype_code,
+        world: world_code,
         ..Code::default()
     })
 }
@@ -73,6 +76,23 @@ fn ensure_distinct_archetype_components(ecs: &Ecs) -> Result<(), EcsError> {
     Ok(())
 }
 
+fn generate_world(ecs: &Ecs) -> String {
+    let mut generated_code = String::new();
+
+    generated_code.push_str(
+        "/// A world holding all archetypes.\n#[derive(Debug, Clone)]\npub struct World {\n",
+    );
+    for archetype in &ecs.archetypes {
+        let field_name = pascal_to_snake(&archetype.name);
+        generated_code.push_str(&format!(
+            "    pub {field_name}: {name},\n",
+            name = archetype.name
+        ));
+    }
+    generated_code.push_str("}\n\n");
+    generated_code
+}
+
 fn generate_component_code(ecs: &Ecs) -> String {
     let mut generated_code = String::new();
 
@@ -84,7 +104,7 @@ fn generate_component_code(ecs: &Ecs) -> String {
 
     for (id, component) in ecs.components.iter().enumerate() {
         generated_code.push_str(&format!(
-            "#[derive(Debug)]\npub struct {name}Component({name}Data);\n",
+            "#[derive(Debug, Clone)]\npub struct {name}Component({name}Data);\n",
             name = component.name
         ));
 
@@ -114,14 +134,32 @@ fn generate_component_code(ecs: &Ecs) -> String {
 fn generate_archetype_code(ecs: &Ecs) -> String {
     let mut generated_code = String::new();
     for archetype in &ecs.archetypes {
+        generated_code.push_str(
+            "/// An archetype grouping entities with identical components.\n#[derive(Debug, Clone)]\n",
+        );
         generated_code.push_str(&format!("pub struct {} {{\n", archetype.name));
+        generated_code.push_str("    pub entities: Vec<EntityId>,\n");
         for component in &archetype.components {
             let field_name = pascal_to_snake(component);
-            generated_code.push_str(&format!("    pub {field_name}: {component}Component,\n",));
+            let field_name = pluralize_name(field_name);
+            generated_code.push_str(&format!(
+                "    pub {field_name}: Vec<{component}Component>,\n",
+            ));
         }
         generated_code.push_str("}\n\n");
     }
     generated_code
+}
+
+fn pluralize_name(field_name: String) -> String {
+    let field_name = if let Some(prefix) = field_name.strip_suffix('y') {
+        format!("{prefix}ies")
+    } else if !field_name.ends_with('s') {
+        format!("{field_name}s")
+    } else {
+        field_name
+    };
+    field_name
 }
 
 fn pascal_to_snake(component: &ComponentRef) -> String {
