@@ -237,7 +237,7 @@ fn generate_system_code(ecs: &Ecs) -> String {
         generated_code.push_str(&format!("\nimpl {name} {{\n", name = system.name.type_name,));
         generated_code.push_str("    /// Apply the system to the given entity components\n");
         generated_code.push_str("    #[inline]\n");
-        generated_code.push_str("    pub fn apply(&self");
+        generated_code.push_str("    pub fn apply(&self"); // TODO Add a function signature that takes vecs of components directly?
         for input in &system.inputs {
             generated_code.push_str(&format!(
                 ", {field_name}: &{type_name}",
