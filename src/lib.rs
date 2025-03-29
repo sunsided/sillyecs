@@ -189,12 +189,12 @@ fn generate_component_code(ecs: &Ecs) -> String {
         generated_code.push_str("}\n");
 
         generated_code.push_str(&format!(
-            "\n#[automatically_derived]\nimpl Component for {name} {{\n    const ID: ComponentId = ComponentId({id});\n}}\n\n",
+            "\n#[automatically_derived]\nimpl Component for {name} {{\n    const ID: ComponentId = ComponentId({id});\n}}\n",
             name = component.name.type_name
         ));
 
         generated_code.push_str(&format!(
-            "\n#[automatically_derived]\nimpl From<{raw_name}Data> for {name} {{\n    fn from(data: {raw_name}Data) -> Self {{\n        Self(data)\n    }}\n}}\n\n",
+            "\n#[automatically_derived]\nimpl From<{raw_name}Data> for {name} {{\n    fn from(data: {raw_name}Data) -> Self {{\n        Self(data)\n    }}\n}}\n",
             name = component.name.type_name,
             raw_name = component.name.type_name_raw
         ));
