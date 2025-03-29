@@ -1,4 +1,4 @@
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 use std::collections::HashMap;
 use std::io;
 use std::io::BufReader;
@@ -11,16 +11,16 @@ pub struct Ecs {
 
 #[derive(Debug, Deserialize)]
 pub struct Archetype {
-    pub name: String,
+    pub name: Name,
     pub components: Vec<ComponentRef>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct Component {
-    pub name: String,
+    pub name: Name,
 }
 
-pub type ComponentRef = String;
+pub type ComponentRef = Name;
 
 #[derive(thiserror::Error, Debug)]
 pub enum EcsError {
@@ -35,6 +35,29 @@ pub struct Code {
     pub components: String,
     pub archetypes: String,
     pub world: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Name {
+    pub type_name: String,
+    pub field_name: String,
+    pub field_name_plural: String,
+}
+
+impl<'de> Deserialize<'de> for Name {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let type_name = String::deserialize(deserializer)?;
+        let field_name = pascal_to_snake(&type_name);
+        let field_name_plural = pluralize_name(field_name.clone());
+        Ok(Name {
+            type_name,
+            field_name,
+            field_name_plural,
+        })
+    }
 }
 
 pub fn build<R>(reader: BufReader<R>) -> Result<Code, EcsError>
@@ -62,16 +85,20 @@ where
 fn ensure_distinct_archetype_components(ecs: &Ecs) -> Result<(), EcsError> {
     let mut archetype_component_sets: HashMap<String, String> = HashMap::new();
     for archetype in &ecs.archetypes {
-        let mut component_set = archetype.components.iter().cloned().collect::<Vec<_>>();
+        let mut component_set = archetype
+            .components
+            .iter()
+            .map(|c| c.type_name.clone())
+            .collect::<Vec<_>>();
         component_set.sort_unstable();
         let component_set = component_set.join("+").to_ascii_lowercase();
         if let Some(duplicate) = archetype_component_sets.get(&component_set) {
             return Err(EcsError::DuplicateArchetype(
-                archetype.name.clone(),
+                archetype.name.type_name.clone(),
                 duplicate.clone(),
             ));
         }
-        archetype_component_sets.insert(component_set.clone(), archetype.name.clone());
+        archetype_component_sets.insert(component_set.clone(), archetype.name.type_name.clone());
     }
     Ok(())
 }
@@ -83,10 +110,10 @@ fn generate_world(ecs: &Ecs) -> String {
         "/// A world holding all archetypes.\n#[derive(Debug, Clone)]\npub struct World {\n",
     );
     for archetype in &ecs.archetypes {
-        let field_name = pascal_to_snake(&archetype.name);
         generated_code.push_str(&format!(
             "    pub {field_name}: {name},\n",
-            name = archetype.name
+            field_name = archetype.name.field_name,
+            name = archetype.name.type_name
         ));
     }
     generated_code.push_str("}\n\n");
@@ -105,27 +132,27 @@ fn generate_component_code(ecs: &Ecs) -> String {
     for (id, component) in ecs.components.iter().enumerate() {
         generated_code.push_str(&format!(
             "#[derive(Debug, Clone)]\npub struct {name}Component({name}Data);\n",
-            name = component.name
+            name = component.name.type_name
         ));
 
         generated_code.push_str(&format!(
             "\n#[automatically_derived]\nimpl Component for {name}Component {{\n    const ID: ComponentId = ComponentId({id});\n}}\n",
-            name = component.name
+            name = component.name.type_name
         ));
 
         generated_code.push_str(&format!(
             "\n#[automatically_derived]\nimpl From<{name}Data> for {name}Component {{\n    fn from(data: {name}Data) -> Self {{\n        Self(data)\n    }}\n}}\n\n",
-            name = component.name
+            name = component.name.type_name
         ));
 
         generated_code.push_str(&format!(
             "\n#[automatically_derived]\nimpl std::ops::Deref for {name}Component {{\n    type Target = {name}Data;\n\n    fn deref(&self) -> &Self::Target {{\n        &self.0\n    }}\n}}\n\n",
-            name = component.name
+            name = component.name.type_name
         ));
 
         generated_code.push_str(&format!(
             "#[automatically_derived]\nimpl std::ops::DerefMut for {name}Component {{\n    fn deref_mut(&mut self) -> &mut Self::Target {{\n        &mut self.0\n    }}\n}}\n\n",
-            name = component.name
+            name = component.name.type_name
         ));
     }
     generated_code
@@ -137,13 +164,13 @@ fn generate_archetype_code(ecs: &Ecs) -> String {
         generated_code.push_str(
             "/// An archetype grouping entities with identical components.\n#[derive(Debug, Clone)]\n",
         );
-        generated_code.push_str(&format!("pub struct {} {{\n", archetype.name));
+        generated_code.push_str(&format!("pub struct {} {{\n", archetype.name.type_name));
         generated_code.push_str("    pub entities: Vec<EntityId>,\n");
         for component in &archetype.components {
-            let field_name = pascal_to_snake(component);
-            let field_name = pluralize_name(field_name);
             generated_code.push_str(&format!(
-                "    pub {field_name}: Vec<{component}Component>,\n",
+                "    pub {field_names}: Vec<{type_name}Component>,\n",
+                field_names = component.field_name_plural,
+                type_name = component.type_name
             ));
         }
         generated_code.push_str("}\n\n");
@@ -162,8 +189,8 @@ fn pluralize_name(field_name: String) -> String {
     field_name
 }
 
-fn pascal_to_snake(component: &ComponentRef) -> String {
-    let field_name = component
+fn pascal_to_snake(type_name: &str) -> String {
+    let field_name = type_name
         .chars()
         .flat_map(|c| {
             if c.is_uppercase() {
@@ -189,8 +216,8 @@ fn ensure_component_consistency(ecs: &Ecs) -> Result<(), EcsError> {
         for component_ref in &archetype.components {
             if !defined_components.contains(component_ref) {
                 return Err(EcsError::MissingComponent(
-                    component_ref.clone(),
-                    archetype.name.clone(),
+                    component_ref.type_name.clone(),
+                    archetype.name.type_name.clone(),
                 ));
             }
         }
@@ -207,7 +234,7 @@ mod tests {
         let cases = vec![
             ("PascalCase", "pascal_case"),
             ("SnakeCase", "snake_case"),
-            ("HTTPServer", "http_server"),
+            ("HTTPServer", "h_t_t_p_server"),
             ("", ""),
             ("lowercase", "lowercase"),
             ("UPPERCASE", "u_p_p_e_r_c_a_s_e"),
