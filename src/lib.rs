@@ -25,8 +25,8 @@ pub struct Component {
 #[derive(Debug, Deserialize)]
 pub struct System {
     pub name: SystemName,
-    pub inputs: Vec<ComponentRef>,
-    pub outputs: Vec<ComponentRef>,
+    pub inputs: Vec<ComponentName>,
+    pub outputs: Vec<ComponentName>,
 }
 
 pub type ComponentRef = ComponentName;
@@ -207,6 +207,29 @@ fn generate_system_code(ecs: &Ecs) -> String {
             "#[derive(Debug, Clone)]\npub struct {name}({name}Data);\n",
             name = component.name.type_name,
         ));
+
+        // TODO: How can we require that the system has this trait while not implementing it ourselves?
+        generated_code.push_str(&format!(
+            "\npub trait Apply{name} {{\n",
+            name = component.name.type_name,
+        ));
+        generated_code.push_str("    fn apply(&self");
+        for input in &component.inputs {
+            generated_code.push_str(&format!(
+                ", {field_name}: &{type_name}",
+                field_name = input.field_name,
+                type_name = input.type_name
+            ));
+        }
+        for output in &component.outputs {
+            generated_code.push_str(&format!(
+                ", {field_name}: &mut {type_name}",
+                field_name = output.field_name,
+                type_name = output.type_name
+            ));
+        }
+        generated_code.push_str(");\n");
+        generated_code.push_str("}\n");
 
         generated_code.push_str(&format!(
             "\n#[automatically_derived]\nimpl System for {name} {{\n    const ID: SystemId = SystemId({id});\n}}\n",
