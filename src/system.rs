@@ -14,6 +14,7 @@ pub struct System {
     pub name: SystemName,
     #[serde(default)]
     pub description: Option<String>,
+    pub phase: SystemPhaseRef,
     pub inputs: Vec<ComponentName>,
     pub outputs: Vec<ComponentName>,
 
@@ -123,6 +124,13 @@ impl Default for SystemId {
         Self(SYSTEM_IDS.fetch_add(1, std::sync::atomic::Ordering::SeqCst))
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct SystemPhase {
+    pub name: String,
+}
+
+pub type SystemPhaseRef = String;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 #[serde(transparent)]

@@ -1,6 +1,6 @@
 use crate::archetype::Archetype;
 use crate::component::Component;
-use crate::system::System;
+use crate::system::{System, SystemPhase};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
@@ -9,6 +9,7 @@ pub struct Ecs {
     pub components: Vec<Component>,
     pub archetypes: Vec<Archetype>,
     pub systems: Vec<System>,
+    pub phases: Vec<SystemPhase>,
 }
 
 impl Ecs {
@@ -44,6 +45,8 @@ pub enum EcsError {
     NoMatchingArchetypeForSystem(String),
     #[error("Promotion of archetype '{0}' to itself is not allowed.")]
     PromotionToSelf(String),
+    #[error("System {1} uses undefined phase '{0}'.")]
+    MissingPhase(String, String),
 }
 
 impl Ecs {
@@ -147,6 +150,13 @@ impl Ecs {
         for system in &self.systems {
             let required_components: HashSet<_> =
                 system.inputs.iter().chain(&system.outputs).collect();
+
+            if !self.phases.iter().any(|phase| phase.name.eq(&system.phase)) {
+                return Err(EcsError::MissingPhase(
+                    system.phase.clone(),
+                    system.name.type_name.clone(),
+                ));
+            }
 
             if !self.archetypes.iter().any(|archetype| {
                 archetype
