@@ -2,6 +2,30 @@
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub struct SystemId(std::num::NonZeroU64);
 
+impl SystemId {
+    /// Returns this ID as a [`NonZeroU64`](std::num::NonZeroU64) value.
+    pub const fn as_nonzero_u64(&self) -> std::num::NonZeroU64 {
+        self.0
+    }
+
+    /// Returns this ID as a `u64` value.
+    pub const fn as_u64(&self) -> u64 {
+            self.0.get()
+    }
+}
+
+impl From<SystemId> for std::num::NonZeroU64 {
+    fn from(value: SystemId) -> std::num::NonZeroU64 {
+        value.as_nonzero_u64()
+    }
+}
+
+impl From<SystemId> for u64 {
+    fn from(value: SystemId) -> u64 {
+        value.as_u64()
+    }
+}
+
 /// Marker trait for systems.
 pub trait System: 'static + Send + Sync {
     /// The ID of this system.
@@ -14,12 +38,40 @@ pub trait System: 'static + Send + Sync {
 {%- else %}
 /// A system operating on multiple [`Component`]s.
 {%- endif %}
+///
+/// The business logic is implemented via the [`Apply{{ system.name.type }}`] trait.
+/// See also [`{{ system.name.raw }}Data`] for the systems-specific data.
+///
+/// ### Reads
+/// {% for input in system.inputs %}
+/// - [`{{ input.type }}`]{% endfor %}
+///
+/// ### Mutates
+/// {% for output in system.outputs %}
+/// - [`{{ output.type }}`]{% endfor %}
 #[derive(Debug, Clone)]
 pub struct {{ system.name.type }}({{ system.name.type }}Data);
 
+/// Implements the business logic for the [`{{ system.name.type }}`] system.
 pub trait Apply{{ system.name.type }}: System {
-    /// Apply the system to the given entity components
-    fn apply(&self, velocity: &VelocityComponent, position: &mut PositionComponent);
+    /// Applies the system's business logic to the given entity components.
+    ///
+    /// ### Reads
+    /// {% for input in system.inputs %}
+    /// - `{{ input.field }}`: A reference to the input component of type [`{{ input.type }}`].{% endfor %}
+    ///
+    /// ### Mutates
+    /// {% for output in system.outputs %}
+    /// - `{{ output.field }}`: A mutable reference to the component of type [`{{ output.type }}`].{% endfor %}
+    fn apply(
+        &self,
+        {%- for input in system.inputs %}
+        {{ input.field }}: &{{ input.type }},
+        {%- endfor %}
+        {%- for output in system.outputs %}
+        {{ output.field }}: &mut {{ output.type }},
+        {%- endfor %}
+    );
 }
 
 impl {{ system.name.type }} {

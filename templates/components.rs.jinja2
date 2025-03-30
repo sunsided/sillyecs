@@ -2,6 +2,30 @@
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub struct ComponentId(std::num::NonZeroU64);
 
+impl ComponentId {
+    /// Returns this ID as a [`NonZeroU64`](std::num::NonZeroU64) value.
+    pub const fn as_nonzero_u64(&self) -> std::num::NonZeroU64 {
+        self.0
+    }
+
+    /// Returns this ID as a `u64` value.
+    pub const fn as_u64(&self) -> u64 {
+            self.0.get()
+    }
+}
+
+impl From<ComponentId> for std::num::NonZeroU64 {
+    fn from(value: ComponentId) -> std::num::NonZeroU64 {
+        value.as_nonzero_u64()
+    }
+}
+
+impl From<ComponentId> for u64 {
+    fn from(value: ComponentId) -> u64 {
+        value.as_u64()
+    }
+}
+
 /// Marker trait for components.
 pub trait Component: 'static + Send + Sync {
     /// The ID of this component.
