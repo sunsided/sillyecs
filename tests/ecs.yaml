@@ -13,3 +13,5 @@ archetypes:
       - Position
       - Velocity
       - Health
+
+systems: [ ]

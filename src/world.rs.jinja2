@@ -1,0 +1,8 @@
+/// A world holding all archetypes.
+#[derive(Debug, Clone)]
+pub struct World {
+    {%- for archetype in ecs.archetypes %}
+    pub {{ archetype.name.field | snake_case }}: {{ archetype.name.type }},
+    {%- endfor %}
+}
+

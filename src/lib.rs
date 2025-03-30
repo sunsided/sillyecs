@@ -1,28 +1,29 @@
-use serde::{Deserialize, Deserializer};
+use minijinja::{Environment, context};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::HashMap;
 use std::io;
 use std::io::BufReader;
 use std::ops::Deref;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Ecs {
     pub components: Vec<Component>,
     pub archetypes: Vec<Archetype>,
     pub systems: Vec<System>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Archetype {
     pub name: ArchetypeName,
     pub components: Vec<ComponentRef>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Component {
     pub name: ComponentName,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct System {
     pub name: SystemName,
     pub inputs: Vec<ComponentName>,
@@ -37,6 +38,8 @@ pub enum EcsError {
     MissingComponent(String, String),
     #[error("Duplicate archetype '{0}' and '{1}'")]
     DuplicateArchetype(String, String),
+    #[error("Failed to process template: {0}")]
+    TemplateError(#[from] minijinja::Error),
 }
 
 #[derive(Default)]
@@ -47,11 +50,15 @@ pub struct Code {
     pub world: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 pub struct Name {
+    #[serde(rename = "type")]
     pub type_name: String,
+    #[serde(rename = "raw")]
     pub type_name_raw: String,
+    #[serde(rename = "field")]
     pub field_name: String,
+    #[serde(rename = "fields")]
     pub field_name_plural: String,
 }
 
@@ -68,13 +75,16 @@ impl Name {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
+#[serde(transparent)]
 pub struct ArchetypeName(Name);
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
+#[serde(transparent)]
 pub struct ComponentName(Name);
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
+#[serde(transparent)]
 pub struct SystemName(Name);
 
 impl Deref for ArchetypeName {
@@ -139,10 +149,19 @@ where
     ensure_component_consistency(&ecs)?;
     ensure_distinct_archetype_components(&ecs)?;
 
+    let mut env = Environment::new();
+    env.add_filter("snake_case", snake_case_filter);
+
+    env.add_template("world", include_str!("world.rs.jinja2"))?;
+
+    let world_template = env.get_template("world")?;
+    let world_code = world_template.render(context! {
+        ecs => ecs,
+    })?;
+
     let component_code = generate_component_code(&ecs);
     let archetype_code = generate_archetype_code(&ecs);
     let system_code = generate_system_code(&ecs);
-    let world_code = generate_world(&ecs);
 
     println!("{}", component_code);
     println!("{}", archetype_code);
@@ -174,23 +193,6 @@ fn ensure_distinct_archetype_components(ecs: &Ecs) -> Result<(), EcsError> {
         archetype_component_sets.insert(component_set.clone(), archetype.name.type_name.clone());
     }
     Ok(())
-}
-
-fn generate_world(ecs: &Ecs) -> String {
-    let mut generated_code = String::new();
-
-    generated_code.push_str(
-        "/// A world holding all archetypes.\n#[derive(Debug, Clone)]\npub struct World {\n",
-    );
-    for archetype in &ecs.archetypes {
-        generated_code.push_str(&format!(
-            "    pub {field_name}: {name},\n",
-            field_name = archetype.name.field_name,
-            name = archetype.name.type_name
-        ));
-    }
-    generated_code.push_str("}\n\n");
-    generated_code
 }
 
 fn generate_system_code(ecs: &Ecs) -> String {
@@ -370,6 +372,10 @@ fn pluralize_name(field_name: String) -> String {
         field_name
     };
     field_name
+}
+
+fn snake_case_filter(value: String) -> String {
+    pascal_to_snake(&value.trim())
 }
 
 fn pascal_to_snake(type_name: &str) -> String {
