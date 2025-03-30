@@ -137,6 +137,7 @@ impl {{ system.name.type }} {
     /// ### Mutates
     /// {% for output in system.outputs %}
     /// - `{{ output.field }}`: A mutable slice of the components of type [`{{ output.type }}`].{% endfor %}
+    #[inline]
     fn apply_many(
         &self,
         {%- for input in system.inputs %}
@@ -160,17 +161,16 @@ impl {{ system.name.type }} {
     {%- for archetype in system.affected_archetypes %}
 
     /// Applies this system to the [`{{ archetype.type }}`].
+    #[inline]
     pub fn apply_to_{{ archetype.field }}(&self, archetype: &mut {{ archetype.type }}) {
-        for i in 0..archetype.len() {
-            self.apply_single(
-                {%- for input in system.inputs %}
-                &archetype.{{ input.fields }}[i],
-                {%- endfor %}
-                {%- for output in system.outputs %}
-                &mut archetype.{{ output.fields }}[i],
-                {%- endfor %}
-            );
-        }
+        self.apply_many(
+            {%- for input in system.inputs %}
+            &archetype.{{ input.fields }},
+            {%- endfor %}
+            {%- for output in system.outputs %}
+            &mut archetype.{{ output.fields }},
+            {%- endfor %}
+        );
     }
     {%- endfor %}
 }
