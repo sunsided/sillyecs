@@ -1,5 +1,7 @@
+use crate::component::ComponentId;
 use crate::ecs::{Ecs, EcsError};
 use crate::snake_case_filter;
+use minijinja::functions::Function;
 use minijinja::{Environment, context};
 use std::fs::File;
 use std::io::{BufReader, Write};
@@ -28,10 +30,11 @@ impl EcsCode {
     where
         R: io::Read,
     {
-        let ecs: Ecs = serde_yaml::from_reader(reader).expect("Failed to deserialize ecs.yaml");
+        let mut ecs: Ecs = serde_yaml::from_reader(reader).expect("Failed to deserialize ecs.yaml");
         ecs.ensure_component_consistency()?;
         ecs.ensure_distinct_archetype_components()?;
         ecs.ensure_system_consistency()?;
+        ecs.finish();
 
         let mut env = Environment::new();
         env.add_filter("snake_case", snake_case_filter);

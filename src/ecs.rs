@@ -11,6 +11,14 @@ pub struct Ecs {
     pub systems: Vec<System>,
 }
 
+impl Ecs {
+    pub(crate) fn finish(&mut self) {
+        for archetype in &mut self.archetypes {
+            archetype.finish(&self.components);
+        }
+    }
+}
+
 #[derive(thiserror::Error, Debug)]
 pub enum EcsError {
     #[error("Component '{0}' is defined more than once.")]

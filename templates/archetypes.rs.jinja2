@@ -64,14 +64,35 @@ pub struct {{ archetype.name.type }} {
 }
 
 impl {{ archetype.name.type }} {
+    /// The IDs of the components used by this archetype, in ascending order.
+    pub const COMPONENT_IDS: [ComponentId; {{ archetype.component_count }}] = [
+        {%- for id in archetype.component_ids %}
+        ComponentId::new({{- id -}}).expect("Invalid ID on ECS construction time"),
+        {%- endfor %}
+    ];
+
+    /// Returns the number of entities in this archetype.
     #[inline(always)]
     pub fn len(&self) -> usize {
         self.entities.len()
     }
 
+    /// Indicates whether this archetype has no entities.
     #[inline(always)]
     pub fn is_empty(&self) -> bool {
         self.entities.is_empty()
+    }
+
+    /// Returns the number of components used by this archetype.
+    #[inline(always)]
+    pub const fn num_components(&self) -> usize {
+        {{ archetype.component_count }}
+    }
+
+    /// Dynamically determines whether this archetype has a specific component.
+    pub const fn has_components<Id>(&self, id: ComponentId) -> bool {
+        let id = id.as_u64();
+        {% for id in archetype.component_ids %}id == {{ id }} || {% endfor %}false
     }
 }
 

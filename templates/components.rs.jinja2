@@ -3,6 +3,14 @@
 pub struct ComponentId(std::num::NonZeroU64);
 
 impl ComponentId {
+    pub const fn new(id: u64) -> Option<Self> {
+        if let Some(id) = std::num::NonZeroU64::new(id) {
+            Some(Self(id))
+        } else {
+            None
+        }
+    }
+
     /// Returns this ID as a [`NonZeroU64`](std::num::NonZeroU64) value.
     pub const fn as_nonzero_u64(&self) -> std::num::NonZeroU64 {
         self.0

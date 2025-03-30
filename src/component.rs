@@ -16,7 +16,7 @@ pub struct Component {
 
 pub type ComponentRef = ComponentName;
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 #[serde(transparent)]
 pub struct ComponentId(u64);
 
