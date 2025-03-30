@@ -80,6 +80,23 @@ impl {{ system.name.type }} {
     pub fn apply(&self, velocity: &VelocityComponent, position: &mut PositionComponent) {
         Apply{{ system.name.type }}::apply(self, velocity, position);
     }
+
+    {%- for archetype in system.affected_archetypes %}
+
+    /// Applies this system to the [`{{ archetype.type }}`].
+    pub fn apply_to_{{ archetype.field }}(&self, archetype: &mut {{ archetype.type }}) {
+        for i in 0..archetype.len() {
+            self.apply(
+                {%- for input in system.inputs %}
+                &archetype.{{ input.fields }}[i],
+                {%- endfor %}
+                {%- for output in system.outputs %}
+                &mut archetype.{{ output.fields }}[i],
+                {%- endfor %}
+            );
+        }
+    }
+    {%- endfor %}
 }
 
 #[automatically_derived]

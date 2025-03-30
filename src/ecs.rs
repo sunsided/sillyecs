@@ -16,6 +16,10 @@ impl Ecs {
         for archetype in &mut self.archetypes {
             archetype.finish(&self.components);
         }
+
+        for system in &mut self.systems {
+            system.finish(&self.archetypes);
+        }
     }
 }
 

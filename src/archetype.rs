@@ -24,8 +24,10 @@ pub struct Archetype {
     pub component_count: usize,
 }
 
+pub type ArchetypeRef = ArchetypeName;
+
 impl Archetype {
-    pub(crate) fn finish(&mut self, components: &Vec<Component>) {
+    pub(crate) fn finish(&mut self, components: &[Component]) {
         let mut ids = Vec::new();
         for component in &self.components {
             let id = components
@@ -41,7 +43,7 @@ impl Archetype {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 #[serde(transparent)]
 pub struct ArchetypeId(u64);
 

@@ -2,16 +2,54 @@ components:
   - name: Position
   - name: Velocity
   - name: Health
+  - name: Collider
 
 archetypes:
   - name: Particle
+    description: A particle system particle.
     components:
       - Position
       - Velocity
+
   - name: Player
     components:
       - Position
       - Velocity
       - Health
 
-systems: [ ]
+  - name: ForegroundObject
+    components:
+      - Position
+      - Collider
+    promotions:
+      # TODO: Ensure that we cannot promote to ourself
+      - target: BackgroundObject  # generate PromoteForegroundObjectToBackgroundObject
+        # TODO: Ensure that the combination of components is correct for the target
+        retain:
+          - Position
+        add: [ ]
+
+  - name: BackgroundObject
+    components:
+      - Position
+    promotions:
+      # TODO: Ensure that we cannot promote to ourself
+      - target: ForegroundObject  # generate PromoteBackgroundObjectToForegroundObject
+        # TODO: Ensure that the combination of components is correct for the target
+        retain:
+          - Position
+        add:
+          - Collider
+    # TODO promote from -> to, remove x,y,z, add a,b
+    # TODO double check the existence of x,y,z on the source
+    # TODO double check the existence of a,b on the destination
+
+systems:
+  - name: Physics
+    inputs:
+      - Velocity
+    outputs:
+      - Position
+
+# TODO: List systems and their inputs and mutation targets. Generate traits that implement the signature.
+# TODO: Generate a function that loops all archetypes matching the signature of a given system
