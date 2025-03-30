@@ -94,6 +94,28 @@ impl {{ archetype.name.type }} {
         let id = id.as_u64();
         {% for id in archetype.component_ids %}id == {{ id }} || {% endfor %}false
     }
+
+    {%- for promotion in archetype.promotion_infos %}
+
+    /// Promotes this [`{{ archetype.name.type }}`] to [`{{ promotion.target.type }}`].
+    pub fn promote_to_{{ promotion.target.fields }}(
+        self,
+        {%- for field in promotion.components_to_add %}
+        {{ field.fields }}: Vec<{{ field.type }}>,
+        {%- endfor %}
+    ) -> {{ promotion.target.type }} {
+        // TODO: Move dropped arrays to a pool? Create a trait with "recycle_<component vector>".
+        {{ promotion.target.type }} {
+            entities: self.entities,
+            {%- for field in promotion.components_to_add %}
+            {{ field.fields }},
+            {%- endfor %}
+            {%- for field in promotion.components_to_pass %}
+            {{ field.fields }}: self.{{ field.fields }},
+            {%- endfor %}
+        }
+    }
+    {%- endfor %}
 }
 
 {% for component_name in archetype.components %}

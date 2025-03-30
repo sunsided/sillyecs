@@ -23,23 +23,14 @@ archetypes:
       - Collider
     promotions:
       # TODO: Ensure that we cannot promote to ourself
-      - target: BackgroundObject  # generate PromoteForegroundObjectToBackgroundObject
-        # TODO: Ensure that the combination of components is correct for the target
-        retain:
-          - Position
-        add: [ ]
+      - BackgroundObject
 
   - name: BackgroundObject
     components:
       - Position
     promotions:
       # TODO: Ensure that we cannot promote to ourself
-      - target: ForegroundObject  # generate PromoteBackgroundObjectToForegroundObject
-        # TODO: Ensure that the combination of components is correct for the target
-        retain:
-          - Position
-        add:
-          - Collider
+      - ForegroundObject
     # TODO promote from -> to, remove x,y,z, add a,b
     # TODO double check the existence of x,y,z on the source
     # TODO double check the existence of a,b on the destination

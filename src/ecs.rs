@@ -13,8 +13,9 @@ pub struct Ecs {
 
 impl Ecs {
     pub(crate) fn finish(&mut self) {
+        let cloned_archetypes = self.archetypes.clone();
         for archetype in &mut self.archetypes {
-            archetype.finish(&self.components);
+            archetype.finish(&self.components, &cloned_archetypes);
         }
 
         for system in &mut self.systems {
@@ -41,6 +42,8 @@ pub enum EcsError {
     TemplateError(#[from] minijinja::Error),
     #[error("System {0} requires components not covered by any archetype.")]
     NoMatchingArchetypeForSystem(String),
+    #[error("Promotion of archetype '{0}' to itself is not allowed.")]
+    PromotionToSelf(String),
 }
 
 impl Ecs {
@@ -62,6 +65,10 @@ impl Ecs {
             }
             archetype_component_sets
                 .insert(component_set.clone(), archetype.name.type_name.clone());
+
+            if archetype.promotions.contains(&archetype.name) {
+                return Err(EcsError::PromotionToSelf(archetype.name.type_name.clone()));
+            }
         }
         Ok(())
     }

@@ -6,7 +6,7 @@ use std::sync::atomic::AtomicU64;
 
 static ARCHETYPE_IDS: AtomicU64 = AtomicU64::new(1);
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Archetype {
     #[serde(skip_deserializing, default)]
     pub id: ArchetypeId,
@@ -14,6 +14,12 @@ pub struct Archetype {
     #[serde(default)]
     pub description: Option<String>,
     pub components: Vec<ComponentRef>,
+    #[serde(default, skip_serializing)]
+    pub promotions: Vec<ArchetypeRef>,
+
+    /// The promotion information. Available after a call to [`Archetype::finish`](Archetype::finish).
+    #[serde(skip_deserializing, default)]
+    pub promotion_infos: Vec<PromotionInfo>,
 
     /// The component IDs in ascending order. Available after a call to [`Archetype::finish`](Archetype::finish).
     #[serde(skip_deserializing, default)]
@@ -24,10 +30,17 @@ pub struct Archetype {
     pub component_count: usize,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct PromotionInfo {
+    pub target: ArchetypeName,
+    pub components_to_pass: Vec<ComponentRef>,
+    pub components_to_add: Vec<ComponentRef>,
+}
+
 pub type ArchetypeRef = ArchetypeName;
 
 impl Archetype {
-    pub(crate) fn finish(&mut self, components: &[Component]) {
+    pub(crate) fn finish(&mut self, components: &[Component], archetypes: &[Archetype]) {
         let mut ids = Vec::new();
         for component in &self.components {
             let id = components
@@ -40,6 +53,33 @@ impl Archetype {
         ids.sort_unstable();
         self.component_count = ids.len();
         self.component_ids = ids;
+
+        // Process promotions.
+        assert!(self.promotion_infos.is_empty());
+        for promotion in &self.promotions {
+            let target = archetypes
+                .iter()
+                .find(|a| a.name.eq(promotion))
+                .expect("Promotion target not found");
+            let mut components_to_pass = Vec::new();
+            for component in &self.components {
+                if target.components.contains(component) {
+                    components_to_pass.push(component.clone());
+                }
+            }
+
+            let mut components_to_add = Vec::new();
+            for component in &target.components {
+                if !self.components.contains(component) {
+                    components_to_add.push(component.clone());
+                }
+            }
+            self.promotion_infos.push(PromotionInfo {
+                target: target.name.clone(),
+                components_to_pass,
+                components_to_add,
+            });
+        }
     }
 }
 
