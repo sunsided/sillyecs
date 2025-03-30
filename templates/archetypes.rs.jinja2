@@ -30,6 +30,23 @@ impl From<ArchetypeId> for u64 {
 pub trait Archetype: 'static + Send + Sync {
     /// The ID of this archetype.
     const ID: ArchetypeId;
+
+    /// Returns the number of entities in this archetype.
+    fn len(&self) -> usize;
+
+    /// Indicates whether this archetype has no entities.
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+/// Trait for archetypes containing the specified `Component`.
+pub trait HasComponent<T: Component> {
+    /// Returns a slice of all component values.
+    fn get(&self) -> &[T];
+
+    /// Returns a mutable slice of all component values.
+    fn get_mut(&mut self) -> &mut [T];
 }
 
 {%- for archetype in ecs.archetypes %}
@@ -46,9 +63,44 @@ pub struct {{ archetype.name.type }} {
     {%- endfor %}
 }
 
+impl {{ archetype.name.type }} {
+    #[inline(always)]
+    pub fn len(&self) -> usize {
+        self.entities.len()
+    }
+
+    #[inline(always)]
+    pub fn is_empty(&self) -> bool {
+        self.entities.is_empty()
+    }
+}
+
+{% for component_name in archetype.components %}
+#[automatically_derived]
+impl HasComponent<{{ component_name.type }}> for {{ archetype.name.type }} {
+    /// Returns a slice of all [`{{ component_name.type }}`] component values.
+    fn get(&self) -> &[{{ component_name.type }}] {
+        &self.{{ component_name.fields }}
+    }
+
+    /// Returns a mutable slice of all [`{{ component_name.type }}`] component values.
+    fn get_mut(&mut self) -> &mut [{{ component_name.type }}] {
+        &mut self.{{ component_name.fields }}
+    }
+}
+{% endfor %}
+
 #[automatically_derived]
 impl Archetype for {{ archetype.name.type }} {
     const ID: ArchetypeId = ArchetypeId(std::num::NonZeroU64::new({{ archetype.id }}).expect("A zero archetype ID was provided"));
+
+    fn len(&self) -> usize {
+        self.entities.len()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.entities.is_empty()
+    }
 }
 
 impl PartialEq<ArchetypeId> for {{ archetype.name.type }} {
