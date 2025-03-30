@@ -27,6 +27,8 @@ pub enum EcsError {
     DuplicateArchetype(String, String),
     #[error("Failed to process template: {0}")]
     TemplateError(#[from] minijinja::Error),
+    #[error("System {0} requires components not covered by any archetype.")]
+    NoMatchingArchetypeForSystem(String),
 }
 
 impl Ecs {
@@ -119,6 +121,26 @@ impl Ecs {
             }
         }
 
+        Ok(())
+    }
+
+    pub(crate) fn ensure_system_consistency(&self) -> Result<(), EcsError> {
+        for system in &self.systems {
+            let required_components: HashSet<_> =
+                system.inputs.iter().chain(&system.outputs).collect();
+
+            if !self.archetypes.iter().any(|archetype| {
+                archetype
+                    .components
+                    .iter()
+                    .collect::<HashSet<_>>()
+                    .is_superset(&required_components)
+            }) {
+                return Err(EcsError::NoMatchingArchetypeForSystem(
+                    system.name.type_name.clone(),
+                ));
+            }
+        }
         Ok(())
     }
 }
