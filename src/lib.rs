@@ -4,12 +4,8 @@ mod component;
 mod ecs;
 mod system;
 
-use crate::code::Code;
-use crate::ecs::{Ecs, EcsError};
-use minijinja::{Environment, context};
+pub use crate::code::EcsCode;
 use serde::Serialize;
-use std::io;
-use std::io::BufReader;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 pub struct Name {
@@ -34,55 +30,6 @@ impl Name {
             field_name_plural,
         }
     }
-}
-
-pub fn build<R>(reader: BufReader<R>) -> Result<Code, EcsError>
-where
-    R: io::Read,
-{
-    let ecs: Ecs = serde_yaml::from_reader(reader).expect("Failed to deserialize ecs.yaml");
-    ecs.ensure_component_consistency()?;
-    ecs.ensure_distinct_archetype_components()?;
-
-    let mut env = Environment::new();
-    env.add_filter("snake_case", snake_case_filter);
-
-    env.add_template("world", include_str!("../templates/world.rs.jinja2"))?;
-    env.add_template(
-        "components",
-        include_str!("../templates/components.rs.jinja2"),
-    )?;
-    env.add_template(
-        "archetypes",
-        include_str!("../templates/archetypes.rs.jinja2"),
-    )?;
-    env.add_template("systems", include_str!("../templates/systems.rs.jinja2"))?;
-
-    let world_code = env.get_template("world")?.render(context! {
-        ecs => ecs,
-    })?;
-
-    let component_code = env.get_template("components")?.render(context! {
-        ecs => ecs,
-    })?;
-
-    let archetype_code = env.get_template("archetypes")?.render(context! {
-        ecs => ecs,
-    })?;
-
-    let system_code = env.get_template("systems")?.render(context! {
-        ecs => ecs,
-    })?;
-
-    println!("{}", component_code);
-    println!("{}", archetype_code);
-    Ok(Code {
-        components: component_code,
-        archetypes: archetype_code,
-        world: world_code,
-        systems: system_code,
-        ..Code::default()
-    })
 }
 
 fn pluralize_name(field_name: String) -> String {
