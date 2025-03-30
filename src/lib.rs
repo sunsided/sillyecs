@@ -1,54 +1,15 @@
+mod archetype;
+mod code;
+mod component;
+mod ecs;
+mod system;
+
+use crate::code::Code;
+use crate::ecs::{Ecs, EcsError};
 use minijinja::{Environment, context};
-use serde::{Deserialize, Deserializer, Serialize};
-use std::collections::HashMap;
+use serde::Serialize;
 use std::io;
 use std::io::BufReader;
-use std::ops::Deref;
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Ecs {
-    pub components: Vec<Component>,
-    pub archetypes: Vec<Archetype>,
-    pub systems: Vec<System>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Archetype {
-    pub name: ArchetypeName,
-    pub components: Vec<ComponentRef>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Component {
-    pub name: ComponentName,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct System {
-    pub name: SystemName,
-    pub inputs: Vec<ComponentName>,
-    pub outputs: Vec<ComponentName>,
-}
-
-pub type ComponentRef = ComponentName;
-
-#[derive(thiserror::Error, Debug)]
-pub enum EcsError {
-    #[error("Component '{0}' in archetype '{1}' is not defined in the ECS components.")]
-    MissingComponent(String, String),
-    #[error("Duplicate archetype '{0}' and '{1}'")]
-    DuplicateArchetype(String, String),
-    #[error("Failed to process template: {0}")]
-    TemplateError(#[from] minijinja::Error),
-}
-
-#[derive(Default)]
-pub struct Code {
-    pub components: String,
-    pub archetypes: String,
-    pub systems: String,
-    pub world: String,
-}
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 pub struct Name {
@@ -75,92 +36,39 @@ impl Name {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
-#[serde(transparent)]
-pub struct ArchetypeName(Name);
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
-#[serde(transparent)]
-pub struct ComponentName(Name);
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
-#[serde(transparent)]
-pub struct SystemName(Name);
-
-impl Deref for ArchetypeName {
-    type Target = Name;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl Deref for ComponentName {
-    type Target = Name;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl Deref for SystemName {
-    type Target = Name;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl<'de> Deserialize<'de> for ArchetypeName {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let type_name = String::deserialize(deserializer)?;
-        Ok(Self(Name::new(type_name, "Archetype")))
-    }
-}
-
-impl<'de> Deserialize<'de> for ComponentName {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let type_name = String::deserialize(deserializer)?;
-        Ok(Self(Name::new(type_name, "Component")))
-    }
-}
-
-impl<'de> Deserialize<'de> for SystemName {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let type_name = String::deserialize(deserializer)?;
-        Ok(Self(Name::new(type_name, "System")))
-    }
-}
-
 pub fn build<R>(reader: BufReader<R>) -> Result<Code, EcsError>
 where
     R: io::Read,
 {
     let ecs: Ecs = serde_yaml::from_reader(reader).expect("Failed to deserialize ecs.yaml");
-    ensure_component_consistency(&ecs)?;
-    ensure_distinct_archetype_components(&ecs)?;
+    ecs.ensure_component_consistency()?;
+    ecs.ensure_distinct_archetype_components()?;
 
     let mut env = Environment::new();
     env.add_filter("snake_case", snake_case_filter);
 
-    env.add_template("world", include_str!("world.rs.jinja2"))?;
+    env.add_template("world", include_str!("../templates/world.rs.jinja2"))?;
+    env.add_template(
+        "components",
+        include_str!("../templates/components.rs.jinja2"),
+    )?;
+    env.add_template(
+        "archetypes",
+        include_str!("../templates/archetypes.rs.jinja2"),
+    )?;
 
-    let world_template = env.get_template("world")?;
-    let world_code = world_template.render(context! {
+    let world_code = env.get_template("world")?.render(context! {
         ecs => ecs,
     })?;
 
-    let component_code = generate_component_code(&ecs);
-    let archetype_code = generate_archetype_code(&ecs);
+    let component_code = env.get_template("components")?.render(context! {
+        ecs => ecs,
+    })?;
+
+    let archetype_code = env.get_template("archetypes")?.render(context! {
+        ecs => ecs,
+    })?;
+
     let system_code = generate_system_code(&ecs);
 
     println!("{}", component_code);
@@ -172,27 +80,6 @@ where
         systems: system_code,
         ..Code::default()
     })
-}
-
-fn ensure_distinct_archetype_components(ecs: &Ecs) -> Result<(), EcsError> {
-    let mut archetype_component_sets: HashMap<String, String> = HashMap::new();
-    for archetype in &ecs.archetypes {
-        let mut component_set = archetype
-            .components
-            .iter()
-            .map(|c| c.type_name.clone())
-            .collect::<Vec<_>>();
-        component_set.sort_unstable();
-        let component_set = component_set.join("+").to_ascii_lowercase();
-        if let Some(duplicate) = archetype_component_sets.get(&component_set) {
-            return Err(EcsError::DuplicateArchetype(
-                archetype.name.type_name.clone(),
-                duplicate.clone(),
-            ));
-        }
-        archetype_component_sets.insert(component_set.clone(), archetype.name.type_name.clone());
-    }
-    Ok(())
 }
 
 fn generate_system_code(ecs: &Ecs) -> String {
@@ -291,78 +178,6 @@ fn generate_system_code(ecs: &Ecs) -> String {
     generated_code
 }
 
-fn generate_component_code(ecs: &Ecs) -> String {
-    let mut generated_code = String::new();
-
-    generated_code.push_str("/// The ID of a [`Component`].\n#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]\npub struct ComponentId(u64);\n\n");
-
-    generated_code.push_str(&format!(
-        "/// Marker trait for components.\npub trait Component: 'static + Send + Sync {{\n    const ID: ComponentId;\n}}\n\n",
-    ));
-
-    for (id, component) in ecs.components.iter().enumerate() {
-        generated_code.push_str(&format!(
-            "#[derive(Debug, Clone)]\npub struct {name}({raw_name}Data);\n",
-            name = component.name.type_name,
-            raw_name = component.name.type_name_raw
-        ));
-
-        generated_code.push_str(&format!(
-            "\nimpl {name} {{\n",
-            name = component.name.type_name
-        ));
-
-        generated_code.push_str(&format!(
-            "    pub fn into_inner(self) -> {raw_name}Data {{\n        self.0\n    }}\n",
-            raw_name = component.name.type_name_raw
-        ));
-        generated_code.push_str("}\n");
-
-        generated_code.push_str(&format!(
-            "\n#[automatically_derived]\nimpl Component for {name} {{\n    const ID: ComponentId = ComponentId({id});\n}}\n",
-            name = component.name.type_name
-        ));
-
-        generated_code.push_str(&format!(
-            "\n#[automatically_derived]\nimpl From<{raw_name}Data> for {name} {{\n    fn from(data: {raw_name}Data) -> Self {{\n        Self(data)\n    }}\n}}\n",
-            name = component.name.type_name,
-            raw_name = component.name.type_name_raw
-        ));
-
-        generated_code.push_str(&format!(
-            "\n#[automatically_derived]\nimpl std::ops::Deref for {name} {{\n    type Target = {raw_name}Data;\n\n    fn deref(&self) -> &Self::Target {{\n        &self.0\n    }}\n}}\n\n",
-            name = component.name.type_name,
-            raw_name = component.name.type_name_raw
-        ));
-
-        generated_code.push_str(&format!(
-            "#[automatically_derived]\nimpl std::ops::DerefMut for {name} {{\n    fn deref_mut(&mut self) -> &mut Self::Target {{\n        &mut self.0\n    }}\n}}\n\n",
-            name = component.name.type_name
-        ));
-    }
-    generated_code
-}
-
-fn generate_archetype_code(ecs: &Ecs) -> String {
-    let mut generated_code = String::new();
-    for archetype in &ecs.archetypes {
-        generated_code.push_str(
-            "/// An archetype grouping entities with identical components.\n#[derive(Debug, Clone)]\n",
-        );
-        generated_code.push_str(&format!("pub struct {} {{\n", archetype.name.type_name));
-        generated_code.push_str("    pub entities: Vec<EntityId>,\n");
-        for component in &archetype.components {
-            generated_code.push_str(&format!(
-                "    pub {field_names}: Vec<{type_name}>,\n",
-                field_names = component.field_name_plural,
-                type_name = component.type_name
-            ));
-        }
-        generated_code.push_str("}\n\n");
-    }
-    generated_code
-}
-
 fn pluralize_name(field_name: String) -> String {
     let field_name = if let Some(prefix) = field_name.strip_suffix('y') {
         format!("{prefix}ies")
@@ -391,27 +206,6 @@ fn pascal_to_snake(type_name: &str) -> String {
         .skip_while(|&c| c == '_')
         .collect::<String>();
     field_name
-}
-
-/// Ensure that all components used by archetypes are defined in the components vector of the ECS.
-fn ensure_component_consistency(ecs: &Ecs) -> Result<(), EcsError> {
-    let defined_components: std::collections::HashSet<_> = ecs
-        .components
-        .iter()
-        .map(|component| &component.name)
-        .collect();
-
-    for archetype in &ecs.archetypes {
-        for component_ref in &archetype.components {
-            if !defined_components.contains(component_ref) {
-                return Err(EcsError::MissingComponent(
-                    component_ref.type_name.clone(),
-                    archetype.name.type_name.clone(),
-                ));
-            }
-        }
-    }
-    Ok(())
 }
 
 #[cfg(test)]

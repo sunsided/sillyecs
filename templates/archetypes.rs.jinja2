@@ -1,0 +1,26 @@
+/// The ID of an [`Archetype`].
+#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
+pub struct ArchetypeId(u64);
+
+/// Marker trait for archetypes.
+pub trait Archetype: 'static + Send + Sync {
+    const ID: ArchetypeId;
+}
+
+{%- for archetype in ecs.archetypes %}
+
+/// An archetype grouping entities with identical components.
+#[derive(Debug, Clone)]
+pub struct {{ archetype.name.type }} {
+    pub entities: Vec<EntityId>,
+    {%- for component_name in archetype.components %}
+    pub {{ component_name.fields }}: Vec<{{ component_name.type }}>,
+    {%- endfor %}
+}
+
+#[automatically_derived]
+impl Archetype for {{ archetype.name.type }} {
+    const ID: ArchetypeId = ArchetypeId({{ archetype.id }});
+}
+
+{%- endfor %}

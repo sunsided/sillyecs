@@ -1,0 +1,49 @@
+/// The ID of a [`Component`].
+#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
+pub struct ComponentId(u64);
+
+/// Marker trait for components.
+pub trait Component: 'static + Send + Sync {
+    const ID: ComponentId;
+}
+
+{%- for component in ecs.components %}
+
+#[derive(Debug, Clone)]
+pub struct {{ component.name.type }}({{ component.name.raw }}Data);
+
+impl {{ component.name.type }} {
+    pub fn into_inner(self) -> {{ component.name.raw }}Data {
+        self.0
+    }
+}
+
+#[automatically_derived]
+impl Component for {{ component.name.type }} {
+    const ID: ComponentId = ComponentId({{ component.id }});
+}
+
+#[automatically_derived]
+impl From<{{ component.name.raw }}Data> for {{ component.name.type }} {
+    fn from(data: {{ component.name.raw }}Data) -> Self {
+        Self(data)
+    }
+}
+
+#[automatically_derived]
+impl std::ops::Deref for {{ component.name.type }} {
+    type Target = {{ component.name.raw }}Data;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+#[automatically_derived]
+impl std::ops::DerefMut for {{ component.name.type }} {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+{%- endfor %}
