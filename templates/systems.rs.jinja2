@@ -1,14 +1,19 @@
 /// The ID of a [`System`].
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
-pub struct SystemId(u64);
+pub struct SystemId(std::num::NonZeroU64);
 
 /// Marker trait for systems.
 pub trait System: 'static + Send + Sync {
+    /// The ID of this system.
     const ID: SystemId;
 }
 
 {%- for system in ecs.systems %}
-
+{% if system.description %}
+/// {{ system.description }}
+{%- else %}
+/// A system operating on multiple [`Component`]s.
+{%- endif %}
 #[derive(Debug, Clone)]
 pub struct {{ system.name.type }}({{ system.name.type }}Data);
 
@@ -27,7 +32,13 @@ impl {{ system.name.type }} {
 
 #[automatically_derived]
 impl System for {{ system.name.type }} {
-    const ID: SystemId = SystemId({{ system.id }});
+    const ID: SystemId = SystemId(std::num::NonZeroU64::new({{ system.id }}).expect("A zero system ID was provided"));
+}
+
+impl PartialEq<SystemId> for {{ system.name.type }} {
+    fn eq(&self, other: &SystemId) -> bool {
+        Self::ID.eq(other)
+    }
 }
 
 #[automatically_derived]

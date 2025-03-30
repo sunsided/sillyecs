@@ -4,13 +4,15 @@ use serde::{Deserialize, Deserializer, Serialize};
 use std::ops::Deref;
 use std::sync::atomic::AtomicU64;
 
-static ARCHETYPE_IDS: AtomicU64 = AtomicU64::new(0);
+static ARCHETYPE_IDS: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Archetype {
     #[serde(skip_deserializing, default)]
     pub id: ArchetypeId,
     pub name: ArchetypeName,
+    #[serde(default)]
+    pub description: Option<String>,
     pub components: Vec<ComponentRef>,
 }
 

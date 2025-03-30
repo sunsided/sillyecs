@@ -1,15 +1,19 @@
 /// The ID of an [`Archetype`].
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
-pub struct ArchetypeId(u64);
+pub struct ArchetypeId(std::num::NonZeroU64);
 
 /// Marker trait for archetypes.
 pub trait Archetype: 'static + Send + Sync {
+    /// The ID of this archetype.
     const ID: ArchetypeId;
 }
 
 {%- for archetype in ecs.archetypes %}
-
+{% if archetype.description %}
+/// {{ archetype.description }}
+{%- else %}
 /// An archetype grouping entities with identical components.
+{%- endif %}
 #[derive(Debug, Clone)]
 pub struct {{ archetype.name.type }} {
     pub entities: Vec<EntityId>,
@@ -20,7 +24,13 @@ pub struct {{ archetype.name.type }} {
 
 #[automatically_derived]
 impl Archetype for {{ archetype.name.type }} {
-    const ID: ArchetypeId = ArchetypeId({{ archetype.id }});
+    const ID: ArchetypeId = ArchetypeId(std::num::NonZeroU64::new({{ archetype.id }}).expect("A zero archetype ID was provided"));
+}
+
+impl PartialEq<ArchetypeId> for {{ archetype.name.type }} {
+    fn eq(&self, other: &ArchetypeId) -> bool {
+        Self::ID.eq(other)
+    }
 }
 
 {%- endfor %}

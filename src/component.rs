@@ -3,13 +3,15 @@ use serde::{Deserialize, Deserializer, Serialize};
 use std::ops::Deref;
 use std::sync::atomic::AtomicU64;
 
-static COMPONENT_IDS: AtomicU64 = AtomicU64::new(0);
+static COMPONENT_IDS: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Component {
     #[serde(skip_deserializing, default)]
     pub id: ComponentId,
     pub name: ComponentName,
+    #[serde(default)]
+    pub description: Option<String>,
 }
 
 pub type ComponentRef = ComponentName;

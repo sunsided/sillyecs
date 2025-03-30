@@ -1,26 +1,45 @@
 /// The ID of a [`Component`].
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
-pub struct ComponentId(u64);
+pub struct ComponentId(std::num::NonZeroU64);
 
 /// Marker trait for components.
 pub trait Component: 'static + Send + Sync {
+    /// The ID of this component.
     const ID: ComponentId;
 }
 
 {%- for component in ecs.components %}
-
+{% if component.description %}
+/// {{ component.description }}
+{%- else %}
+/// A component.
+{%- endif %}
+///
+/// See also [`{{ component.name.raw }}Data`] for the actual data.
 #[derive(Debug, Clone)]
 pub struct {{ component.name.type }}({{ component.name.raw }}Data);
 
 impl {{ component.name.type }} {
-    pub fn into_inner(self) -> {{ component.name.raw }}Data {
+    /// Creates a new [`{{ component.name.type }}`] instance from [`{{ component.name.raw }}Data`].
+    pub const fn new(data: {{ component.name.raw }}Data) -> Self {
+        Self(data)
+    }
+
+    /// Consumes self and returns the inner [`{{ component.name.raw }}Data`].
+    pub const fn into_inner(self) -> {{ component.name.raw }}Data {
         self.0
     }
 }
 
 #[automatically_derived]
 impl Component for {{ component.name.type }} {
-    const ID: ComponentId = ComponentId({{ component.id }});
+    const ID: ComponentId = ComponentId(std::num::NonZeroU64::new({{ component.id }}).expect("A zero component ID was provided"));
+}
+
+impl PartialEq<ComponentId> for {{ component.name.type }} {
+    fn eq(&self, other: &ComponentId) -> bool {
+        Self::ID.eq(other)
+    }
 }
 
 #[automatically_derived]
@@ -42,6 +61,34 @@ impl std::ops::Deref for {{ component.name.type }} {
 #[automatically_derived]
 impl std::ops::DerefMut for {{ component.name.type }} {
     fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+#[automatically_derived]
+impl std::convert::AsRef<{{ component.name.raw }}Data> for {{ component.name.type }} {
+    fn as_ref(&self) -> &{{ component.name.raw }}Data {
+        &self.0
+    }
+}
+
+#[automatically_derived]
+impl std::convert::AsMut<{{ component.name.raw }}Data> for {{ component.name.type }} {
+    fn as_mut(&mut self) -> &mut {{ component.name.raw }}Data {
+        &mut self.0
+    }
+}
+
+#[automatically_derived]
+impl std::borrow::Borrow<{{ component.name.raw }}Data> for {{ component.name.type }} {
+    fn borrow(&self) -> &{{ component.name.raw }}Data {
+        &self.0
+    }
+}
+
+#[automatically_derived]
+impl std::borrow::BorrowMut<{{ component.name.raw }}Data> for {{ component.name.type }} {
+    fn borrow_mut(&mut self) -> &mut {{ component.name.raw }}Data {
         &mut self.0
     }
 }

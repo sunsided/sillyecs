@@ -4,13 +4,15 @@ use serde::{Deserialize, Deserializer, Serialize};
 use std::ops::Deref;
 use std::sync::atomic::AtomicU64;
 
-static SYSTEM_IDS: AtomicU64 = AtomicU64::new(0);
+static SYSTEM_IDS: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct System {
     #[serde(skip_deserializing, default)]
     pub id: SystemId,
     pub name: SystemName,
+    #[serde(default)]
+    pub description: Option<String>,
     pub inputs: Vec<ComponentName>,
     pub outputs: Vec<ComponentName>,
 }
