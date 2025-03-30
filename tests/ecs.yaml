@@ -48,6 +48,7 @@ systems:
   - name: Physics
     inputs:
       - Velocity
+      - Health  # TODO: Remove ...
     outputs:
       - Position
 

@@ -28,6 +28,14 @@ pub struct System {
     /// The number of affected archetypes. Available after a call to [`Archetype::finish`](Archetype::finish).
     #[serde(skip_deserializing, default)]
     pub affected_archetype_count: usize,
+
+    /// The code to iterate component values. Available after a call to [`Archetype::finish`](Archetype::finish).
+    #[serde(skip_deserializing, default)]
+    pub component_iter_code: String,
+
+    /// The code to untuple component values. Available after a call to [`Archetype::finish`](Archetype::finish).
+    #[serde(skip_deserializing, default)]
+    pub component_untuple_code: String,
 }
 
 impl System {
@@ -56,6 +64,53 @@ impl System {
         self.affected_archetype_count = ids_and_names.len();
         self.affected_archetype_ids = ids_and_names.iter().map(|entry| entry.0).collect();
         self.affected_archetypes = ids_and_names.into_iter().map(|entry| entry.1).collect();
+
+        // Create zipped iteration code.
+        let num_components = self.inputs.len() + self.outputs.len();
+        debug_assert_ne!(num_components, 0);
+
+        if num_components == 1 {
+            self.component_iter_code = String::new();
+            if let Some(output) = self.outputs.first() {
+                self.component_untuple_code = format!("{name}", name = output.field_name);
+            } else if let Some(input) = self.inputs.first() {
+                self.component_untuple_code = format!("{name}", name = input.field_name);
+            } else {
+                unreachable!();
+            }
+        } else {
+            let mut iter_stack = String::new();
+            let mut untuple_stack = String::new();
+
+            for output in self.outputs.iter().rev() {
+                if iter_stack.is_empty() {
+                    iter_stack = format!("{name}.iter_mut()", name = output.field_name_plural);
+                    untuple_stack = format!("{name}", name = output.field_name);
+                } else {
+                    iter_stack = format!(
+                        "{name}.iter_mut().zip({iter_stack})",
+                        name = output.field_name_plural
+                    );
+                    untuple_stack = format!("({name}, {untuple_stack})", name = output.field_name);
+                }
+            }
+
+            for input in self.inputs.iter().rev() {
+                if iter_stack.is_empty() {
+                    iter_stack = format!("{name}.iter()", name = input.field_name_plural);
+                    untuple_stack = format!("{name}", name = input.field_name);
+                } else {
+                    iter_stack = format!(
+                        "{name}.iter().zip({iter_stack})",
+                        name = input.field_name_plural
+                    );
+                    untuple_stack = format!("({name}, {untuple_stack})", name = input.field_name);
+                }
+            }
+
+            self.component_iter_code = iter_stack;
+            self.component_untuple_code = untuple_stack;
+        }
     }
 }
 

@@ -38,6 +38,7 @@ impl EcsCode {
 
         let mut env = Environment::new();
         env.add_filter("snake_case", snake_case_filter);
+        env.add_filter("length", length);
 
         env.add_template("world", include_str!("../templates/world.rs.jinja2"))?;
         env.add_template(
@@ -154,4 +155,37 @@ impl EcsCode {
             .map_err(|e| WriteCodeError::FailedToWriteFile(e.to_string(), e))?;
         Ok(())
     }
+}
+
+use minijinja::Error;
+use minijinja::value::{Value, ValueKind};
+
+fn length(value: Value) -> Result<Value, Error> {
+    match value.kind() {
+        ValueKind::Undefined => todo!("undefined"),
+        ValueKind::None => todo!("none"),
+        ValueKind::Bool => todo!("bool"),
+        ValueKind::Number => todo!("number"),
+        ValueKind::String => todo!("string"),
+        ValueKind::Bytes => todo!("bytes"),
+        ValueKind::Seq => Ok(Value::from(value.len())),
+        ValueKind::Map => todo!("map"),
+        ValueKind::Iterable => todo!("iterable"),
+        ValueKind::Plain => todo!("plain"),
+        ValueKind::Invalid => todo!("invalid"),
+        _ => todo!("unknown"),
+    }
+
+    /*
+    match value.kind() {
+        // ValueKind::Array => Ok(Value::from(value.as_array().unwrap().len())),
+        ValueKind::Iterable => Ok(Value::from(value.as_map().unwrap().len()))
+        ValueKind::Map => Ok(Value::from(value.as_map().unwrap().len())),
+        ValueKind::String => Ok(Value::from(value.as_str().unwrap().chars().count())),
+        _ => Err(Error::new(format!(
+            "Expected an array, map, or string but got {:?}",
+            value.kind()
+        ))),
+    }
+     */
 }
