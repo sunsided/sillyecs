@@ -14,7 +14,9 @@ pub struct Ecs {
 #[derive(thiserror::Error, Debug)]
 pub enum EcsError {
     #[error("Component '{0}' in archetype '{1}' is not defined in the ECS components.")]
-    MissingComponent(String, String),
+    MissingComponentInArchetype(String, String),
+    #[error("Component '{0}' in system '{1}' is not defined in the ECS components.")]
+    MissingComponentInSystem(String, String),
     #[error("Duplicate archetype '{0}' and '{1}'")]
     DuplicateArchetype(String, String),
     #[error("Failed to process template: {0}")]
@@ -55,13 +57,36 @@ impl Ecs {
         for archetype in &self.archetypes {
             for component_ref in &archetype.components {
                 if !defined_components.contains(component_ref) {
-                    return Err(EcsError::MissingComponent(
+                    return Err(EcsError::MissingComponentInArchetype(
                         component_ref.type_name.clone(),
                         archetype.name.type_name.clone(),
                     ));
                 }
             }
         }
+
+        for system in &self.systems {
+            // Validate system inputs
+            for component_ref in &system.inputs {
+                if !defined_components.contains(component_ref) {
+                    return Err(EcsError::MissingComponentInSystem(
+                        component_ref.type_name.clone(),
+                        system.name.type_name.clone(),
+                    ));
+                }
+            }
+
+            // Validate system outputs
+            for component_ref in &system.outputs {
+                if !defined_components.contains(component_ref) {
+                    return Err(EcsError::MissingComponentInSystem(
+                        component_ref.type_name.clone(),
+                        system.name.type_name.clone(),
+                    ));
+                }
+            }
+        }
+
         Ok(())
     }
 }
