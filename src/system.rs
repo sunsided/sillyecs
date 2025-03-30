@@ -2,12 +2,27 @@ use crate::Name;
 use crate::component::ComponentName;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::ops::Deref;
+use std::sync::atomic::AtomicU64;
+
+static SYSTEM_IDS: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct System {
+    #[serde(skip_deserializing, default)]
+    pub id: SystemId,
     pub name: SystemName,
     pub inputs: Vec<ComponentName>,
     pub outputs: Vec<ComponentName>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
+#[serde(transparent)]
+pub struct SystemId(u64);
+
+impl Default for SystemId {
+    fn default() -> Self {
+        Self(SYSTEM_IDS.fetch_add(1, std::sync::atomic::Ordering::SeqCst))
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
