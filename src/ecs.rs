@@ -3,12 +3,15 @@ use crate::component::Component;
 use crate::system::{System, SystemPhase};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
+use crate::system_scheduler::schedule_systems;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Ecs {
     pub components: Vec<Component>,
     pub archetypes: Vec<Archetype>,
     pub systems: Vec<System>,
+    #[serde(default, skip_serializing)]
+    pub scheduled_systems: Vec<Vec<System>>,
     pub phases: Vec<SystemPhase>,
 }
 
@@ -193,6 +196,21 @@ impl Ecs {
                 ));
             }
         }
+        Ok(())
+    }
+
+    pub(crate) fn scheduled_systems(&mut self) -> Result<(), EcsError> {
+        let groups = schedule_systems(&self.systems);
+        self.scheduled_systems = groups.into_iter().map(|group| {
+            group
+                .iter()
+                .map(|&system| self.systems.iter()
+                    .find(|s| s.id == system)
+                    .expect("Failed to find system"))
+                .cloned()
+                .collect()
+        })
+            .collect();
         Ok(())
     }
 }

@@ -79,8 +79,10 @@ impl System {
         if num_components == 1 {
             self.component_iter_code = String::new();
             if let Some(output) = self.outputs.first() {
+                self.component_iter_code = format!("{name}", name = output.field_name_plural);
                 self.component_untuple_code = format!("{name}", name = output.field_name);
             } else if let Some(input) = self.inputs.first() {
+                self.component_iter_code = format!("{name}", name = input.field_name_plural);
                 self.component_untuple_code = format!("{name}", name = input.field_name);
             } else {
                 unreachable!();

@@ -5,3 +5,13 @@ pub struct World {
     pub {{ archetype.name.field | snake_case }}: {{ archetype.name.type }},
     {%- endfor %}
 }
+
+impl World {
+    pub fn apply_systems(&mut self) {
+        {%- for group in ecs.scheduled_systems %}
+            // TODO: group
+        {%- endfor %}
+
+        todo!()
+    }
+}
