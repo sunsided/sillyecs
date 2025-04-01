@@ -41,6 +41,39 @@ pub trait CreateSystems {
     {%- endfor %}
 }
 
+/// Trait for constructing system instances.
+pub trait SystemPhaseEvents {
+    {%- for phase in ecs.phases %}
+
+    /// Marks the beginning of the `{{ phase.name.raw }}` phase.
+    fn on_begin_{{ phase.name.field }}_phase(&mut self) {
+        // empty placeholder implementation
+    }
+
+    /// Marks the end of the `{{ phase.name.raw }}` phase.
+    fn on_end_{{ phase.name.field }}_phase(&mut self) {
+        // empty placeholder implementation
+    }
+    {%- endfor %}
+}
+
+impl SystemPhaseEvents for () {
+   {%- for phase in ecs.phases %}
+
+    /// Marks the beginning of the `{{ phase.name.raw }}` phase.
+    #[inline(always)]
+    fn on_begin_{{ phase.name.field }}_phase(&mut self) {
+        // empty placeholder implementation
+    }
+
+    /// Marks the end of the `{{ phase.name.raw }}` phase.
+    #[inline(always)]
+    fn on_end_{{ phase.name.field }}_phase(&mut self) {
+        // empty placeholder implementation
+    }
+    {%- endfor %}
+}
+
 {%- for system in ecs.systems %}
 {% if system.description %}
 /// {{ system.description }}

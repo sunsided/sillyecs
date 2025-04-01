@@ -1,6 +1,6 @@
 /// A world holding all archetypes.
 #[derive(Debug, Clone)]
-pub struct World {
+pub struct World<E = ()> {
     {%- for archetype in ecs.archetypes %}
     pub {{ archetype.name.field | snake_case }}: {{ archetype.name.type }},
     {%- endfor %}
@@ -8,11 +8,18 @@ pub struct World {
     {%- for system in ecs.systems %}
     pub {{ system.name.field }}_system: {{ system.name.type }},
     {%- endfor %}
+
+    /// The system phase events
+    events: Option<E>
 }
 
-impl World {
+impl<E> World<E> {
     /// Creates a new [`World`].
-    pub fn new<S: CreateSystems>(create_systems: &S) -> Self {
+    pub fn new<S>(create_systems: &S, phase_events: Option<E>) -> Self
+    where
+        S: CreateSystems,
+        E: SystemPhaseEvents
+    {
         {%- for system in ecs.systems %}
         let {{ system.name.field }}_system = create_systems.create_{{ system.name.field }}();
         {%- endfor %}
@@ -23,18 +30,25 @@ impl World {
             {%- for system in ecs.systems %}
             {{ system.name.field }}_system,
             {%- endfor %}
+            events: phase_events
         }
     }
 
     /// Apply all system phases.
-    pub fn apply_system_phases(&mut self) {
+    pub fn apply_system_phases(&mut self)
+    where
+        E: SystemPhaseEvents
+    {
         {%- for phase in ecs.phases %}
         self.apply_system_phase_{{ phase.name.field }}();
         {%- endfor %}
     }
 
     /// Apply all system phases with thread parallelism.
-    pub fn par_apply_system_phases(&mut self) {
+    pub fn par_apply_system_phases(&mut self)
+    where
+        E: SystemPhaseEvents
+    {
         {%- for phase in ecs.phases %}
         self.par_apply_system_phase_{{ phase.name.field }}();
         {%- endfor %}
@@ -42,8 +56,14 @@ impl World {
     {%- for phase in ecs.phases %}
 
     /// Execute system phase `{{ phase.name.raw }}`
-    pub fn apply_system_phase_{{ phase.name.field }}(&mut self) {
-        // TODO: Emit hook for begin of system phase
+    pub fn apply_system_phase_{{ phase.name.field }}(&mut self)
+    where
+        E: SystemPhaseEvents
+    {
+        if let Some(events) = &mut self.events {
+            events.on_begin_{{ phase.name.field }}_phase();
+        }
+
         {%- if ecs.scheduled_systems[phase.name] | length == 0 %}
         // no systems in this phase
         {%- else %}
@@ -64,20 +84,27 @@ impl World {
         {%- endfor %}
         {%- endfor %}
         {%- endif %}
-        // TODO: Emit hook for end of system phase
+
+        if let Some(events) = &mut self.events {
+            events.on_end_{{ phase.name.field }}_phase();
+        }
     }
 
-    pub fn par_apply_system_phase_{{ phase.name.field }}(&mut self) {
-        use rayon::scope;
+    pub fn par_apply_system_phase_{{ phase.name.field }}(&mut self)
+    where
+        E: SystemPhaseEvents
+    {
+        if let Some(events) = &mut self.events {
+            events.on_begin_{{ phase.name.field }}_phase();
+        }
 
-        // TODO: Emit hook for begin of system phase
         {%- if ecs.scheduled_systems[phase.name] | length == 0 %}
         // no systems in this phase
         {%- else %}
         {%- for group in ecs.scheduled_systems[phase.name] %}
         {%- set group_number = loop.index %}
         // System group {{ group_number }}
-        scope(|s| {
+        rayon::scope(|s| {
             // TODO: Instead of parallelizing systems (and then have them access archetypes), parallelize archetypes and apply all systems. This should improve data parallelism because it keeps caches hot.
 
             {%- for system in group %}
@@ -98,7 +125,10 @@ impl World {
         });
         {%- endfor %}
         {%- endif %}
-        // TODO: Emit hook for end of system phase
+
+        if let Some(events) = &mut self.events {
+            events.on_end_{{ phase.name.field }}_phase();
+        }
     }
     {%- endfor %}
 }
