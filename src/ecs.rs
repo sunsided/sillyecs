@@ -106,8 +106,9 @@ impl Ecs {
             }
         }
 
-        let mut system_components = HashSet::new();
         for system in &self.systems {
+            let mut system_components = HashSet::new();
+
             // Validate system inputs
             for component_ref in &system.inputs {
                 if !system_components.insert(component_ref) {
@@ -146,7 +147,24 @@ impl Ecs {
         Ok(())
     }
 
-    pub(crate) fn ensure_system_consistency(&self) -> Result<(), EcsError> {
+    pub(crate) fn ensure_system_consistency(&mut self) -> Result<(), EcsError> {
+        // Assign explicit ordering to the systems.
+        let mut order = 1;
+        let mut orders: HashSet<_> = self.systems.iter().map(|s| s.order).filter(|&o| o != 0).collect();
+        for system in &mut self.systems {
+            if system.order != 0 {
+                continue;
+            }
+
+            while orders.contains(&order) {
+                order += 1;
+            }
+
+            system.order = order;
+            order += 1;
+            orders.insert(order);
+        }
+
         for system in &self.systems {
             let required_components: HashSet<_> =
                 system.inputs.iter().chain(&system.outputs).collect();

@@ -44,10 +44,15 @@ phases:
 systems:
   - name: Physics
     phase: FixedUpdate
+    order: 2
     inputs:
       - Velocity
       - Health  # TODO: Remove ...
     outputs:
+      - Position
+  - name: Render
+    phase: Render
+    inputs:
       - Position
 
 # TODO: List systems and their inputs and mutation targets. Generate traits that implement the signature.

@@ -14,8 +14,13 @@ pub struct System {
     pub name: SystemName,
     #[serde(default)]
     pub description: Option<String>,
+    /// The order in which systems are executed when they cannot be parallelized.
+    #[serde(default)]
+    pub order: u32,
     pub phase: SystemPhaseRef,
+    #[serde(default)]
     pub inputs: Vec<ComponentName>,
+    #[serde(default)]
     pub outputs: Vec<ComponentName>,
 
     /// The archetypes this system operates on. Available after a call to [`Archetype::finish`](Archetype::finish).
