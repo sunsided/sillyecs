@@ -151,7 +151,7 @@ pub fn schedule_systems(systems: &[System]) -> Vec<Vec<SystemId>> {
 mod tests {
     use crate::Name;
     use crate::component::ComponentName;
-    use crate::system::{System, SystemId, SystemName, SystemPhaseRef};
+    use crate::system::{System, SystemId, SystemName, SystemPhaseName, SystemPhaseRef};
     use super::*;
 
     fn sysname(name: &str) -> SystemName {
@@ -163,7 +163,7 @@ mod tests {
     }
 
     fn phasename(name: &str) -> SystemPhaseRef {
-        name.to_string()
+        SystemPhaseName(Name::new(name.to_string(), "Phase"))
     }
 
     fn create_system(id: u64, name: &str, order: u32, inputs: Vec<&str>, outputs: Vec<&str>) -> System {
