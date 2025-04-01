@@ -150,7 +150,12 @@ impl Ecs {
     pub(crate) fn ensure_system_consistency(&mut self) -> Result<(), EcsError> {
         // Assign explicit ordering to the systems.
         let mut order = 1;
-        let mut orders: HashSet<_> = self.systems.iter().map(|s| s.order).filter(|&o| o != 0).collect();
+        let mut orders: HashSet<_> = self
+            .systems
+            .iter()
+            .map(|s| s.order)
+            .filter(|&o| o != 0)
+            .collect();
         for system in &mut self.systems {
             if system.order != 0 {
                 continue;

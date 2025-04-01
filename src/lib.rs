@@ -3,9 +3,12 @@ mod code;
 mod component;
 mod ecs;
 mod system;
+mod system_scheduler;
 
+use std::fmt::{Display, Formatter};
 pub use crate::code::EcsCode;
 use serde::Serialize;
+use crate::system::SystemName;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 pub struct Name {
@@ -29,6 +32,12 @@ impl Name {
             field_name,
             field_name_plural,
         }
+    }
+}
+
+impl Display for Name {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.type_name)
     }
 }
 

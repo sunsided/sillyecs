@@ -1,3 +1,4 @@
+use std::fmt::{Display, Formatter};
 use crate::Name;
 use crate::archetype::{Archetype, ArchetypeId, ArchetypeName, ArchetypeRef};
 use crate::component::{Component, ComponentId, ComponentName};
@@ -7,7 +8,7 @@ use std::sync::atomic::AtomicU64;
 
 static SYSTEM_IDS: AtomicU64 = AtomicU64::new(1);
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct System {
     #[serde(skip_deserializing, default)]
     pub id: SystemId,
@@ -120,9 +121,9 @@ impl System {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 #[serde(transparent)]
-pub struct SystemId(u64);
+pub struct SystemId(pub(crate) u64);
 
 impl Default for SystemId {
     fn default() -> Self {
@@ -139,7 +140,13 @@ pub type SystemPhaseRef = String;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 #[serde(transparent)]
-pub struct SystemName(Name);
+pub struct SystemName(pub(crate) Name);
+
+impl Display for SystemName {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(&self.0, f)
+    }
+}
 
 impl Deref for SystemName {
     type Target = Name;

@@ -28,7 +28,7 @@ impl Default for ComponentId {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 #[serde(transparent)]
-pub struct ComponentName(Name);
+pub struct ComponentName(pub(crate) Name);
 
 impl Deref for ComponentName {
     type Target = Name;
