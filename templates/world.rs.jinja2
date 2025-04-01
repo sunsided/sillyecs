@@ -13,6 +13,7 @@ pub struct World<E = ()> {
     events: Option<E>
 }
 
+#[allow(dead_code)]
 impl<E> World<E> {
     /// Creates a new [`World`].
     pub fn new<S>(create_systems: &S, phase_events: Option<E>) -> Self

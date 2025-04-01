@@ -57,6 +57,7 @@ pub trait SystemPhaseEvents {
     {%- endfor %}
 }
 
+#[automatically_derived]
 impl SystemPhaseEvents for () {
    {%- for phase in ecs.phases %}
 
@@ -95,6 +96,7 @@ impl SystemPhaseEvents for () {
 pub struct {{ system.name.type }}({{ system.name.type }}Data);
 
 /// Implements the business logic for the [`{{ system.name.type }}`] system.
+#[allow(dead_code)]
 pub trait Apply{{ system.name.type }}: System {
     /// Applies the system's business logic to the given entity components.
     ///
@@ -147,6 +149,7 @@ pub trait Apply{{ system.name.type }}: System {
     }
 }
 
+#[allow(dead_code)]
 impl {{ system.name.type }} {
     /// Apply the system to the given entity components
     #[inline]
