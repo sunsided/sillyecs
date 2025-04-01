@@ -24,7 +24,10 @@ impl World {
         {%- for group in ecs.scheduled_systems[phase.name] %}
         // Execute system group {{ loop.index }}
         {%- for system in group %}
-        // Run system {{ system.name.raw }}
+        // Run system {{ system.name.type }}
+        {%- for archetype in system.affected_archetypes %}
+            // Apply to {{ archetype.type }}
+        {%- endfor %}
         {%- endfor %}
         {%- endfor %}
         {%- endif %}

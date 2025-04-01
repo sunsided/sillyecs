@@ -32,8 +32,8 @@ impl EcsCode {
         ecs.ensure_component_consistency()?;
         ecs.ensure_distinct_archetype_components()?;
         ecs.ensure_system_consistency()?;
-        ecs.scheduled_systems()?;
         ecs.finish();
+        ecs.scheduled_systems()?;
 
         if !ecs.systems.is_empty() {
             debug_assert_ne!(ecs.scheduled_systems.len(), 0, "Some systems should be scheduled");
