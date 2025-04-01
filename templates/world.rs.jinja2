@@ -41,11 +41,18 @@ impl World {
         // no systems in this phase
         {%- else %}
         {%- for group in ecs.scheduled_systems[phase.name] %}
-        // Execute system group {{ loop.index }}
+        {%- set group_number = loop.index %}
         {%- for system in group %}
-        // Run system {{ system.name.type }}
         {%- for archetype in system.affected_archetypes %}
-            // Apply to {{ archetype.type }}
+        // System group {{ group_number }}: Apply {{ system.name.type }} to {{ archetype.type }}
+        self.{{ system.name.field }}_system.apply_many(
+            {%- for input in system.inputs %}
+            &self.{{ archetype.field }}.{{ input.fields }},
+            {%- endfor %}
+            {%- for output in system.outputs %}
+            &mut self.{{ archetype.field }}.{{ output.fields }},
+            {%- endfor %}
+        );
         {%- endfor %}
         {%- endfor %}
         {%- endfor %}
