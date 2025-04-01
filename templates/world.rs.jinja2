@@ -32,6 +32,13 @@ impl World {
         self.apply_system_phase_{{ phase.name.field }}();
         {%- endfor %}
     }
+
+    /// Apply all system phases with thread parallelism.
+    pub fn par_apply_system_phases(&mut self) {
+        {%- for phase in ecs.phases %}
+        self.par_apply_system_phase_{{ phase.name.field }}();
+        {%- endfor %}
+    }
     {%- for phase in ecs.phases %}
 
     /// Execute system phase `{{ phase.name.raw }}`
