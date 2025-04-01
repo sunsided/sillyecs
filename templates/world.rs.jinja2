@@ -78,6 +78,8 @@ impl World {
         {%- set group_number = loop.index %}
         // System group {{ group_number }}
         scope(|s| {
+            // TODO: Instead of parallelizing systems (and then have them access archetypes), parallelize archetypes and apply all systems. This should improve data parallelism because it keeps caches hot.
+
             {%- for system in group %}
             s.spawn(|_| {
                 {%- for archetype in system.affected_archetypes %}
