@@ -55,7 +55,7 @@ pub trait HasComponent<T: Component> {
 {%- else %}
 /// An archetype grouping entities with identical components.
 {%- endif %}
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct {{ archetype.name.type }} {
     pub entities: Vec<EntityId>,
     {%- for component_name in archetype.components %}

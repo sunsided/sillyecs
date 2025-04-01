@@ -32,6 +32,15 @@ pub trait System: 'static + Send + Sync {
     const ID: SystemId;
 }
 
+/// Trait for constructing system instances.
+pub trait CreateSystems {
+    {%- for system in ecs.systems %}
+
+    /// Create an instance of type [`{{ system.name.type }}`].
+    fn create_{{ system.name.field }}(&self) -> {{ system.name.type }};
+    {%- endfor %}
+}
+
 {%- for system in ecs.systems %}
 {% if system.description %}
 /// {{ system.description }}

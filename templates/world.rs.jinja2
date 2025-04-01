@@ -4,9 +4,28 @@ pub struct World {
     {%- for archetype in ecs.archetypes %}
     pub {{ archetype.name.field | snake_case }}: {{ archetype.name.type }},
     {%- endfor %}
+
+    {%- for system in ecs.systems %}
+    pub {{ system.name.field }}_system: {{ system.name.type }},
+    {%- endfor %}
 }
 
 impl World {
+    /// Creates a new [`World`].
+    pub fn new<S: CreateSystems>(create_systems: &S) -> Self {
+        {%- for system in ecs.systems %}
+        let {{ system.name.field }}_system = create_systems.create_{{ system.name.field }}();
+        {%- endfor %}
+        Self {
+            {%- for archetype in ecs.archetypes %}
+            {{ archetype.name.field | snake_case }}: {{ archetype.name.type }}::default(),
+            {%- endfor %}
+            {%- for system in ecs.systems %}
+            {{ system.name.field }}_system,
+            {%- endfor %}
+        }
+    }
+
     /// Apply all system phases.
     pub fn apply_system_phases(&mut self) {
         {%- for phase in ecs.phases %}
