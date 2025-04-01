@@ -74,7 +74,7 @@ systems:
 Use `sillyecs` in your `build.rs`:
 
 ```rust
-use ecs_builder::EcsCode;
+use sillyecs::EcsCode;
 use std::fs::File;
 use std::io::BufReader;
 
