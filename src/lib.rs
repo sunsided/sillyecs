@@ -8,7 +8,6 @@ mod system_scheduler;
 use std::fmt::{Display, Formatter};
 pub use crate::code::EcsCode;
 use serde::Serialize;
-use crate::system::SystemName;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 pub struct Name {

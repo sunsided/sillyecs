@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 use crate::Name;
-use crate::archetype::{Archetype, ArchetypeId, ArchetypeName, ArchetypeRef};
-use crate::component::{Component, ComponentId, ComponentName};
+use crate::archetype::{Archetype, ArchetypeId, ArchetypeRef};
+use crate::component::ComponentName;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::ops::Deref;
 use std::sync::atomic::AtomicU64;

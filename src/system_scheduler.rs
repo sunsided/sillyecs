@@ -125,77 +125,85 @@ mod tests {
         name.to_string()
     }
 
+    fn create_system(id: u64, name: &str, order: u32, inputs: Vec<&str>, outputs: Vec<&str>) -> System {
+        System {
+            id: SystemId(id),
+            name: sysname(name),
+            order,
+            inputs: inputs.into_iter().map(compname).collect(),
+            outputs: outputs.into_iter().map(compname).collect(),
+            phase: phasename("default"),
+            affected_archetype_count: 0,
+            affected_archetype_ids: Default::default(),
+            affected_archetypes: Default::default(),
+            component_iter_code: String::new(),
+            component_untuple_code: String::new(),
+            description: None
+        }
+    }
+
     #[test]
-    fn it_works() {
+    fn order_one() {
         let systems = vec![
-            System {
-                id: SystemId(1),
-                name: sysname("Producer"),
-                order: 1,
-                inputs: vec![],
-                outputs: vec![compname("x")],
-                phase: phasename("default"),
-                affected_archetype_count: 0,
-                affected_archetype_ids: Default::default(),
-                affected_archetypes: Default::default(),
-                component_iter_code: String::new(),
-                component_untuple_code: String::new(),
-                description: None
-            },
-
-            System {
-                id: SystemId(3),
-                name: sysname("Consumer"),
-                order: 3,
-                inputs: vec![compname("y")],
-                outputs: vec![],
-                phase: phasename("default"),
-                affected_archetype_count: 0,
-                affected_archetype_ids: Default::default(),
-                affected_archetypes: Default::default(),
-                component_iter_code: String::new(),
-                component_untuple_code: String::new(),
-                description: None
-            },
-
-            System {
-                id: SystemId(2),
-                name: sysname("Transformer"),
-                order: 2,
-                inputs: vec![compname("x")],
-                outputs: vec![compname("y")],
-                phase: phasename("default"),
-                affected_archetype_count: 0,
-                affected_archetype_ids: Default::default(),
-                affected_archetypes: Default::default(),
-                component_iter_code: String::new(),
-                component_untuple_code: String::new(),
-                description: None
-            },
-
-
-            System {
-                id: SystemId(4),
-                name: sysname("Backflow"),
-                order: 4,
-                inputs: vec![compname("y")],
-                outputs: vec![compname("x")],
-                phase: phasename("default"),
-                affected_archetype_count: 0,
-                affected_archetype_ids: Default::default(),
-                affected_archetypes: Default::default(),
-                component_iter_code: String::new(),
-                component_untuple_code: String::new(),
-                description: None
-            }, // creates a cycle
+            create_system(1, "Producer", 1, vec!["x"], vec![]),
+            // Allow the consumer to run with or after the transformer by ordering.
+            create_system(3, "Consumer", 3, vec!["y"], vec![]),
+            create_system(2, "Transformer", 2, vec!["x"], vec!["y"]),
+            create_system(4, "Backflow", 4, vec!["y"], vec!["x"]), // creates a cycle
         ];
 
         let sorted = schedule_systems(&systems);
-        println!("Execution order:");
+
+        let mut counter = 0;
+        let mut ordered: Vec<(usize, &str)> = vec![];
         for group in sorted {
             for sys in group {
-                println!("- {}", sys.name);
+                ordered.push((counter, &sys.name.type_name_raw));
             }
+            counter += 1;
         }
+
+        assert_eq!(ordered, vec![
+            // First group
+            (0, "Producer"),
+            // Second group
+            (1, "Transformer"),
+            // Third group
+            (2, "Consumer"),
+            (2, "Backflow")
+        ]);
+    }
+
+    #[test]
+    fn order_two() {
+        let systems = vec![
+            create_system(1, "Producer", 1, vec!["x"], vec![]),
+            // Force the consumer to run before the transformer by ordering.
+            create_system(3, "Consumer", 2, vec!["y"], vec![]),
+            create_system(2, "Transformer", 3, vec!["x"], vec!["y"]),
+            create_system(4, "Backflow", 4, vec!["y"], vec!["x"]), // creates a cycle
+        ];
+
+        let sorted = schedule_systems(&systems);
+
+        let mut counter = 0;
+        let mut ordered: Vec<(usize, &str)> = vec![];
+        for group in sorted {
+            for sys in group {
+                ordered.push((counter, &sys.name.type_name_raw));
+            }
+            counter += 1;
+        }
+
+        assert_eq!(ordered, vec![
+            // First group
+            (0, "Producer"),
+            // Second group
+            (1, "Consumer"),
+            // Third group
+            (2, "Transformer"),
+            // Fourth group
+            (3, "Backflow")
+        ]);
     }
 }
