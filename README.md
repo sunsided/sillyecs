@@ -11,7 +11,7 @@ A silly little compile-time generated archetype ECS in Rust.
 
 ```toml
 [build-dependencies]
-sillyecs = "0.0.1"
+sillyecs = "0.0.2"
 ```
 
 ## Usage
@@ -74,7 +74,7 @@ systems:
 Use `sillyecs` in your `build.rs`:
 
 ```rust
-use sillyecs::EcsCode;
+use ecs_builder::EcsCode;
 use std::fs::File;
 use std::io::BufReader;
 

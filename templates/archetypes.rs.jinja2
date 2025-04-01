@@ -1,7 +1,51 @@
+/// The ID of an entity.
+#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
+pub struct EntityId(std::num::NonZeroU64);
+
+#[allow(dead_code)]
+impl EntityId {
+    /// Returns a new, unique entity ID.
+    ///
+    /// Uniqueness is guaranteed by using a monotonically increasing `AtomicU64` counter
+    /// for generating IDs, starting from 1.
+    ///
+    /// # Implementation
+    /// This function uses a thread-safe counter with sequential consistency ordering
+    /// to ensure unique IDs even under concurrent access.
+    pub fn new() -> Self {
+        static ENTITY_IDS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+        let id = ENTITY_IDS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        EntityId(std::num::NonZeroU64::new(id).expect("ID was zero"))
+    }
+
+    /// Returns this ID as a [`NonZeroU64`](std::num::NonZeroU64) value.
+    pub const fn as_nonzero_u64(&self) -> std::num::NonZeroU64 {
+        self.0
+    }
+
+    /// Returns this ID as a `u64` value.
+    pub const fn as_u64(&self) -> u64 {
+            self.0.get()
+    }
+}
+
+impl From<EntityId> for std::num::NonZeroU64 {
+    fn from(value: EntityId) -> std::num::NonZeroU64 {
+        value.as_nonzero_u64()
+    }
+}
+
+impl From<EntityId> for u64 {
+    fn from(value: EntityId) -> u64 {
+        value.as_u64()
+    }
+}
+
 /// The ID of an [`Archetype`].
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub struct ArchetypeId(std::num::NonZeroU64);
 
+#[allow(dead_code)]
 impl ArchetypeId {
     /// Returns this ID as a [`NonZeroU64`](std::num::NonZeroU64) value.
     pub const fn as_nonzero_u64(&self) -> std::num::NonZeroU64 {
@@ -27,6 +71,7 @@ impl From<ArchetypeId> for u64 {
 }
 
 /// Marker trait for archetypes.
+#[allow(dead_code)]
 pub trait Archetype: 'static + Send + Sync {
     /// The ID of this archetype.
     const ID: ArchetypeId;
@@ -63,6 +108,7 @@ pub struct {{ archetype.name.type }} {
     {%- endfor %}
 }
 
+#[allow(dead_code)]
 impl {{ archetype.name.type }} {
     /// The IDs of the components used by this archetype, in ascending order.
     pub const COMPONENT_IDS: [ComponentId; {{ archetype.component_count }}] = [
@@ -134,6 +180,7 @@ impl HasComponent<{{ component_name.type }}> for {{ archetype.name.type }} {
 {% endfor %}
 
 #[automatically_derived]
+#[allow(dead_code)]
 impl Archetype for {{ archetype.name.type }} {
     const ID: ArchetypeId = ArchetypeId(std::num::NonZeroU64::new({{ archetype.id }}).expect("A zero archetype ID was provided"));
 

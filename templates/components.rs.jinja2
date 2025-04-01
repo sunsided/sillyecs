@@ -2,6 +2,7 @@
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub struct ComponentId(std::num::NonZeroU64);
 
+#[allow(dead_code)]
 impl ComponentId {
     pub const fn new(id: u64) -> Option<Self> {
         if let Some(id) = std::num::NonZeroU64::new(id) {
@@ -51,6 +52,7 @@ pub trait Component: 'static + Send + Sync {
 #[derive(Debug, Clone)]
 pub struct {{ component.name.type }}({{ component.name.raw }}Data);
 
+#[allow(dead_code)]
 impl {{ component.name.type }} {
     /// Creates a new [`{{ component.name.type }}`] instance from [`{{ component.name.raw }}Data`].
     pub const fn new(data: {{ component.name.raw }}Data) -> Self {
