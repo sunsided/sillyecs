@@ -59,5 +59,37 @@ impl World {
         {%- endif %}
         // TODO: Emit hook for end of system phase
     }
+
+    pub fn par_apply_system_phase_{{ phase.name.field }}(&mut self) {
+        use rayon::scope;
+
+        // TODO: Emit hook for begin of system phase
+        {%- if ecs.scheduled_systems[phase.name] | length == 0 %}
+        // no systems in this phase
+        {%- else %}
+        {%- for group in ecs.scheduled_systems[phase.name] %}
+        {%- set group_number = loop.index %}
+        // System group {{ group_number }}
+        scope(|s| {
+            {%- for system in group %}
+            s.spawn(|_| {
+                {%- for archetype in system.affected_archetypes %}
+                // Apply {{ system.name.type }} to {{ archetype.type }}
+                self.{{ system.name.field }}_system.apply_many(
+                    {%- for input in system.inputs %}
+                    &self.{{ archetype.field }}.{{ input.fields }},
+                    {%- endfor %}
+                    {%- for output in system.outputs %}
+                    &mut self.{{ archetype.field }}.{{ output.fields }},
+                    {%- endfor %}
+                );
+            {%- endfor %}
+            });
+            {%- endfor %}
+        });
+        {%- endfor %}
+        {%- endif %}
+        // TODO: Emit hook for end of system phase
+    }
     {%- endfor %}
 }
