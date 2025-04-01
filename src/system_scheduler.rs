@@ -2,15 +2,14 @@ use crate::component::ComponentName;
 use crate::system::{System, SystemId};
 use std::collections::{HashMap, HashSet};
 
-pub fn schedule_systems(systems: &[System]) -> Vec<&System> {
+pub fn schedule_systems(systems: &[System]) -> Vec<Vec<&System>> {
     let mut graph: HashMap<SystemId, Vec<SystemId>> = HashMap::new();
     let mut in_degree: HashMap<SystemId, usize> = HashMap::new();
     let mut systems_by_id: HashMap<SystemId, &System> = HashMap::new();
 
-    let mut readers: HashMap<ComponentName, HashSet<SystemId>> = HashMap::new(); // component -> systems reading it
-    let mut writers: HashMap<ComponentName, HashSet<SystemId>> = HashMap::new(); // component -> systems writing it
+    let mut readers: HashMap<ComponentName, HashSet<SystemId>> = HashMap::new();
+    let mut writers: HashMap<ComponentName, HashSet<SystemId>> = HashMap::new();
 
-    // Index systems and gather readers/writers
     for sys in systems {
         systems_by_id.insert(sys.id, sys);
         in_degree.entry(sys.id).or_insert(0);
@@ -23,7 +22,6 @@ pub fn schedule_systems(systems: &[System]) -> Vec<&System> {
         }
     }
 
-    // Build graph edges based on write → read dependencies
     for (component, writers_of) in &writers {
         if let Some(readers_of) = readers.get(component) {
             for &writer in writers_of {
@@ -37,34 +35,58 @@ pub fn schedule_systems(systems: &[System]) -> Vec<&System> {
         }
     }
 
-    // Priority queue: systems with zero in-degree
     let mut ready: Vec<SystemId> = in_degree
         .iter()
         .filter_map(|(&id, &deg)| if deg == 0 { Some(id) } else { None })
         .collect();
 
-    let mut scheduled = Vec::new();
+    let mut scheduled: Vec<Vec<&System>> = Vec::new();
     let mut visited = HashSet::new();
 
-    while scheduled.len() < systems.len() {
+    while visited.len() < systems.len() {
         if ready.is_empty() {
-            // Cycle detected: select lowest-order unscheduled system
+            // Fallback: lowest-order unscheduled system
             let mut remaining: Vec<_> = in_degree
                 .keys()
-                .filter(|&id| !visited.contains(id))
+                .filter(|&&id| !visited.contains(&id))
                 .collect();
             remaining.sort_by_key(|id| systems_by_id[id].order);
             ready.push(*remaining[0]);
         }
 
-        // Pick system with lowest order among ready
+        let mut batch = Vec::new();
+        let mut used_outputs = HashSet::new();
+
         ready.sort_by_key(|id| systems_by_id[id].order);
-        let current = ready.remove(0);
+        let mut i = 0;
+        while i < ready.len() {
+            let candidate = ready[i];
 
-        if visited.insert(current) {
-            scheduled.push(systems_by_id[&current]);
+            if visited.contains(&candidate) {
+                ready.remove(i);
+                continue;
+            }
 
-            if let Some(dependents) = graph.get(&current) {
+            let system = systems_by_id[&candidate];
+            let has_conflict = system
+                .outputs
+                .iter()
+                .any(|out| used_outputs.contains(out));
+
+            if !has_conflict {
+                batch.push(candidate);
+                used_outputs.extend(system.outputs.iter().cloned());
+                ready.remove(i);
+            } else {
+                i += 1;
+            }
+        }
+
+        // Mark as visited and update graph
+        for sys_id in &batch {
+            visited.insert(*sys_id);
+
+            if let Some(dependents) = graph.get(sys_id) {
                 for &dep in dependents {
                     if let Some(deg) = in_degree.get_mut(&dep) {
                         *deg -= 1;
@@ -75,10 +97,14 @@ pub fn schedule_systems(systems: &[System]) -> Vec<&System> {
                 }
             }
         }
+
+        let batch_refs = batch.into_iter().map(|id| systems_by_id[&id]).collect();
+        scheduled.push(batch_refs);
     }
 
     scheduled
 }
+
 
 #[cfg(test)]
 mod tests {
@@ -166,8 +192,10 @@ mod tests {
 
         let sorted = schedule_systems(&systems);
         println!("Execution order:");
-        for sys in sorted {
-            println!("- {}", sys.name);
+        for group in sorted {
+            for sys in group {
+                println!("- {}", sys.name);
+            }
         }
     }
 }
