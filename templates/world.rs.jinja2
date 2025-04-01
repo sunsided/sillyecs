@@ -17,6 +17,7 @@ impl World {
 
     /// Execute system phase `{{ phase.name.raw }}`
     pub fn apply_system_phase_{{ phase.name.field }}(&mut self) {
+        // TODO: Emit hook for begin of system phase
         {%- if ecs.scheduled_systems[phase.name] | length == 0 %}
         // no systems in this phase
         {%- else %}
@@ -27,6 +28,7 @@ impl World {
         {%- endfor %}
         {%- endfor %}
         {%- endif %}
+        // TODO: Emit hook for end of system phase
     }
     {%- endfor %}
 }
