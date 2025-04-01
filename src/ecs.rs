@@ -10,7 +10,7 @@ pub struct Ecs {
     pub components: Vec<Component>,
     pub archetypes: Vec<Archetype>,
     pub systems: Vec<System>,
-    #[serde(default, skip_serializing)]
+    #[serde(default, skip_deserializing)]
     pub scheduled_systems: Vec<Vec<System>>,
     pub phases: Vec<SystemPhase>,
 }

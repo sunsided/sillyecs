@@ -9,7 +9,7 @@ pub struct World {
 impl World {
     pub fn apply_systems(&mut self) {
         {%- for group in ecs.scheduled_systems %}
-            // TODO: group
+            // Execute system group {{ loop.index }}
         {%- endfor %}
 
         todo!()

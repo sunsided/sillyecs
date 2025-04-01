@@ -35,6 +35,10 @@ impl EcsCode {
         ecs.scheduled_systems()?;
         ecs.finish();
 
+        if !ecs.systems.is_empty() {
+            debug_assert_ne!(ecs.scheduled_systems.len(), 0, "Some systems should be scheduled");
+        }
+
         let mut env = Environment::new();
         env.add_filter("snake_case", snake_case_filter);
         env.add_filter("length", length);
