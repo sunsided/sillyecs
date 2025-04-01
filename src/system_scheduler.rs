@@ -1,7 +1,49 @@
+//! System scheduling module that manages parallel execution of ECS systems.
+//!
+//! This module provides functionality to analyze system dependencies and group them into
+//! parallelizable batches for efficient execution. It handles:
+//!
+//! - Component read/write dependencies between systems
+//! - Explicit ordering requirements
+//! - Resource conflict resolution
+//! - Parallel batch scheduling
+//! - Cyclic dependency handling through fallback ordering
+//!
+//! The main entry point is the [`schedule_systems`] function which takes a slice of systems
+//! and returns an ordered list of system batches that can be executed in parallel while
+//! respecting all dependencies and constraints.
+
 use crate::component::ComponentName;
 use crate::system::{System, SystemId};
 use std::collections::{HashMap, HashSet};
 
+/// Schedules systems into parallelizable batches based on their component dependencies and execution order.
+///
+/// This function takes a slice of systems and returns a vector of system batches, where each batch contains
+/// systems that can be executed in parallel. Systems are scheduled based on Kahn's algorithm for
+/// topological sorting by:
+///
+/// 1. Component dependencies - Systems reading components written by other systems must execute after them
+/// 2. Explicit ordering - Systems with lower order values execute before those with higher values
+/// 3. Resource conflicts - Systems writing the same components cannot execute in parallel
+///
+/// # Parameters
+///
+/// * `systems` - A slice containing the systems to schedule
+///
+/// # Returns
+///
+/// A `Vec<Vec<SystemId>>` where each inner vector represents a batch of systems that can run in parallel.
+/// The outer vector represents the sequential order in which batches must be executed.
+///
+/// # Algorithm
+///
+/// 1. Builds a dependency graph based on component read/write relationships
+/// 2. Uses a modified topological sort that:
+///    - Handles cycles by falling back to system order
+///    - Groups independent systems into parallel batches
+///    - Respects explicit ordering within batches
+/// 3. Ensures systems writing the same components are in different batches
 pub fn schedule_systems(systems: &[System]) -> Vec<Vec<SystemId>> {
     let mut graph: HashMap<SystemId, Vec<SystemId>> = HashMap::new();
     let mut in_degree: HashMap<SystemId, usize> = HashMap::new();
@@ -104,7 +146,6 @@ pub fn schedule_systems(systems: &[System]) -> Vec<Vec<SystemId>> {
 
     scheduled
 }
-
 
 #[cfg(test)]
 mod tests {
