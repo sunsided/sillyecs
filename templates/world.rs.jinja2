@@ -8,8 +8,11 @@ pub struct World {
 
 impl World {
     pub fn apply_systems(&mut self) {
-        {%- for group in ecs.scheduled_systems %}
+        {%- for phase in ecs.phases %}
+        // Execute system phase {{ phase.name }}
+        {%- for group in ecs.scheduled_systems[phase.name] %}
             // Execute system group {{ loop.index }}
+        {%- endfor %}
         {%- endfor %}
 
         todo!()

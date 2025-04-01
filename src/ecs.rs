@@ -1,6 +1,6 @@
 use crate::archetype::Archetype;
 use crate::component::Component;
-use crate::system::{System, SystemPhase};
+use crate::system::{System, SystemPhase, SystemPhaseRef};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use crate::system_scheduler::schedule_systems;
@@ -9,10 +9,10 @@ use crate::system_scheduler::schedule_systems;
 pub struct Ecs {
     pub components: Vec<Component>,
     pub archetypes: Vec<Archetype>,
+    pub phases: Vec<SystemPhase>,
     pub systems: Vec<System>,
     #[serde(default, skip_deserializing)]
-    pub scheduled_systems: Vec<Vec<System>>,
-    pub phases: Vec<SystemPhase>,
+    pub scheduled_systems: HashMap<SystemPhaseRef, Vec<Vec<System>>>,
 }
 
 impl Ecs {
@@ -200,17 +200,24 @@ impl Ecs {
     }
 
     pub(crate) fn scheduled_systems(&mut self) -> Result<(), EcsError> {
-        let groups = schedule_systems(&self.systems);
-        self.scheduled_systems = groups.into_iter().map(|group| {
-            group
-                .iter()
-                .map(|&system| self.systems.iter()
-                    .find(|s| s.id == system)
-                    .expect("Failed to find system"))
-                .cloned()
-                .collect()
-        })
-            .collect();
+        let mut phase_groups = HashMap::new();
+        for phase in &self.phases {
+            let systems_in_group: Vec<_> = self.systems.iter().filter(|s| s.phase == phase.name).cloned().collect();
+            let groups = schedule_systems(&systems_in_group);
+            let scheduled_systems: Vec<_> = groups.into_iter().map(|group| {
+                group
+                    .iter()
+                    .map(|&system| self.systems.iter()
+                        .find(|s| s.id == system)
+                        .expect("Failed to find system"))
+                    .cloned()
+                    .collect()
+            })
+                .collect();
+            phase_groups.insert(phase.name.clone(), scheduled_systems);
+        }
+        
+        self.scheduled_systems = phase_groups;
         Ok(())
     }
 }
