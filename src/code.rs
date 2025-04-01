@@ -1,7 +1,5 @@
-use crate::component::ComponentId;
 use crate::ecs::{Ecs, EcsError};
 use crate::snake_case_filter;
-use minijinja::functions::Function;
 use minijinja::{Environment, context};
 use std::fs::File;
 use std::io::{BufReader, Write};
