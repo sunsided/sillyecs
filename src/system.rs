@@ -158,7 +158,7 @@ impl<'de> Deserialize<'de> for SystemPhaseName {
         D: Deserializer<'de>,
     {
         let type_name = String::deserialize(deserializer)?;
-        Ok(Self(Name::new(type_name, "System")))
+        Ok(Self(Name::new(type_name, "Phase")))
     }
 }
 

@@ -7,14 +7,23 @@ pub struct World {
 }
 
 impl World {
-    pub fn apply_systems(&mut self) {
+    /// Apply all system phases.
+    pub fn apply_system_phases(&mut self) {
         {%- for phase in ecs.phases %}
-        // Execute system phase {{ phase.name.type }}
-        {%- for group in ecs.scheduled_systems[phase.name] %}
-            // Execute system group {{ loop.index }}
+        self.apply_system_phase_{{ phase.name.field }}();
         {%- endfor %}
-        {%- endfor %}
-
-        todo!();
     }
+    {%- for phase in ecs.phases %}
+
+    /// Execute system phase `{{ phase.name.raw }}`
+    pub fn apply_system_phase_{{ phase.name.field }}(&mut self) {
+        {%- if ecs.scheduled_systems[phase.name] | length == 0 %}
+        // no systems in this phase
+        {%- else %}
+        {%- for group in ecs.scheduled_systems[phase.name] %}
+        // Execute system group {{ loop.index }}
+        {%- endfor %}
+        {%- endif %}
+    }
+    {%- endfor %}
 }
