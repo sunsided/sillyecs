@@ -1,8 +1,13 @@
 [package]
 name = "sillyecs"
-repository = "git@github.com:sunsided/sillyecs.git"
+description = "A silly little compile-time generated archetype ECS in Rust"
+keywords = ["ecs", "archetype", "game-development"]
+categories = ["game-development", "game-engines", "development-tools::build-utils"]
+homepage = "https://github.com/sunsided/sillyecs"
+repository = "https://github.com/sunsided/sillyecs.git"
 authors = ["Markus Mayer <widemeadows@gmail.com>"]
-version = "0.1.0"
+license = "EUPL-1.2"
+version = "0.0.1"
 edition = "2024"
 
 [dependencies]
