@@ -135,10 +135,33 @@ impl Default for SystemId {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct SystemPhase {
-    pub name: String,
+    pub name: SystemPhaseName,
 }
 
-pub type SystemPhaseRef = String;
+pub type SystemPhaseRef = SystemPhaseName;
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
+#[serde(transparent)]
+pub struct SystemPhaseName(pub(crate) Name);
+
+impl Deref for SystemPhaseName {
+    type Target = Name;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<'de> Deserialize<'de> for SystemPhaseName {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let type_name = String::deserialize(deserializer)?;
+        Ok(Self(Name::new(type_name, "System")))
+    }
+}
+
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 #[serde(transparent)]

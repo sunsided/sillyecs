@@ -179,7 +179,7 @@ impl Ecs {
 
             if !self.phases.iter().any(|phase| phase.name.eq(&system.phase)) {
                 return Err(EcsError::MissingPhase(
-                    system.phase.clone(),
+                    system.phase.type_name_raw.clone(),
                     system.name.type_name.clone(),
                 ));
             }
