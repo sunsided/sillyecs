@@ -2,7 +2,7 @@ use crate::component::ComponentName;
 use crate::system::{System, SystemId};
 use std::collections::{HashMap, HashSet};
 
-pub fn schedule_systems(systems: &[System]) -> Vec<Vec<&System>> {
+pub fn schedule_systems(systems: &[System]) -> Vec<Vec<SystemId>> {
     let mut graph: HashMap<SystemId, Vec<SystemId>> = HashMap::new();
     let mut in_degree: HashMap<SystemId, usize> = HashMap::new();
     let mut systems_by_id: HashMap<SystemId, &System> = HashMap::new();
@@ -40,7 +40,7 @@ pub fn schedule_systems(systems: &[System]) -> Vec<Vec<&System>> {
         .filter_map(|(&id, &deg)| if deg == 0 { Some(id) } else { None })
         .collect();
 
-    let mut scheduled: Vec<Vec<&System>> = Vec::new();
+    let mut scheduled: Vec<Vec<SystemId>> = Vec::new();
     let mut visited = HashSet::new();
 
     while visited.len() < systems.len() {
@@ -98,7 +98,7 @@ pub fn schedule_systems(systems: &[System]) -> Vec<Vec<&System>> {
             }
         }
 
-        let batch_refs = batch.into_iter().map(|id| systems_by_id[&id]).collect();
+        let batch_refs = batch.into_iter().collect();
         scheduled.push(batch_refs);
     }
 
@@ -158,6 +158,7 @@ mod tests {
         let mut ordered: Vec<(usize, &str)> = vec![];
         for group in sorted {
             for sys in group {
+                let sys = systems.iter().find(|s| s.id == sys).unwrap();
                 ordered.push((counter, &sys.name.type_name_raw));
             }
             counter += 1;
@@ -190,6 +191,7 @@ mod tests {
         let mut ordered: Vec<(usize, &str)> = vec![];
         for group in sorted {
             for sys in group {
+                let sys = systems.iter().find(|s| s.id == sys).unwrap();
                 ordered.push((counter, &sys.name.type_name_raw));
             }
             counter += 1;
