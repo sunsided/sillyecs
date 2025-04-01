@@ -22,6 +22,9 @@ impl World {
         {%- else %}
         {%- for group in ecs.scheduled_systems[phase.name] %}
         // Execute system group {{ loop.index }}
+        {%- for system in group %}
+        // Run system {{ system.name.raw }}
+        {%- endfor %}
         {%- endfor %}
         {%- endif %}
     }
