@@ -8,11 +8,14 @@ pub struct World {
     {%- for system in ecs.systems %}
     pub {{ system.name.field }}_system: {{ system.name.type }},
     {%- endfor %}
+
+    /// Extra data for the world.
+    data: WorldData
 }
 
 impl World {
     /// Creates a new [`World`].
-    pub fn new<S: CreateSystems>(create_systems: &S) -> Self {
+    pub fn new<S: CreateSystems>(data: WorldData, create_systems: &S) -> Self {
         {%- for system in ecs.systems %}
         let {{ system.name.field }}_system = create_systems.create_{{ system.name.field }}();
         {%- endfor %}
@@ -23,6 +26,7 @@ impl World {
             {%- for system in ecs.systems %}
             {{ system.name.field }}_system,
             {%- endfor %}
+            data,
         }
     }
 
