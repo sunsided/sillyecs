@@ -34,7 +34,15 @@ impl<E> World<E> {
         }
     }
 
-    /// Apply all system phases.
+    /// Apply all system phases sequentially.
+    ///
+    /// This method executes all system phases in sequence.
+    /// The phases are processed in the following order:
+    ///
+    /// {% for phase in ecs.phases %}- {{ phase.name.raw }}
+    /// {% endfor %}
+    /// # Type Parameters
+    /// - `E`: The type implementing [`SystemPhaseEvents`] for phase lifecycle events
     pub fn apply_system_phases(&mut self)
     where
         E: SystemPhaseEvents
@@ -45,6 +53,19 @@ impl<E> World<E> {
     }
 
     /// Apply all system phases with thread parallelism.
+    ///
+    /// This method executes all system phases in sequence, but with parallel execution
+    /// of systems within each phase. The phases are processed in the following order:
+    ///
+    /// {% for phase in ecs.phases %}- {{ phase.name.raw }}
+    /// {% endfor %}
+    /// # Type Parameters
+    /// - `E`: The type implementing [`SystemPhaseEvents`] for phase lifecycle events
+    ///
+    /// # Parallelism
+    /// - Each phase is processed sequentially
+    /// - Within each phase, systems are executed in parallel where possible
+    /// - Thread parallelism is implemented using the Rayon library
     pub fn par_apply_system_phases(&mut self)
     where
         E: SystemPhaseEvents
@@ -56,6 +77,22 @@ impl<E> World<E> {
     {%- for phase in ecs.phases %}
 
     /// Execute system phase `{{ phase.name.raw }}`
+    ///
+    /// This method executes all systems scheduled for the `{{ phase.name.raw }}` phase in sequential order.
+    /// Systems are organized into groups that must be executed in sequence, while systems within each
+    /// group can potentially be parallelized (see `par_apply_system_phase_{{ phase.name.field }}`).
+    ///
+    /// # Execution Flow
+    /// 1. Triggers the phase start event if event handling is enabled
+    /// 2. Sequentially processes each system group
+    /// 3. For each system in a group:
+    ///    - Applies the system to all matching archetypes
+    ///    - Provides read-only access to input components
+    ///    - Provides mutable access to output components
+    /// 4. Triggers the phase end event if event handling is enabled
+    ///
+    /// # Type Parameters
+    /// - `E`: The type implementing `SystemPhaseEvents` for phase lifecycle events
     pub fn apply_system_phase_{{ phase.name.field }}(&mut self)
     where
         E: SystemPhaseEvents
@@ -90,6 +127,19 @@ impl<E> World<E> {
         }
     }
 
+    /// Applies the specified system phase with parallel execution of systems.
+    ///
+    /// This method uses Rayon's parallel scoping to execute systems concurrently within each system
+    /// group. Systems within a group are executed in parallel while groups themselves are processed
+    /// sequentially.
+    ///
+    /// # Type Parameters
+    /// - `E`: The type implementing `SystemPhaseEvents` for phase lifecycle events
+    ///
+    /// # Notes
+    /// - Systems in each group are spawned as parallel tasks
+    /// - Each system operates on its affected archetypes concurrently
+    /// - Phase events are triggered at the start and end of execution
     pub fn par_apply_system_phase_{{ phase.name.field }}(&mut self)
     where
         E: SystemPhaseEvents
