@@ -94,12 +94,12 @@ impl<E> World<E> {
     ///
     /// # Type Parameters
     /// - `E`: The type implementing `SystemPhaseEvents` for phase lifecycle events
-    pub fn apply_system_phase_{{ phase.name.field }}(&mut self)
+    fn apply_system_phase_{{ phase.name.field }}(&mut self)
     where
         E: SystemPhaseEvents
     {
         if let Some(events) = &mut self.events {
-            events.on_begin_{{ phase.name.field }}_phase();
+            events.on_begin_phase(SystemPhase::{{ phase.name.raw }});
         }
 
         {%- if ecs.scheduled_systems[phase.name] | length == 0 %}
@@ -124,7 +124,7 @@ impl<E> World<E> {
         {%- endif %}
 
         if let Some(events) = &mut self.events {
-            events.on_end_{{ phase.name.field }}_phase();
+            events.on_end_phase(SystemPhase::{{ phase.name.raw }});
         }
     }
 
@@ -141,12 +141,12 @@ impl<E> World<E> {
     /// - Systems in each group are spawned as parallel tasks
     /// - Each system operates on its affected archetypes concurrently
     /// - Phase events are triggered at the start and end of execution
-    pub fn par_apply_system_phase_{{ phase.name.field }}(&mut self)
+    fn par_apply_system_phase_{{ phase.name.field }}(&mut self)
     where
         E: SystemPhaseEvents
     {
         if let Some(events) = &mut self.events {
-            events.on_begin_{{ phase.name.field }}_phase();
+            events.on_begin_phase(SystemPhase::{{ phase.name.raw }});
         }
 
         {%- if ecs.scheduled_systems[phase.name] | length == 0 %}
@@ -178,7 +178,7 @@ impl<E> World<E> {
         {%- endif %}
 
         if let Some(events) = &mut self.events {
-            events.on_end_{{ phase.name.field }}_phase();
+            events.on_end_phase(SystemPhase::{{ phase.name.raw }});
         }
     }
     {%- endfor %}

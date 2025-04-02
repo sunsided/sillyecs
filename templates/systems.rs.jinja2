@@ -32,6 +32,25 @@ pub trait System: 'static + Send + Sync {
     const ID: SystemId;
 }
 
+/// The system phases.
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[allow(dead_code)]
+pub enum SystemPhase {
+{%- for phase in ecs.phases %}
+    {%- if phase.description %}
+    /// {{ phase.description }}
+    {%- else %}
+    /// The `{{ phase.name.raw }}` system phase.
+    {%- endif %}
+    {{ phase.name.raw }} = {{ loop.index - 1 }},
+{%- endfor %}
+}
+
+impl SystemPhase {
+    /// The number of system phases.
+    pub const COUNT: usize = {{ ecs.phases | length }};
+}
+
 /// Trait for constructing system instances.
 pub trait CreateSystems {
     {%- for system in ecs.systems %}
@@ -43,36 +62,30 @@ pub trait CreateSystems {
 
 /// Trait for constructing system instances.
 pub trait SystemPhaseEvents {
-    {%- for phase in ecs.phases %}
-
-    /// Marks the beginning of the `{{ phase.name.raw }}` phase.
-    fn on_begin_{{ phase.name.field }}_phase(&mut self) {
+    /// Marks the beginning of a phase.
+    #[inline(always)]
+    fn on_begin_phase(&mut self, phase: SystemPhase) {
         // empty placeholder implementation
     }
 
-    /// Marks the end of the `{{ phase.name.raw }}` phase.
-    fn on_end_{{ phase.name.field }}_phase(&mut self) {
+    /// Marks the end of a phase.
+    #[inline(always)]
+    fn on_end_phase(&mut self, phase: SystemPhase) {
         // empty placeholder implementation
     }
-    {%- endfor %}
 }
 
 #[automatically_derived]
 impl SystemPhaseEvents for () {
-   {%- for phase in ecs.phases %}
-
-    /// Marks the beginning of the `{{ phase.name.raw }}` phase.
     #[inline(always)]
-    fn on_begin_{{ phase.name.field }}_phase(&mut self) {
+    fn on_begin_phase(&mut self, phase: SystemPhase) {
         // empty placeholder implementation
     }
 
-    /// Marks the end of the `{{ phase.name.raw }}` phase.
     #[inline(always)]
-    fn on_end_{{ phase.name.field }}_phase(&mut self) {
+    fn on_end_phase(&mut self, phase: SystemPhase) {
         // empty placeholder implementation
     }
-    {%- endfor %}
 }
 
 {%- for system in ecs.systems %}
