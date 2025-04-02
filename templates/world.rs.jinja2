@@ -95,9 +95,13 @@ impl<E> World<E> {
 
     /// Runs a per-frame update of the frame context at the start of a frame.
     fn on_begin_frame(&mut self) {
-        self.context.frame_number = self.context.frame_number.wrapping_add(1);
         self.context.current_frame_start = std::time::Instant::now();
-        self.context.delta_time = self.context.current_frame_start - self.context.last_frame_start;
+        if self.context.frame_number == 0 {
+            self.context.delta_time = std::time::Duration::ZERO;
+        } else {
+            self.context.delta_time = self.context.current_frame_start - self.context.last_frame_start;
+        }
+        self.context.frame_number = self.context.frame_number.wrapping_add(1);
     }
 
     /// Runs a per-frame update of the frame context at the end of a frame.
