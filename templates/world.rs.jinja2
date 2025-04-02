@@ -1,9 +1,12 @@
 /// A frame context.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub struct FrameContext {
     /// The frame number.
     pub frame_number: u64,
+
+    /// The start time of the last frame.
+    pub last_frame_start: std::time::Instant,
 
     /// The delta time since the last frame.
     pub delta_time: std::time::Duration,
@@ -13,6 +16,35 @@ pub struct FrameContext {
 
     /// User-specific data.
     pub data: FrameContextData
+}
+
+#[allow(dead_code)]
+impl Default for FrameContext {
+    fn default() -> Self {
+        Self {
+            frame_number: 0,
+            last_frame_start: std::time::Instant::now(),
+            delta_time: Default::default(),
+            fixed_time: Default::default(),
+            data: Default::default()
+        }
+    }
+}
+
+#[allow(dead_code)]
+impl std::ops::Deref for FrameContext {
+    type Target = FrameContextData;
+
+    fn deref(&self) -> &Self::Target {
+        &self.data
+    }
+}
+
+#[allow(dead_code)]
+impl std::ops::DerefMut for FrameContext {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.data
+    }
 }
 
 /// A world holding all archetypes.
@@ -26,6 +58,9 @@ pub struct World<E = ()> {
     pub {{ system.name.field }}_system: {{ system.name.type }},
     {%- endfor %}
 
+    /// The frame context.
+    pub context: FrameContext,
+
     /// The system phase events
     events: Option<E>
 }
@@ -38,6 +73,7 @@ impl<E> World<E> {
         S: CreateSystems,
         E: SystemPhaseEvents
     {
+        let context = FrameContext::default();
         {%- for system in ecs.systems %}
         let {{ system.name.field }}_system = create_systems.create_{{ system.name.field }}();
         {%- endfor %}
@@ -48,6 +84,7 @@ impl<E> World<E> {
             {%- for system in ecs.systems %}
             {{ system.name.field }}_system,
             {%- endfor %}
+            context,
             events: phase_events
         }
     }
@@ -128,6 +165,9 @@ impl<E> World<E> {
         {%- for archetype in system.affected_archetypes %}
         // System group {{ group_number }}: Apply {{ system.name.type }} to {{ archetype.type }}
         self.{{ system.name.field }}_system.apply_many(
+            {%- if system.needs_context %}
+            &self.context,
+            {%- endif %}
             {%- if system.needs_entities %}
             &self.{{ archetype.field }}.entities,
             {%- endif %}
@@ -183,6 +223,9 @@ impl<E> World<E> {
                 {%- for archetype in system.affected_archetypes %}
                 // Apply {{ system.name.type }} to {{ archetype.type }}
                 self.{{ system.name.field }}_system.apply_many(
+                    {%- if system.needs_context %}
+                    &self.context,
+                    {%- endif %}
                     {%- if system.needs_entities %}
                     &self.{{ archetype.field }}.entities,
                     {%- endif %}
