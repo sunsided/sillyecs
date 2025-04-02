@@ -1,3 +1,20 @@
+/// A frame context.
+#[derive(Debug)]
+#[allow(dead_code)]
+pub struct FrameContext {
+    /// The frame number.
+    pub frame_number: u64,
+
+    /// The delta time since the last frame.
+    pub delta_time: std::time::Duration,
+
+    /// The fixed time for fixed-time systems.
+    pub fixed_time: std::time::Duration,
+
+    /// User-specific data.
+    pub data: FrameContextData
+}
+
 /// A world holding all archetypes.
 #[derive(Debug, Clone)]
 pub struct World<E = ()> {
