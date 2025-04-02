@@ -46,6 +46,7 @@ pub enum SystemPhase {
 {%- endfor %}
 }
 
+#[allow(dead_code)]
 impl SystemPhase {
     /// The number of system phases.
     pub const COUNT: usize = {{ ecs.phases | length }};
