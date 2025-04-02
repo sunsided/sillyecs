@@ -5,14 +5,17 @@ pub struct FrameContext {
     /// The frame number.
     pub frame_number: u64,
 
-    /// The start time of the last frame.
-    pub last_frame_start: std::time::Instant,
-
     /// The delta time since the last frame.
     pub delta_time: std::time::Duration,
 
     /// The fixed time for fixed-time systems.
     pub fixed_time: std::time::Duration,
+
+    /// The start time of the current frame.
+    pub current_frame_start: std::time::Instant,
+
+    /// The start time of the last frame.
+    pub last_frame_start: std::time::Instant,
 
     /// User-specific data.
     pub data: FrameContextData
@@ -23,9 +26,10 @@ impl Default for FrameContext {
     fn default() -> Self {
         Self {
             frame_number: 0,
-            last_frame_start: std::time::Instant::now(),
             delta_time: Default::default(),
             fixed_time: Default::default(),
+            current_frame_start: std::time::Instant::now(),
+            last_frame_start: std::time::Instant::now(),
             data: Default::default()
         }
     }
@@ -59,7 +63,7 @@ pub struct World<E = ()> {
     {%- endfor %}
 
     /// The frame context.
-    pub context: FrameContext,
+    context: FrameContext,
 
     /// The system phase events
     events: Option<E>
@@ -89,6 +93,18 @@ impl<E> World<E> {
         }
     }
 
+    /// Runs a per-frame update of the frame context at the start of a frame.
+    fn on_begin_frame(&mut self) {
+        self.context.frame_number = self.context.frame_number.wrapping_add(1);
+        self.context.current_frame_start = std::time::Instant::now();
+        self.context.delta_time = self.context.current_frame_start - self.context.last_frame_start;
+    }
+
+    /// Runs a per-frame update of the frame context at the end of a frame.
+    fn on_end_frame(&mut self) {
+        self.context.last_frame_start = self.context.current_frame_start;
+    }
+
     /// Apply all system phases sequentially.
     ///
     /// This method executes all system phases in sequence.
@@ -102,9 +118,11 @@ impl<E> World<E> {
     where
         E: SystemPhaseEvents
     {
+        self.on_begin_frame();
         {%- for phase in ecs.phases %}
         self.apply_system_phase_{{ phase.name.field }}();
         {%- endfor %}
+        self.on_end_frame();
     }
 
     /// Apply all system phases with thread parallelism.
@@ -125,9 +143,11 @@ impl<E> World<E> {
     where
         E: SystemPhaseEvents
     {
+        self.on_begin_frame();
         {%- for phase in ecs.phases %}
         self.par_apply_system_phase_{{ phase.name.field }}();
         {%- endfor %}
+        self.on_end_frame();
     }
     {%- for phase in ecs.phases %}
 
