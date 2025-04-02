@@ -8,7 +8,7 @@ pub struct FrameContext {
     /// The delta time since the last frame.
     pub delta_time: std::time::Duration,
 
-    /// The fixed time for fixed-time systems.
+    /// The fixed time for fixed-time systems. Defaults to 60 Hz (~16.66 ms).
     pub fixed_time: std::time::Duration,
 
     /// The start time of the current frame.
@@ -27,7 +27,7 @@ impl Default for FrameContext {
         Self {
             frame_number: 0,
             delta_time: Default::default(),
-            fixed_time: Default::default(),
+            fixed_time: std::time::Duration::from_secs_f64(1.0 / 60.0),
             current_frame_start: std::time::Instant::now(),
             last_frame_start: std::time::Instant::now(),
             data: Default::default()
