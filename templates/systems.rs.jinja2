@@ -65,26 +65,36 @@ pub trait CreateSystems {
 pub trait SystemPhaseEvents {
     /// Marks the beginning of a phase.
     #[inline(always)]
+    #[allow(unused_variables)]
     fn on_begin_phase(&mut self, phase: SystemPhase) {
         // empty placeholder implementation
     }
 
     /// Marks the end of a phase.
     #[inline(always)]
+    #[allow(unused_variables)]
     fn on_end_phase(&mut self, phase: SystemPhase) {
         // empty placeholder implementation
     }
 }
 
+/// An alias type for a no-op implementation of [`SystemPhaseEvents`].
+#[allow(dead_code)]
+pub type NoOpPhaseEvents = ();
+
+/// A constant for passing no system type events.
+#[allow(dead_code)]
+const NO_PHASE_EVENTS: Option<NoOpPhaseEvents> = Option::<NoOpPhaseEvents>::None;
+
 #[automatically_derived]
-impl SystemPhaseEvents for () {
+impl SystemPhaseEvents for NoOpPhaseEvents {
     #[inline(always)]
-    fn on_begin_phase(&mut self, phase: SystemPhase) {
+    fn on_begin_phase(&mut self, _phase: SystemPhase) {
         // empty placeholder implementation
     }
 
     #[inline(always)]
-    fn on_end_phase(&mut self, phase: SystemPhase) {
+    fn on_end_phase(&mut self, _phase: SystemPhase) {
         // empty placeholder implementation
     }
 }
