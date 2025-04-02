@@ -86,6 +86,7 @@ pub trait Archetype: 'static + Send + Sync {
 }
 
 /// Trait for archetypes containing the specified `Component`.
+#[allow(dead_code)]
 pub trait HasComponent<T: Component> {
     /// Returns a slice of all component values.
     fn get(&self) -> &[T];
