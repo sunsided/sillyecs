@@ -45,6 +45,7 @@ systems:
   - name: Physics
     phase: FixedUpdate
     order: 2
+    entities: true
     inputs:
       - Velocity
       - Health  # TODO: Remove ...

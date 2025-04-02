@@ -111,6 +111,9 @@ impl<E> World<E> {
         {%- for archetype in system.affected_archetypes %}
         // System group {{ group_number }}: Apply {{ system.name.type }} to {{ archetype.type }}
         self.{{ system.name.field }}_system.apply_many(
+            {%- if system.needs_entities %}
+            &self.{{ archetype.field }}.entities,
+            {%- endif %}
             {%- for input in system.inputs %}
             &self.{{ archetype.field }}.{{ input.fields }},
             {%- endfor %}
@@ -163,6 +166,9 @@ impl<E> World<E> {
                 {%- for archetype in system.affected_archetypes %}
                 // Apply {{ system.name.type }} to {{ archetype.type }}
                 self.{{ system.name.field }}_system.apply_many(
+                    {%- if system.needs_entities %}
+                    &self.{{ archetype.field }}.entities,
+                    {%- endif %}
                     {%- for input in system.inputs %}
                     &self.{{ archetype.field }}.{{ input.fields }},
                     {%- endfor %}

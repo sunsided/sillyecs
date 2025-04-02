@@ -10,17 +10,33 @@ static SYSTEM_IDS: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct System {
+    /// The ID of the system. Automatically generatedd.
     #[serde(skip_deserializing, default)]
     pub id: SystemId,
+
+    /// The name of the system.
     pub name: SystemName,
+
+    /// The optional description of the system to use as a documentation comment.
     #[serde(default)]
     pub description: Option<String>,
+
     /// The order in which systems are executed when they cannot be parallelized.
     #[serde(default)]
     pub order: u32,
+
+    /// Whether the system requires access to entities.
+    #[serde(default, rename(serialize = "needs_entities", deserialize = "entities"))]
+    pub entities: bool,
+
+    /// The phase in which to run the system.
     pub phase: SystemPhaseRef,
+
+    /// The optional input components to the system.
     #[serde(default)]
     pub inputs: Vec<ComponentName>,
+
+    /// The optional output components to the system.
     #[serde(default)]
     pub outputs: Vec<ComponentName>,
 
@@ -73,12 +89,20 @@ impl System {
         self.affected_archetypes = ids_and_names.into_iter().map(|entry| entry.1).collect();
 
         // Create zipped iteration code.
-        let num_components = self.inputs.len() + self.outputs.len();
+        let mut num_components = self.inputs.len() + self.outputs.len();
+        if self.entities {
+            num_components += 1;
+        }
+
         debug_assert_ne!(num_components, 0);
 
         if num_components == 1 {
             self.component_iter_code = String::new();
-            if let Some(output) = self.outputs.first() {
+            if self.entities {
+                self.component_iter_code = "entities".to_string();
+                self.component_untuple_code = "entity".to_string();
+            }
+            else if let Some(output) = self.outputs.first() {
                 self.component_iter_code = format!("{name}", name = output.field_name_plural);
                 self.component_untuple_code = format!("{name}", name = output.field_name);
             } else if let Some(input) = self.inputs.first() {
@@ -90,7 +114,6 @@ impl System {
         } else {
             let mut iter_stack = String::new();
             let mut untuple_stack = String::new();
-
             for output in self.outputs.iter().rev() {
                 if iter_stack.is_empty() {
                     iter_stack = format!("{name}.iter_mut()", name = output.field_name_plural);
@@ -114,6 +137,18 @@ impl System {
                         name = input.field_name_plural
                     );
                     untuple_stack = format!("({name}, {untuple_stack})", name = input.field_name);
+                }
+            }
+
+            if self.entities {
+                if iter_stack.is_empty() {
+                    iter_stack = "entities.iter()".to_string();
+                    untuple_stack = "entity".to_string();
+                } else {
+                    iter_stack = format!(
+                        "entities.iter().zip({iter_stack})",
+                    );
+                    untuple_stack = format!("(entity, {untuple_stack})");
                 }
             }
 
