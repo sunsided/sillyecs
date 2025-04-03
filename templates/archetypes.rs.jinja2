@@ -167,11 +167,10 @@ impl {{ archetype.name.type }} {
     /// Spawn a new entity into the world.
     pub fn spawn_with(
         &mut self,
-        world: &mut World,
         {%- for component_name in archetype.components %}
         {{component_name.field}}: {{ component_name.type }},
         {%- endfor %}
-    ) -> EntityId {
+    ) -> (EntityId, EntityArchetypeRef) {
         {%- for component_name in archetype.components %}
         self.{{ component_name.fields }}.push({{component_name.field}});
         {%- endfor %}
@@ -185,8 +184,7 @@ impl {{ archetype.name.type }} {
             archetype: Self::ID,
             index: entity_index
         };
-        world.register_entity_from_spawn(entity_id, reference);
-        entity_id
+        (entity_id, reference)
     }
 
     {%- for promotion in archetype.promotion_infos %}
