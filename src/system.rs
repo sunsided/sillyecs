@@ -44,23 +44,23 @@ pub struct System {
     #[serde(default)]
     pub outputs: Vec<ComponentName>,
 
-    /// The archetypes this system operates on. Available after a call to [`Archetype::finish`](Archetype::finish).
+    /// The archetypes this system operates on. Available after a call to [`System::finish`](System::finish).
     #[serde(skip_deserializing, default)]
     pub affected_archetypes: Vec<ArchetypeRef>,
 
-    /// The IDs of the affected archetypes in ascending order. Available after a call to [`Archetype::finish`](Archetype::finish).
+    /// The IDs of the affected archetypes in ascending order. Available after a call to [`System::finish`](System::finish).
     #[serde(skip_deserializing, default)]
     pub affected_archetype_ids: Vec<ArchetypeId>,
 
-    /// The number of affected archetypes. Available after a call to [`Archetype::finish`](Archetype::finish).
+    /// The number of affected archetypes. Available after a call to [`System::finish`](System::finish).
     #[serde(skip_deserializing, default)]
     pub affected_archetype_count: usize,
 
-    /// The code to iterate component values. Available after a call to [`Archetype::finish`](Archetype::finish).
+    /// The code to iterate component values. Available after a call to [`System::finish`](System::finish).
     #[serde(skip_deserializing, default)]
     pub component_iter_code: String,
 
-    /// The code to untuple component values. Available after a call to [`Archetype::finish`](Archetype::finish).
+    /// The code to untuple component values. Available after a call to [`System::finish`](System::finish).
     #[serde(skip_deserializing, default)]
     pub component_untuple_code: String,
 }
@@ -172,7 +172,7 @@ impl Default for SystemId {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct SystemPhase {
     /// The name of the phase.
     pub name: SystemPhaseName,
@@ -180,9 +180,85 @@ pub struct SystemPhase {
     /// The optional description of the phase.
     pub description: Option<String>,
 
-    /// Whether this phase uses a fixed timing loop.
-    #[serde(default)]
+    #[serde(default, skip_serializing, rename(deserialize = "fixed"))]
+    pub fixed_input: FixedTiming,
+
+    /// When nonzero, this phase uses a fixed timing loop with the specified time in seconds.
+    #[serde(default, skip_deserializing)]
+    pub fixed_secs: f32,
+
+    /// Indicates the number of times per second that the fixed loop runs. Available after a call to [`SystemPhase::finish`](SystemPhase::finish).
+    #[serde(default, skip_deserializing)]
+    pub fixed_hertz: f32,
+
+    /// Indicates whether this phase is fixed. Available after a call to [`SystemPhase::finish`](SystemPhase::finish).
+    #[serde(default, skip_deserializing)]
     pub fixed: bool
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Default)]
+pub enum FixedTiming {
+    #[default]
+    None,
+    Fixed,
+    FixedHertz(f32),
+    FixedSecs(f32),
+}
+
+impl<'de> Deserialize<'de> for FixedTiming {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>
+    {
+        let str = String::deserialize(deserializer)?;
+        let str = str.to_ascii_lowercase();
+        if str.is_empty() {
+            Ok(FixedTiming::None)
+        } else if str == "true" {
+            Ok(FixedTiming::Fixed)
+        } else if let Some(number) = str.strip_suffix("hz") {
+            let hertz = number.trim().parse::<f32>().map_err(serde::de::Error::custom)?;
+            Ok(FixedTiming::FixedHertz(hertz))
+        } else if let Some(number) = str.strip_suffix("seconds") {
+            let secs = number.trim().parse::<f32>().map_err(serde::de::Error::custom)?;
+            Ok(FixedTiming::FixedSecs(secs))
+        } else if let Some(number) = str.strip_suffix("secs") {
+            let secs = number.trim().parse::<f32>().map_err(serde::de::Error::custom)?;
+            Ok(FixedTiming::FixedSecs(secs))
+        } else if let Some(number) = str.strip_suffix("sec") {
+            let secs = number.trim().parse::<f32>().map_err(serde::de::Error::custom)?;
+            Ok(FixedTiming::FixedSecs(secs))
+        } else if let Some(number) = str.strip_suffix("s") {
+            let secs = number.trim().parse::<f32>().map_err(serde::de::Error::custom)?;
+            Ok(FixedTiming::FixedSecs(secs))
+        } else {
+            Err(serde::de::Error::custom(format!("Invalid fixed timing: {str}")))
+        }
+    }
+}
+
+
+impl SystemPhase {
+    pub(crate) fn finish(&mut self) {
+        match self.fixed_input {
+            FixedTiming::None => {}
+            FixedTiming::Fixed => {
+                self.fixed_hertz = 60.0;
+                self.fixed_secs = 1.0 / 60.0;
+                self.fixed = true;
+            }
+            FixedTiming::FixedHertz(hz) => {
+                self.fixed_hertz = hz;
+                self.fixed_secs = 1.0 / hz;
+                self.fixed = true;
+            }
+            FixedTiming::FixedSecs(sec) => {
+                self.fixed_secs = sec;
+                self.fixed_hertz = 1.0 / sec;
+                self.fixed = true;
+            }
+        }
+    }
 }
 
 pub type SystemPhaseRef = SystemPhaseName;

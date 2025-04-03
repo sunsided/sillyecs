@@ -72,6 +72,7 @@ archetypes:
 phases:
   - name: Startup
   - name: FixedUpdate
+    fixed: 60 Hz
   - name: Update
   - name: Render
 

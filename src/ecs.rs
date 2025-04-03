@@ -25,6 +25,10 @@ impl Ecs {
         for system in &mut self.systems {
             system.finish(&self.archetypes);
         }
+
+        for phase in &mut self.phases {
+            phase.finish();
+        }
     }
 }
 
