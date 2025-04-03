@@ -33,6 +33,10 @@ pub struct System {
     #[serde(default, rename(serialize = "needs_context", deserialize = "context"))]
     pub context: bool,
 
+    /// Whether the system requires access to the user state.
+    #[serde(default, rename(serialize = "needs_state", deserialize = "state"))]
+    pub state: bool,
+
     /// The phase in which to run the system.
     pub phase: SystemPhaseRef,
 

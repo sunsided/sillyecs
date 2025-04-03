@@ -172,6 +172,7 @@ mod tests {
             name: sysname(name),
             order,
             context: false,
+            state: false,
             entities: false,
             inputs: inputs.into_iter().map(compname).collect(),
             outputs: outputs.into_iter().map(compname).collect(),

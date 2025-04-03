@@ -16,9 +16,6 @@ pub struct FrameContext {
 
     /// The start time of the last frame.
     pub last_frame_start: std::time::Instant,
-
-    /// User-specific data.
-    pub data: FrameContextData
 }
 
 #[allow(dead_code)]
@@ -30,24 +27,7 @@ impl Default for FrameContext {
             fixed_time_secs: 1.0 / 60.0,
             current_frame_start: std::time::Instant::now(),
             last_frame_start: std::time::Instant::now(),
-            data: Default::default()
         }
-    }
-}
-
-#[allow(dead_code)]
-impl std::ops::Deref for FrameContext {
-    type Target = FrameContextData;
-
-    fn deref(&self) -> &Self::Target {
-        &self.data
-    }
-}
-
-#[allow(dead_code)]
-impl std::ops::DerefMut for FrameContext {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.data
     }
 }
 
@@ -64,6 +44,9 @@ pub struct World<E = ()> {
 
     /// The frame context.
     context: FrameContext,
+
+    /// User-specific data.
+    pub state: UserState,
     {%- if ecs.any_phase_fixed %}
 
     /// The fixed-time accumulators.
@@ -90,7 +73,7 @@ struct FixedAccumulators {
 #[allow(dead_code)]
 impl<E> World<E> {
     /// Creates a new [`World`].
-    pub fn new<S>(create_systems: &S, phase_events: Option<E>) -> Self
+    pub fn new<S>(create_systems: &S, state: UserState, phase_events: Option<E>) -> Self
     where
         S: CreateSystems,
         E: SystemPhaseEvents
@@ -107,6 +90,7 @@ impl<E> World<E> {
             {{ system.name.field }}_system,
             {%- endfor %}
             context,
+            state,
             {%- if ecs.any_phase_fixed %}
             fixed_accumulators: Default::default(),
             {%- endif %}
@@ -224,13 +208,13 @@ impl<E> World<E> {
         E: SystemPhaseEvents
     {
         if let Some(events) = &mut self.events {
-            events.on_begin_phase(SystemPhase::{{ phase.name.raw }}, &self.context);
+            events.on_begin_phase(SystemPhase::{{ phase.name.raw }}, &self.context, &mut self.state);
         }
 
         self.apply_system_phase_{{ phase.name.field }}_without_events();
 
         if let Some(events) = &mut self.events {
-            events.on_end_phase(SystemPhase::{{ phase.name.raw }}, &self.context);
+            events.on_end_phase(SystemPhase::{{ phase.name.raw }}, &self.context, &mut self.state);
         }
     }
 
@@ -253,6 +237,9 @@ impl<E> World<E> {
             self.{{ system.name.field }}_system.apply_many(
                 {%- if system.needs_context %}
                 &self.context,
+                {%- endif %}
+                {%- if system.needs_state %}
+                &self.state,
                 {%- endif %}
                 {%- if system.needs_entities %}
                 &self.{{ archetype.field }}.entities,
@@ -289,7 +276,7 @@ impl<E> World<E> {
         E: SystemPhaseEvents
     {
         if let Some(events) = &mut self.events {
-            events.on_begin_phase(SystemPhase::{{ phase.name.raw }}, &self.context);
+            events.on_begin_phase(SystemPhase::{{ phase.name.raw }}, &self.context, &mut self.state);
         }
 
         {%- if ecs.scheduled_systems[phase.name] | length == 0 %}
@@ -312,6 +299,9 @@ impl<E> World<E> {
                     {%- if system.needs_context %}
                     &self.context,
                     {%- endif %}
+                    {%- if system.needs_state %}
+                    &self.state,
+                    {%- endif %}
                     {%- if system.needs_entities %}
                     &self.{{ archetype.field }}.entities,
                     {%- endif %}
@@ -330,7 +320,7 @@ impl<E> World<E> {
         {%- endif %}
 
         if let Some(events) = &mut self.events {
-            events.on_end_phase(SystemPhase::{{ phase.name.raw }}, &self.context);
+            events.on_end_phase(SystemPhase::{{ phase.name.raw }}, &self.context, &mut self.state);
         }
     }
     {%- endfor %}
