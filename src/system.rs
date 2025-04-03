@@ -174,7 +174,15 @@ impl Default for SystemId {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct SystemPhase {
+    /// The name of the phase.
     pub name: SystemPhaseName,
+
+    /// The optional description of the phase.
+    pub description: Option<String>,
+
+    /// Whether this phase uses a fixed timing loop.
+    #[serde(default)]
+    pub fixed: bool
 }
 
 pub type SystemPhaseRef = SystemPhaseName;

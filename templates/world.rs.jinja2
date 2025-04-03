@@ -6,10 +6,10 @@ pub struct FrameContext {
     pub frame_number: u64,
 
     /// The delta time since the last frame.
-    pub delta_time: std::time::Duration,
+    pub delta_time_secs: f32,
 
     /// The fixed time for fixed-time systems. Defaults to 60 Hz (~16.66 ms).
-    pub fixed_time: std::time::Duration,
+    pub fixed_time_secs: f32,
 
     /// The start time of the current frame.
     pub current_frame_start: std::time::Instant,
@@ -26,8 +26,8 @@ impl Default for FrameContext {
     fn default() -> Self {
         Self {
             frame_number: 0,
-            delta_time: Default::default(),
-            fixed_time: std::time::Duration::from_secs_f64(1.0 / 60.0),
+            delta_time_secs: 0.0,
+            fixed_time_secs: 1.0 / 60.0,
             current_frame_start: std::time::Instant::now(),
             last_frame_start: std::time::Instant::now(),
             data: Default::default()
@@ -97,9 +97,9 @@ impl<E> World<E> {
     fn on_begin_frame(&mut self) {
         self.context.current_frame_start = std::time::Instant::now();
         if self.context.frame_number == 0 {
-            self.context.delta_time = std::time::Duration::ZERO;
+            self.context.delta_time_secs = 0.0;
         } else {
-            self.context.delta_time = self.context.current_frame_start - self.context.last_frame_start;
+            self.context.delta_time_secs = (self.context.current_frame_start - self.context.last_frame_start).as_secs_f32();
         }
         self.context.frame_number = self.context.frame_number.wrapping_add(1);
     }

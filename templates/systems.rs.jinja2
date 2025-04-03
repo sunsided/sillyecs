@@ -47,6 +47,13 @@ pub enum SystemPhase {
     /// {{ phase.description }}
     {%- else %}
     /// The `{{ phase.name.raw }}` system phase.
+    {%- if phase.fixed %}
+    ///
+    /// This phase runs using a **fixed-time loop** and may iterate zero or multiple times per frame.
+    {%- else %}
+    ///
+    /// This phase is executed exactly once per frame.
+    {%- endif %}
     {%- endif %}
     {{ phase.name.raw }} = {{ loop.index - 1 }},
 {%- endfor %}
