@@ -82,6 +82,16 @@ impl From<ArchetypeId> for u64 {
     }
 }
 
+/// A locator for an entity across archetypes.
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct EntityArchetypeRef {
+    /// The ID of the archetype the entity is in.
+    pub archetype: ArchetypeId,
+
+    /// The Entity's index within that archetype.
+    pub index: usize
+}
+
 /// Marker trait for archetypes.
 #[allow(dead_code)]
 pub trait Archetype: 'static + Send + Sync {
@@ -152,6 +162,26 @@ impl {{ archetype.name.type }} {
     pub const fn has_components<Id>(&self, id: ComponentId) -> bool {
         let id = id.as_u64();
         {% for id in archetype.component_ids %}id == {{ id }} || {% endfor %}false
+    }
+
+    /// Spawn a new entity into the world.
+    pub fn spawn(&mut self, world: &mut World) -> EntityId {
+        world.register_entity_from_spawn(|| {
+            let index = self.entities.len();
+
+            let entity_id = EntityId::new();
+            self.entities.push(entity_id);
+
+            {%- for component_name in archetype.components %}
+            self.{{ component_name.fields }}.push(Default::default());
+            {%- endfor %}
+
+            let reference = EntityArchetypeRef {
+                archetype: Self::ID,
+                index
+            };
+            (entity_id, reference)
+        })
     }
 
     {%- for promotion in archetype.promotion_infos %}

@@ -10,7 +10,7 @@ impl SystemId {
 
     /// Returns this ID as a `u64` value.
     pub const fn as_u64(&self) -> u64 {
-            self.0.get()
+        self.0.get()
     }
 }
 

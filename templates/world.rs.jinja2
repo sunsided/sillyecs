@@ -42,6 +42,9 @@ pub struct World<E = ()> {
     pub {{ system.name.field }}_system: {{ system.name.type }},
     {%- endfor %}
 
+    /// The entity locator.
+    entity_locations: std::collections::HashMap<EntityId, EntityArchetypeRef>,
+
     /// The frame context.
     context: FrameContext,
 
@@ -89,6 +92,7 @@ impl<E> World<E> {
             {%- for system in ecs.systems %}
             {{ system.name.field }}_system,
             {%- endfor %}
+            entity_locations: Default::default(),
             context,
             state,
             {%- if ecs.any_phase_fixed %}
@@ -97,6 +101,17 @@ impl<E> World<E> {
             events: phase_events
         }
     }
+
+    /// Callback function for an archetype to spawn an entity.
+    #[doc(hidden)]
+    pub fn register_entity_from_spawn<V>(&mut self, mut visitor: V) -> EntityId
+    where
+        V: FnMut() -> (EntityId, EntityArchetypeRef)
+    {
+        let (id, reference) = visitor();
+        self.entity_locations.insert(id, reference);
+        id
+    }  
 
     /// Runs a per-frame update of the frame context at the start of a frame.
     fn on_begin_frame(&mut self) {
