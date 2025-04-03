@@ -63,6 +63,44 @@ pub enum SystemPhase {
 impl SystemPhase {
     /// The number of system phases.
     pub const COUNT: usize = {{ ecs.phases | length }};
+    {%- for phase in ecs.phases %}
+    {%- if phase.fixed %}
+
+    /// The number of seconds the [`{{ phase.name.raw }}`](SystemPhase::{{ phase.name.raw }}) fixed-time step should run.
+    pub const {{ phase.name.field | upper }}_SECS: f32 = {{ phase.fixed_secs }};
+
+    /// The frequency of the [`{{ phase.name.raw }}`](SystemPhase::{{ phase.name.raw }}) fixed-time step.
+    pub const {{ phase.name.field | upper }}_HZ: f32 = {{ phase.fixed_hertz }};
+    {%- endif %}
+    {%- endfor %}
+
+    /// Returns the number of seconds between the fixed time steps if this phase
+    /// is configured to run in fixed time, otherwise [`None`].
+    pub const fn fixed_secs(&self) -> Option<f32> {
+        match self {
+            {%- for phase in ecs.phases %}
+            Self::{{ phase.name.raw }} => {% if phase.fixed -%}
+                Some(Self::{{ phase.name.field | upper }}_SECS)
+                {%- else -%}
+                None
+                {%- endif -%},
+            {%- endfor %}
+        }
+    }
+
+    /// Returns frequency this phase should run if this phase
+    /// is configured to run in fixed time, otherwise [`None`].
+    pub const fn fixed_hz(&self) -> Option<f32> {
+        match self {
+            {%- for phase in ecs.phases %}
+            Self::{{ phase.name.raw }} => {% if phase.fixed -%}
+                Some(Self::{{ phase.name.field | upper}}_HZ)
+                {%- else -%}
+                None
+                {%- endif -%},
+            {%- endfor %}
+        }
+    }
 }
 
 /// Trait for constructing system instances.
@@ -79,14 +117,14 @@ pub trait SystemPhaseEvents {
     /// Marks the beginning of a phase.
     #[inline(always)]
     #[allow(unused_variables)]
-    fn on_begin_phase(&mut self, phase: SystemPhase) {
+    fn on_begin_phase(&mut self, phase: SystemPhase, context: &FrameContext) {
         // empty placeholder implementation
     }
 
     /// Marks the end of a phase.
     #[inline(always)]
     #[allow(unused_variables)]
-    fn on_end_phase(&mut self, phase: SystemPhase) {
+    fn on_end_phase(&mut self, phase: SystemPhase, context: &FrameContext) {
         // empty placeholder implementation
     }
 }
@@ -102,12 +140,12 @@ const NO_PHASE_EVENTS: Option<NoOpPhaseEvents> = Option::<NoOpPhaseEvents>::None
 #[automatically_derived]
 impl SystemPhaseEvents for NoOpPhaseEvents {
     #[inline(always)]
-    fn on_begin_phase(&mut self, _phase: SystemPhase) {
+    fn on_begin_phase(&mut self, _phase: SystemPhase, _context: &FrameContext) {
         // empty placeholder implementation
     }
 
     #[inline(always)]
-    fn on_end_phase(&mut self, _phase: SystemPhase) {
+    fn on_end_phase(&mut self, _phase: SystemPhase, _context: &FrameContext) {
         // empty placeholder implementation
     }
 }

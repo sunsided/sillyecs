@@ -64,10 +64,28 @@ pub struct World<E = ()> {
 
     /// The frame context.
     context: FrameContext,
+    {%- if ecs.any_phase_fixed %}
+
+    /// The fixed-time accumulators.
+    fixed_accumulators: FixedAccumulators,
+    {%- endif %}
 
     /// The system phase events
     events: Option<E>
 }
+{%- if ecs.any_phase_fixed %}
+
+/// Time accumulators for fixed-time phases.
+#[derive(Debug, Clone, Default)]
+struct FixedAccumulators {
+    {%- for phase in ecs.phases %}
+    {%- if phase.fixed %}
+    /// The time accumulator for the [`{{ phase.name.raw }}`](SystemPhase::{{ phase.name.raw }}) fixed-time step.
+    {{ phase.name.field }}: f32,
+    {%- endif %}
+    {%- endfor %}
+}
+{%- endif %}
 
 #[allow(dead_code)]
 impl<E> World<E> {
@@ -89,6 +107,9 @@ impl<E> World<E> {
             {{ system.name.field }}_system,
             {%- endfor %}
             context,
+            {%- if ecs.any_phase_fixed %}
+            fixed_accumulators: Default::default(),
+            {%- endif %}
             events: phase_events
         }
     }
@@ -124,7 +145,20 @@ impl<E> World<E> {
     {
         self.on_begin_frame();
         {%- for phase in ecs.phases %}
+        {%- if not phase.fixed %}
         self.apply_system_phase_{{ phase.name.field }}();
+        {%- else %}
+
+        // Apply fixed-time loop for phase {{ phase.name.raw }}
+        self.context.fixed_time_secs = SystemPhase::{{ phase.name.field | upper }}_SECS;
+        self.fixed_accumulators.{{ phase.name.field }} += self.context.delta_time_secs;
+        while self.fixed_accumulators.{{ phase.name.field }} >= SystemPhase::{{ phase.name.field | upper }}_SECS {
+            self.apply_system_phase_{{ phase.name.field }}();
+            self.fixed_accumulators.{{ phase.name.field }} -= SystemPhase::{{ phase.name.field | upper }}_SECS;
+        }
+
+        self.context.fixed_time_secs = 0.0;
+        {%- endif %}
         {%- endfor %}
         self.on_end_frame();
     }
@@ -149,7 +183,20 @@ impl<E> World<E> {
     {
         self.on_begin_frame();
         {%- for phase in ecs.phases %}
+        {%- if not phase.fixed %}
         self.par_apply_system_phase_{{ phase.name.field }}();
+        {%- else %}
+
+        // Apply fixed-time loop for phase {{ phase.name.raw }}
+        self.context.fixed_time_secs = SystemPhase::{{ phase.name.field | upper }}_SECS;
+        self.fixed_accumulators.{{ phase.name.field }} += self.context.delta_time_secs;
+        while self.fixed_accumulators.{{ phase.name.field }} >= SystemPhase::{{ phase.name.field | upper }}_SECS {
+            self.par_apply_system_phase_{{ phase.name.field }}();
+            self.fixed_accumulators.{{ phase.name.field }} -= SystemPhase::{{ phase.name.field | upper }}_SECS;
+        }
+
+        self.context.fixed_time_secs = 0.0;
+        {%- endif %}
         {%- endfor %}
         self.on_end_frame();
     }
@@ -177,13 +224,13 @@ impl<E> World<E> {
         E: SystemPhaseEvents
     {
         if let Some(events) = &mut self.events {
-            events.on_begin_phase(SystemPhase::{{ phase.name.raw }});
+            events.on_begin_phase(SystemPhase::{{ phase.name.raw }}, &self.context);
         }
 
         self.apply_system_phase_{{ phase.name.field }}_without_events();
 
         if let Some(events) = &mut self.events {
-            events.on_end_phase(SystemPhase::{{ phase.name.raw }});
+            events.on_end_phase(SystemPhase::{{ phase.name.raw }}, &self.context);
         }
     }
 
@@ -242,7 +289,7 @@ impl<E> World<E> {
         E: SystemPhaseEvents
     {
         if let Some(events) = &mut self.events {
-            events.on_begin_phase(SystemPhase::{{ phase.name.raw }});
+            events.on_begin_phase(SystemPhase::{{ phase.name.raw }}, &self.context);
         }
 
         {%- if ecs.scheduled_systems[phase.name] | length == 0 %}
@@ -283,7 +330,7 @@ impl<E> World<E> {
         {%- endif %}
 
         if let Some(events) = &mut self.events {
-            events.on_end_phase(SystemPhase::{{ phase.name.raw }});
+            events.on_end_phase(SystemPhase::{{ phase.name.raw }}, &self.context);
         }
     }
     {%- endfor %}

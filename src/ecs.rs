@@ -7,10 +7,18 @@ use crate::system_scheduler::schedule_systems;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Ecs {
+    /// The components.
     pub components: Vec<Component>,
+    /// The archetypes.
     pub archetypes: Vec<Archetype>,
+    /// The system phases.
     pub phases: Vec<SystemPhase>,
+    /// Indicates whether any phase has fixed-time steps.
+    #[serde(default, skip_deserializing)]
+    pub any_phase_fixed: bool,
+    /// The systems.
     pub systems: Vec<System>,
+    /// The systems in scheduling order.
     #[serde(default, skip_deserializing)]
     pub scheduled_systems: HashMap<SystemPhaseRef, Vec<Vec<System>>>,
 }
@@ -28,6 +36,7 @@ impl Ecs {
 
         for phase in &mut self.phases {
             phase.finish();
+            self.any_phase_fixed |= phase.fixed;
         }
     }
 }
