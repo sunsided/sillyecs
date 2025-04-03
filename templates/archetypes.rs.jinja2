@@ -1,5 +1,5 @@
 /// The ID of an entity.
-#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
+#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct EntityId(std::num::NonZeroU64);
 
 #[allow(dead_code)]
@@ -29,6 +29,12 @@ impl EntityId {
     }
 }
 
+impl std::hash::Hash for EntityId {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.hash(state);
+    }
+}
+
 impl From<EntityId> for std::num::NonZeroU64 {
     fn from(value: EntityId) -> std::num::NonZeroU64 {
         value.as_nonzero_u64()
@@ -42,7 +48,7 @@ impl From<EntityId> for u64 {
 }
 
 /// The ID of an [`Archetype`].
-#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
+#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct ArchetypeId(std::num::NonZeroU64);
 
 #[allow(dead_code)]
@@ -55,6 +61,12 @@ impl ArchetypeId {
     /// Returns this ID as a `u64` value.
     pub const fn as_u64(&self) -> u64 {
             self.0.get()
+    }
+}
+
+impl std::hash::Hash for ArchetypeId {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.hash(state);
     }
 }
 
