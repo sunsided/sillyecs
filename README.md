@@ -91,10 +91,10 @@ systems:
 Include the compile-time generated files:
 
 ```rust
-include!(concat!(env!("OUT_DIR"), "/components.gen.rs"));
-include!(concat!(env!("OUT_DIR"), "/archetypes.gen.rs"));
-include!(concat!(env!("OUT_DIR"), "/systems.gen.rs"));
-include!(concat!(env!("OUT_DIR"), "/world.gen.rs"));
+include!(concat!(env!("OUT_DIR"), "/components_gen.rs"));
+include!(concat!(env!("OUT_DIR"), "/archetypes_gen.rs"));
+include!(concat!(env!("OUT_DIR"), "/systems_gen.rs"));
+include!(concat!(env!("OUT_DIR"), "/world_gen.rs"));
 ```
 
 The compiler will tell you which traits and functions to implement.

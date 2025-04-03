@@ -143,10 +143,10 @@ impl EcsCode {
             ));
         }
 
-        Self::write_file(out_dir, "components.gen.rs", &self.components)?;
-        Self::write_file(out_dir, "archetypes.gen.rs", &self.archetypes)?;
-        Self::write_file(out_dir, "systems.gen.rs", &self.systems)?;
-        Self::write_file(out_dir, "world.gen.rs", &self.world)?;
+        Self::write_file(out_dir, "components_gen.rs", &self.components)?;
+        Self::write_file(out_dir, "archetypes_gen.rs", &self.archetypes)?;
+        Self::write_file(out_dir, "systems_gen.rs", &self.systems)?;
+        Self::write_file(out_dir, "world_gen.rs", &self.world)?;
         Ok(())
     }
 
