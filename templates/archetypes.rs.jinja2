@@ -165,23 +165,28 @@ impl {{ archetype.name.type }} {
     }
 
     /// Spawn a new entity into the world.
-    pub fn spawn(&mut self, world: &mut World) -> EntityId {
-        world.register_entity_from_spawn(|| {
-            let index = self.entities.len();
+    pub fn spawn_with(
+        &mut self,
+        world: &mut World,
+        {%- for component_name in archetype.components %}
+        {{component_name.field}}: {{ component_name.type }},
+        {%- endfor %}
+    ) -> EntityId {
+        {%- for component_name in archetype.components %}
+        self.{{ component_name.fields }}.push({{component_name.field}});
+        {%- endfor %}
 
-            let entity_id = EntityId::new();
-            self.entities.push(entity_id);
+        let entity_id = EntityId::new();
 
-            {%- for component_name in archetype.components %}
-            self.{{ component_name.fields }}.push(Default::default());
-            {%- endfor %}
+        let entity_index = self.entities.len();
+        self.entities.push(entity_id);
 
-            let reference = EntityArchetypeRef {
-                archetype: Self::ID,
-                index
-            };
-            (entity_id, reference)
-        })
+        let reference = EntityArchetypeRef {
+            archetype: Self::ID,
+            index: entity_index
+        };
+        world.register_entity_from_spawn(entity_id, reference);
+        entity_id
     }
 
     {%- for promotion in archetype.promotion_infos %}

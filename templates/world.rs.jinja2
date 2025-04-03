@@ -104,13 +104,9 @@ impl<E> World<E> {
 
     /// Callback function for an archetype to spawn an entity.
     #[doc(hidden)]
-    pub fn register_entity_from_spawn<V>(&mut self, mut visitor: V) -> EntityId
-    where
-        V: FnMut() -> (EntityId, EntityArchetypeRef)
-    {
-        let (id, reference) = visitor();
-        self.entity_locations.insert(id, reference);
-        id
+    #[inline]
+    pub fn register_entity_from_spawn(&mut self, entity_id: EntityId, archetype_ref: EntityArchetypeRef) {
+        self.entity_locations.insert(entity_id, archetype_ref);
     }  
 
     /// Runs a per-frame update of the frame context at the start of a frame.
