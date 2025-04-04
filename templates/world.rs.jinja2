@@ -128,13 +128,6 @@ impl<E>{{ world.name.type }}<E> {
     }
     {%- endfor %}
 
-    /// Callback function for an archetype to spawn an entity.
-    #[doc(hidden)]
-    #[inline]
-    pub fn register_entity_from_spawn(&mut self, entity_id: EntityId, archetype_ref: EntityArchetypeRef) {
-        self.entity_locations.insert(entity_id, archetype_ref);
-    }
-
     /// Runs a per-frame update of the frame context at the start of a frame.
     fn on_begin_frame(&mut self) {
         self.context.current_frame_start = std::time::Instant::now();
