@@ -131,6 +131,37 @@ pub struct {{ archetype.name.type }} {
     {%- endfor %}
 }
 
+/// An entity of the [`{{ archetype.name.type }}`].
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
+pub struct {{ archetype.name.raw }}Entity {
+    pub id: EntityId,
+    pub data: {{ archetype.name.raw }}EntityData,
+}
+
+/// An entity of the [`{{ archetype.name.type }}`].
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
+pub struct {{ archetype.name.raw }}EntityData {
+    {%- for component_name in archetype.components %}
+    pub {{ component_name.field }}: {{ component_name.type }},
+    {%- endfor %}
+}
+
+impl std::ops::Deref for {{ archetype.name.raw }}Entity {
+    type Target = {{ archetype.name.raw }}EntityData;
+
+    fn deref(&self) -> &Self::Target {
+        &self.data
+    }
+}
+
+impl std::ops::DerefMut for {{ archetype.name.raw }}Entity {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.data
+    }
+}
+
 #[allow(dead_code)]
 impl {{ archetype.name.type }} {
     /// The IDs of the components used by this archetype, in ascending order.

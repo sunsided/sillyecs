@@ -96,6 +96,19 @@ impl<E>{{ world.name.type }}<E> {
     }
     {%- for archetype in world.archetypes %}
 
+    /// Spawn a new `{{ archetype.name.raw }}` entity into the world given its [`{{ archetype.name.raw }}EntityData`].
+    #[inline]
+    pub fn spawn_{{ archetype.name.field }}(
+        &mut self,
+        {{ archetype.name.field }}: {{ archetype.name.raw }}EntityData
+    ) -> EntityId {
+        self.spawn_{{ archetype.name.field }}_with(
+            {%- for component_name in archetype.components %}
+            {{ archetype.name.field }}.{{component_name.field}},
+            {%- endfor %}
+        )
+    }
+
     /// Spawn a new `{{ archetype.name.raw }}` entity into the world.
     pub fn spawn_{{ archetype.name.field }}_with(
         &mut self,
