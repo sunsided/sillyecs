@@ -68,6 +68,17 @@ struct {{ world.name.type }}Systems {
     pub {{ system.name.field }}: {{ system.name.type }},
     {%- endfor %}
 }
+{%- for archetype in world.archetypes %}
+
+/// Spawns an entity into the world.
+impl<E> Spawn<{{ archetype.name.raw}}EntityData> for {{ world.name.type }}<E> {
+    /// Spawn a new entity into the world.
+    #[inline]
+    fn spawn(&mut self, data: {{ archetype.name.raw}}EntityData) -> EntityId {
+        self.spawn_{{ archetype.name.field}}(data)
+    }
+}
+{%- endfor %}
 
 #[allow(dead_code)]
 impl<E>{{ world.name.type }}<E> {

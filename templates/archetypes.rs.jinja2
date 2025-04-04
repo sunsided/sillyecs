@@ -92,6 +92,13 @@ pub struct EntityArchetypeRef {
     pub index: usize
 }
 
+/// Spawns an entity into the world.
+#[allow(dead_code)]
+pub trait Spawn<E> {
+    /// Spawn a new entity into the world.
+    fn spawn(&mut self, data: E) -> EntityId;
+}
+
 /// Marker trait for archetypes.
 #[allow(dead_code)]
 pub trait Archetype: 'static + Send + Sync {
@@ -146,6 +153,18 @@ pub struct {{ archetype.name.raw }}EntityData {
     {%- for component_name in archetype.components %}
     pub {{ component_name.field }}: {{ component_name.type }},
     {%- endfor %}
+}
+
+impl {{ archetype.name.raw }}EntityData {
+    /// Spawn this entity into the given world.
+    #[inline]
+    #[allow(dead_code)]
+    pub fn spawn_into<W>(self, world: &mut W) -> EntityId
+    where
+        W: Spawn<{{ archetype.name.raw}}EntityData>
+    {
+        world.spawn(self)
+    }
 }
 
 impl std::ops::Deref for {{ archetype.name.raw }}Entity {
