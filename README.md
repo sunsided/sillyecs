@@ -72,19 +72,21 @@ archetypes:
 phases:
   - name: Startup
   - name: FixedUpdate
-    fixed: 60 Hz
+    fixed: 60 Hz  # or "0.01666 s"
   - name: Update
   - name: Render
 
 systems:
   - name: Physics
     phase: FixedUpdate
+    context: true
     inputs:
       - Velocity
     outputs:
       - Position
   - name: Render
     phase: Render
+    state: true
     inputs:
       - Position
 ```
