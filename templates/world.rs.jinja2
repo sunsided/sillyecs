@@ -30,14 +30,15 @@ impl Default for FrameContext {
         }
     }
 }
+{% for world in ecs.worlds %}
 
 /// A world holding all archetypes.
 #[derive(Debug, Clone)]
-pub struct World<E = ()> {
+pub struct {{ world.name.type }}<E = ()> {
     /// The archetypes.
-    archetypes: Archetypes,
+    archetypes: {{ world.name.type }}Archetypes,
     /// The systems.
-    systems: Systems,
+    systems: {{ world.name.type }}Systems,
     /// The entity locator.
     entity_locations: std::collections::HashMap<EntityId, EntityArchetypeRef>,
     /// The frame context.
@@ -54,7 +55,7 @@ pub struct World<E = ()> {
 
 /// The archetypes used in the world.
 #[derive(Debug, Clone, Default)]
-struct Archetypes {
+struct {{ world.name.type }}Archetypes {
     {%- for archetype in ecs.archetypes %}
     pub {{ archetype.name.field | snake_case }}: {{ archetype.name.type }},
     {%- endfor %}
@@ -62,28 +63,15 @@ struct Archetypes {
 
 /// The systems.
 #[derive(Debug, Clone)]
-struct Systems {
-    {%- for system in ecs.systems %}
+struct {{ world.name.type }}Systems {
+    {%- for system in world.systems %}
     pub {{ system.name.field }}: {{ system.name.type }},
     {%- endfor %}
 }
-{%- if ecs.any_phase_fixed %}
-
-/// Time accumulators for fixed-time phases.
-#[derive(Debug, Clone, Default)]
-struct FixedAccumulators {
-    {%- for phase in ecs.phases %}
-    {%- if phase.fixed %}
-    /// The time accumulator for the [`{{ phase.name.raw }}`](SystemPhase::{{ phase.name.raw }}) fixed-time step.
-    {{ phase.name.field }}: f32,
-    {%- endif %}
-    {%- endfor %}
-}
-{%- endif %}
 
 #[allow(dead_code)]
-impl<E> World<E> {
-    /// Creates a new [`World`].
+impl<E>{{ world.name.type }}<E> {
+    /// Creates a new [`{{ world.name.type }}`].
     pub fn new<S>(create_systems: &S, state: UserState, phase_events: Option<E>) -> Self
     where
         S: CreateSystems,
@@ -92,7 +80,7 @@ impl<E> World<E> {
         let context = FrameContext::default();
         Self {
             archetypes: Default::default(),
-            systems: Systems {
+            systems: {{ world.name.type }}Systems {
                 {%- for system in ecs.systems %}
                 {{ system.name.field }}: create_systems.create_{{ system.name.field }}(),
                 {%- endfor %}
@@ -106,7 +94,7 @@ impl<E> World<E> {
             events: phase_events
         }
     }
-    {%- for archetype in ecs.archetypes %}
+    {%- for archetype in world.archetypes %}
 
     /// Spawn a new `{{ archetype.name.raw }}` entity into the world.
     pub fn spawn_{{ archetype.name.field }}_with(
@@ -361,3 +349,17 @@ impl<E> World<E> {
     }
     {%- endfor %}
 }
+{%- endfor  %}
+{%- if ecs.any_phase_fixed %}
+
+/// Time accumulators for fixed-time phases.
+#[derive(Debug, Clone, Default)]
+struct FixedAccumulators {
+    {%- for phase in ecs.phases %}
+    {%- if phase.fixed %}
+    /// The time accumulator for the [`{{ phase.name.raw }}`](SystemPhase::{{ phase.name.raw }}) fixed-time step.
+    {{ phase.name.field }}: f32,
+    {%- endif %}
+    {%- endfor %}
+}
+{%- endif %}

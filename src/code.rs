@@ -32,11 +32,15 @@ impl EcsCode {
         ecs.ensure_component_consistency()?;
         ecs.ensure_distinct_archetype_components()?;
         ecs.ensure_system_consistency()?;
-        ecs.finish();
-        ecs.scheduled_systems()?;
+        ecs.ensure_world_consistency()?;
+        ecs.finish()?;
 
         if !ecs.systems.is_empty() {
-            debug_assert_ne!(ecs.scheduled_systems.len(), 0, "Some systems should be scheduled");
+            debug_assert_ne!(
+                ecs.scheduled_systems.len(),
+                0,
+                "Some systems should be scheduled"
+            );
         }
 
         let mut env = Environment::new();

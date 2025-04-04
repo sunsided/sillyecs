@@ -89,6 +89,14 @@ systems:
     state: true
     inputs:
       - Position
+
+worlds:
+  - name: Main
+    archetypes:
+      - Particle
+      - Player
+      - ForegroundObject
+      - BackgroundObject
 ```
 
 Include the compile-time generated files:

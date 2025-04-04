@@ -4,10 +4,11 @@ mod component;
 mod ecs;
 mod system;
 mod system_scheduler;
+mod world;
 
-use std::fmt::{Display, Formatter};
 pub use crate::code::EcsCode;
 use serde::Serialize;
+use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 pub struct Name {

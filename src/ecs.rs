@@ -1,9 +1,10 @@
 use crate::archetype::Archetype;
 use crate::component::Component;
 use crate::system::{System, SystemPhase, SystemPhaseRef};
+use crate::system_scheduler::schedule_systems;
+use crate::world::World;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
-use crate::system_scheduler::schedule_systems;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Ecs {
@@ -18,13 +19,15 @@ pub struct Ecs {
     pub any_phase_fixed: bool,
     /// The systems.
     pub systems: Vec<System>,
+    /// The worlds.
+    pub worlds: Vec<World>,
     /// The systems in scheduling order.
     #[serde(default, skip_deserializing)]
     pub scheduled_systems: HashMap<SystemPhaseRef, Vec<Vec<System>>>,
 }
 
 impl Ecs {
-    pub(crate) fn finish(&mut self) {
+    pub(crate) fn finish(&mut self) -> Result<(), EcsError> {
         let cloned_archetypes = self.archetypes.clone();
         for archetype in &mut self.archetypes {
             archetype.finish(&self.components, &cloned_archetypes);
@@ -38,6 +41,14 @@ impl Ecs {
             phase.finish();
             self.any_phase_fixed |= phase.fixed;
         }
+
+        self.scheduled_systems()?;
+
+        for world in &mut self.worlds {
+            world.finish(&self.archetypes, &self.systems);
+        }
+
+        Ok(())
     }
 }
 
@@ -63,6 +74,10 @@ pub enum EcsError {
     PromotionToSelf(String),
     #[error("System {1} uses undefined phase '{0}'.")]
     MissingPhase(String, String),
+    #[error("World {0} uses no archetypes.")]
+    WorldWithoutArchetypes(String),
+    #[error("World {1} uses undefined archetype {0}.")]
+    MissingArchetypeInWorld(String, String),
 }
 
 impl Ecs {
@@ -163,6 +178,25 @@ impl Ecs {
         Ok(())
     }
 
+    pub(crate) fn ensure_world_consistency(&mut self) -> Result<(), EcsError> {
+        for world in &mut self.worlds {
+            if world.archetypes_refs.is_empty() {
+                return Err(EcsError::WorldWithoutArchetypes(
+                    world.name.type_name_raw.clone(),
+                ));
+            }
+            for archetype in &world.archetypes_refs {
+                if !self.archetypes.iter().any(|a| a.name.eq(&archetype)) {
+                    return Err(EcsError::MissingArchetypeInWorld(
+                        archetype.type_name_raw.clone(),
+                        world.name.type_name_raw.clone(),
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+
     pub(crate) fn ensure_system_consistency(&mut self) -> Result<(), EcsError> {
         // Assign explicit ordering to the systems.
         let mut order = 1;
@@ -215,21 +249,31 @@ impl Ecs {
     pub(crate) fn scheduled_systems(&mut self) -> Result<(), EcsError> {
         let mut phase_groups = HashMap::new();
         for phase in &self.phases {
-            let systems_in_group: Vec<_> = self.systems.iter().filter(|s| s.phase == phase.name).cloned().collect();
+            let systems_in_group: Vec<_> = self
+                .systems
+                .iter()
+                .filter(|s| s.phase == phase.name)
+                .cloned()
+                .collect();
             let groups = schedule_systems(&systems_in_group);
-            let scheduled_systems: Vec<_> = groups.into_iter().map(|group| {
-                group
-                    .iter()
-                    .map(|&system| self.systems.iter()
-                        .find(|s| s.id == system)
-                        .expect("Failed to find system"))
-                    .cloned()
-                    .collect()
-            })
+            let scheduled_systems: Vec<_> = groups
+                .into_iter()
+                .map(|group| {
+                    group
+                        .iter()
+                        .map(|&system| {
+                            self.systems
+                                .iter()
+                                .find(|s| s.id == system)
+                                .expect("Failed to find system")
+                        })
+                        .cloned()
+                        .collect()
+                })
                 .collect();
             phase_groups.insert(phase.name.clone(), scheduled_systems);
         }
-        
+
         self.scheduled_systems = phase_groups;
         Ok(())
     }

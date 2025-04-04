@@ -56,5 +56,13 @@ systems:
     inputs:
       - Position
 
+worlds:
+  - name: Main
+    archetypes:
+      - Particle
+      - Player
+      - ForegroundObject
+      - BackgroundObject
+
 # TODO: List systems and their inputs and mutation targets. Generate traits that implement the signature.
 # TODO: Generate a function that loops all archetypes matching the signature of a given system
