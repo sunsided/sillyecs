@@ -1,27 +1,76 @@
+/// The ID of a world.
+#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
+pub struct WorldId(std::num::NonZeroU64);
+
+#[allow(dead_code)]
+impl WorldId {
+    /// Returns a new, unique world ID.
+    ///
+    /// Uniqueness is guaranteed by using a monotonically increasing `AtomicU64` counter
+    /// for generating IDs, starting from 1.
+    ///
+    /// # Implementation
+    /// This function uses a thread-safe counter with sequential consistency ordering
+    /// to ensure unique IDs even under concurrent access.
+    pub fn new() -> Self {
+        static WORLD_IDS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+        let id = WORLD_IDS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        WorldId(std::num::NonZeroU64::new(id).expect("ID was zero"))
+    }
+
+    /// Returns this ID as a [`NonZeroU64`](std::num::NonZeroU64) value.
+    pub const fn as_nonzero_u64(&self) -> std::num::NonZeroU64 {
+        self.0
+    }
+
+    /// Returns this ID as a `u64` value.
+    pub const fn as_u64(&self) -> u64 {
+        self.0.get()
+    }
+}
+
+impl std::hash::Hash for WorldId {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.hash(state);
+    }
+}
+
+impl From<WorldId> for std::num::NonZeroU64 {
+    fn from(value: WorldId) -> std::num::NonZeroU64 {
+        value.as_nonzero_u64()
+    }
+}
+
+impl From<WorldId> for u64 {
+    fn from(value: WorldId) -> u64 {
+        value.as_u64()
+    }
+}
+
 /// A frame context.
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub struct FrameContext {
+    /// The world ID.
+    pub world_id: WorldId,
     /// The frame number.
     pub frame_number: u64,
-
     /// The delta time since the last frame.
     pub delta_time_secs: f32,
-
     /// The fixed time for fixed-time systems. Defaults to 60 Hz (~16.66 ms).
     pub fixed_time_secs: f32,
-
     /// The start time of the current frame.
     pub current_frame_start: std::time::Instant,
-
     /// The start time of the last frame.
     pub last_frame_start: std::time::Instant,
 }
 
 #[allow(dead_code)]
-impl Default for FrameContext {
-    fn default() -> Self {
+impl FrameContext {
+    /// Constructs a new frame context.
+    fn new(world_id: WorldId) -> Self {
         Self {
+            world_id,
             frame_number: 0,
             delta_time_secs: 0.0,
             fixed_time_secs: 1.0 / 60.0,
@@ -29,6 +78,13 @@ impl Default for FrameContext {
             last_frame_start: std::time::Instant::now(),
         }
     }
+}
+
+/// Marker trait for worlds.
+#[allow(dead_code)]
+pub trait World {
+    /// The ID of this world.
+    const ID: WorldId;
 }
 {% for world in ecs.worlds %}
 
@@ -51,6 +107,10 @@ pub struct {{ world.name.type }}<E = ()> {
     events: Option<E>,
     /// User-specific data.
     pub state: UserState,
+}
+
+impl<E> World for {{ world.name.type }}<E> {
+    const ID: WorldId = WorldId(std::num::NonZeroU64::new({{ world.id }}).expect("Invalid ID on ECS construction time"));
 }
 
 /// The archetypes used in the world.
@@ -94,7 +154,7 @@ impl<E>{{ world.name.type }}<E> {
         S: CreateSystems,
         E: SystemPhaseEvents
     {
-        let context = FrameContext::default();
+        let context = FrameContext::new(Self::ID);
         Self {
             archetypes: Default::default(),
             systems: {{ world.name.type }}Systems {
