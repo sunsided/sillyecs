@@ -17,6 +17,25 @@ use crate::component::ComponentName;
 use crate::system::{System, SystemId};
 use std::collections::{HashMap, HashSet};
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+pub enum Access {
+    Read,
+    Write,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub struct Dependency {
+    pub resource: Resource,
+    pub access: Access,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub enum Resource {
+    Component(ComponentName),
+    FrameContext,
+    UserState
+}
+
 /// Schedules systems into parallelizable batches based on their component dependencies and execution order.
 ///
 /// This function takes a slice of systems and returns a vector of system batches, where each batch contains
@@ -49,29 +68,39 @@ pub fn schedule_systems(systems: &[System]) -> Vec<Vec<SystemId>> {
     let mut in_degree: HashMap<SystemId, usize> = HashMap::new();
     let mut systems_by_id: HashMap<SystemId, &System> = HashMap::new();
 
-    let mut readers: HashMap<ComponentName, HashSet<SystemId>> = HashMap::new();
-    let mut writers: HashMap<ComponentName, HashSet<SystemId>> = HashMap::new();
+    let mut readers: HashMap<Resource, HashSet<SystemId>> = HashMap::new();
+    let mut writers: HashMap<Resource, HashSet<SystemId>> = HashMap::new();
 
     for sys in systems {
         systems_by_id.insert(sys.id, sys);
         in_degree.entry(sys.id).or_insert(0);
 
-        for input in &sys.inputs {
-            readers.entry(input.clone()).or_default().insert(sys.id);
-        }
-        for output in &sys.outputs {
-            writers.entry(output.clone()).or_default().insert(sys.id);
+        for dep in &sys.dependencies {
+            match dep.access {
+                Access::Read => {
+                    readers.entry(dep.resource.clone()).or_default().insert(sys.id);
+                }
+                Access::Write => {
+                    writers.entry(dep.resource.clone()).or_default().insert(sys.id);
+                }
+            }
         }
     }
 
-    for (component, writers_of) in &writers {
-        if let Some(readers_of) = readers.get(component) {
-            for &writer in writers_of {
-                for &reader in readers_of {
-                    if writer != reader {
-                        graph.entry(writer).or_default().push(reader);
-                        *in_degree.entry(reader).or_insert(0) += 1;
-                    }
+    // Build dependency graph: for each resource, any writer must precede systems with any access (read or write)
+    for (resource, writer_ids) in &writers {
+        let mut affected = HashSet::new();
+        if let Some(reader_ids) = readers.get(resource) {
+            affected.extend(reader_ids);
+        }
+        if let Some(writer_ids2) = writers.get(resource) {
+            affected.extend(writer_ids2);
+        }
+        for &writer in writer_ids {
+            for &dependent in affected.iter() {
+                if writer != dependent {
+                    graph.entry(writer).or_default().push(dependent);
+                    *in_degree.entry(dependent).or_insert(0) += 1;
                 }
             }
         }
@@ -87,7 +116,7 @@ pub fn schedule_systems(systems: &[System]) -> Vec<Vec<SystemId>> {
 
     while visited.len() < systems.len() {
         if ready.is_empty() {
-            // Fallback: lowest-order unscheduled system
+            // Fallback: choose lowest-order unscheduled system
             let mut remaining: Vec<_> = in_degree
                 .keys()
                 .filter(|&&id| !visited.contains(&id))
@@ -97,37 +126,40 @@ pub fn schedule_systems(systems: &[System]) -> Vec<Vec<SystemId>> {
         }
 
         let mut batch = Vec::new();
-        let mut used_outputs = HashSet::new();
+        let mut used_writes = HashSet::new();
 
         ready.sort_by_key(|id| systems_by_id[id].order);
         let mut i = 0;
         while i < ready.len() {
             let candidate = ready[i];
-
             if visited.contains(&candidate) {
                 ready.remove(i);
                 continue;
             }
-
             let system = systems_by_id[&candidate];
-            let has_conflict = system
-                .outputs
-                .iter()
-                .any(|out| used_outputs.contains(out));
+
+            // Check for conflicts: if candidate writes a resource already scheduled in this batch
+            let has_conflict = system.dependencies.iter().any(|dep| {
+                matches!(dep.access, Access::Write) && used_writes.contains(&dep.resource)
+            });
 
             if !has_conflict {
                 batch.push(candidate);
-                used_outputs.extend(system.outputs.iter().cloned());
+                // Add all resources that candidate writes to the used set
+                for dep in &system.dependencies {
+                    if let Access::Write = dep.access {
+                        used_writes.insert(dep.resource.clone());
+                    }
+                }
                 ready.remove(i);
             } else {
                 i += 1;
             }
         }
 
-        // Mark as visited and update graph
+        // Mark systems as visited and update in-degrees
         for sys_id in &batch {
             visited.insert(*sys_id);
-
             if let Some(dependents) = graph.get(sys_id) {
                 for &dep in dependents {
                     if let Some(deg) = in_degree.get_mut(&dep) {
@@ -140,12 +172,12 @@ pub fn schedule_systems(systems: &[System]) -> Vec<Vec<SystemId>> {
             }
         }
 
-        let batch_refs = batch.into_iter().collect();
-        scheduled.push(batch_refs);
+        scheduled.push(batch);
     }
 
     scheduled
 }
+
 
 #[cfg(test)]
 mod tests {
@@ -167,7 +199,7 @@ mod tests {
     }
 
     fn create_system(id: u64, name: &str, order: u32, inputs: Vec<&str>, outputs: Vec<&str>) -> System {
-        System {
+        let mut system = System {
             id: SystemId(id),
             name: sysname(name),
             order,
@@ -182,8 +214,11 @@ mod tests {
             affected_archetypes: Default::default(),
             component_iter_code: String::new(),
             component_untuple_code: String::new(),
-            description: None
-        }
+            description: None,
+            dependencies: Default::default()
+        };
+        system.finish_dependencies();
+        system
     }
 
     #[test]

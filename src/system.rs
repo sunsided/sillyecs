@@ -5,6 +5,7 @@ use crate::component::ComponentName;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::ops::Deref;
 use std::sync::atomic::AtomicU64;
+use crate::system_scheduler::{Access, Dependency, Resource};
 
 static SYSTEM_IDS: AtomicU64 = AtomicU64::new(1);
 
@@ -67,10 +68,46 @@ pub struct System {
     /// The code to untuple component values. Available after a call to [`System::finish`](System::finish).
     #[serde(skip_deserializing, default)]
     pub component_untuple_code: String,
+
+    /// The dependencies. Available after a call to [`System::finish_dependencies`](System::finish_dependencies) (e.g. via [`System::finish`](System::finish)).
+    #[serde(skip)]
+    pub dependencies: Vec<Dependency>
 }
 
 impl System {
+    pub(crate) fn finish_dependencies(&mut self) {
+        self.dependencies.clear();
+
+        // Add inputs as dependencies.
+        self.dependencies.extend(self.inputs.iter().map(|input| Dependency {
+            resource: Resource::Component(input.clone()),
+            access: Access::Read
+        }));
+
+        // Add outputs as dependencies.
+        self.dependencies.extend(self.outputs.iter().map(|output| Dependency {
+            resource: Resource::Component(output.clone()),
+            access: Access::Write
+        }));
+
+        // Add frame context and state to dependencies
+        if self.context {
+            self.dependencies.push(Dependency {
+                resource: Resource::FrameContext,
+                access: Access::Read
+            })
+        }
+        if self.state {
+            self.dependencies.push(Dependency {
+                resource: Resource::UserState,
+                access: Access::Read
+            })
+        }
+    }
+
     pub(crate) fn finish(&mut self, archetypes: &[Archetype]) {
+        self.finish_dependencies();
+
         let mut ids_and_names = Vec::new();
         'archetype: for archetype in archetypes {
             // All inputs must exist in the component.
