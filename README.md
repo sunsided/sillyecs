@@ -38,8 +38,8 @@ Define your ECS components and systems in a YAML file:
 ```yaml
 # ecs.yaml
 states:
-  - name: Render
-    description: The render state
+  - name: WgpuRender
+    description: The WGPU render state; will be initialized in the Render phase hooks
 
 components:
   - name: Position
@@ -79,6 +79,9 @@ phases:
     fixed: 60 Hz  # or "0.01666 s"
   - name: Update
   - name: Render
+    states:
+      - use: WgpuRender  # Use state in phase begin/end hooks
+        write: true
 
 systems:
   - name: Physics
@@ -94,7 +97,7 @@ systems:
     manual: true        # Require manual call to world.apply_system_phase_render()
     # on_request: true  # call world.request_render_phase() to allow execution (resets atomically) 
     states:
-      - use: Render
+      - use: WgpuRender
         write: false  # optional
     inputs:
       - Position
