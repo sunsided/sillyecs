@@ -171,6 +171,9 @@ pub trait System{{ phase.name.type }}Events {
     type Result;
     type Error: core::error::Error;
 
+    /// The name of the phase.
+    const NAME: &'static str = "{{ phase.name.raw }}";
+
     /// Executed at the beginning of the phase (before all systems).
     fn on_begin_phase(
         &mut self,

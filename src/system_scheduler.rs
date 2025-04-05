@@ -73,7 +73,7 @@ pub fn schedule_systems(systems: &[System]) -> Result<Vec<Vec<SystemId>>, EcsErr
         for run_after_name in &sys.run_after {
             // Find the system by name.
             let pred = systems.iter().find(|s| s.name.eq(run_after_name))
-                .expect("Failed to find system specified in run_after");
+                .expect(&format!("Failed to find system {name} specified in run_after", name = run_after_name.type_name_raw));
             // Add forced edge: pred -> sys.
             graph.entry(pred.id).or_default().push(sys.id);
             *in_degree.entry(sys.id).or_default() += 1;
