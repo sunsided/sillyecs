@@ -586,18 +586,25 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
 
     fn handle_despawn_command(&mut self, id: EntityId) -> Result<(), DespawnError> {
          if let Some(loc) = self.entity_locations.remove(&id) {
-            match loc.archetype {
+            let result = match loc.archetype {
                 {%- for archetype in world.archetypes %}
                 {{ archetype.name.type }}::ID => {
                     self.archetypes
                         .{{ archetype.name.field }}
                         .drop_at_index(loc.index)
-                        .map_err(|index| DespawnError::InvalidIndexInArchetype(index, {{ archetype.name.type }}::ID))?;
+                        .map_err(|index| DespawnError::InvalidIndexInArchetype(index, {{ archetype.name.type }}::ID))?
                 }
                 {%- endfor %}
                 // TODO: Make it a non-panic on release builds?
                 #[allow(unreachable_patterns)]
                 archetype_id => unreachable!("Cannot remove entity {id} from archetype {archetype_id} which is not known to this world.")
+            };
+
+            if let Some(moved_entity) = result {
+                self.entity_locations.insert(moved_entity, EntityArchetypeRef {
+                    archetype: loc.archetype,
+                    index: loc.index
+                });
             }
          } else {
             tracing::error!(%id, "Attempted to remove unknown entity");
