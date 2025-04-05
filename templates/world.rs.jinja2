@@ -257,6 +257,22 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
             command_queue
         }
     }
+
+    /// Returns the overall number of entities in this world.
+    pub fn len(&self) -> usize {
+        self.entity_locations.len()
+    }
+
+    /// Indicates whether there are no entities in this world.
+    pub fn is_empty(&self) -> bool {
+        self.entity_locations.is_empty()
+    }
+
+    /// De-spawns an entity given by its [`EntityId`]. Returns an error if the entity was unknown in this world.
+    pub fn despawn_by_id(&mut self, id: EntityId) -> Result<(), DespawnError> {
+        self.handle_despawn_command(id)
+    }
+
     {%- for archetype in world.archetypes %}
 
     /// Spawn a new `{{ archetype.name.raw }}` entity into the world given its [`{{ archetype.name.raw }}EntityData`].
@@ -607,7 +623,7 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
                 });
             }
          } else {
-            tracing::error!(%id, "Attempted to remove unknown entity");
+            return Err(DespawnError::EntityNotFound(id));
          }
          Ok(())
     }
@@ -629,12 +645,16 @@ struct FixedAccumulators {
 
 #[derive(Debug)]
 pub enum DespawnError {
+    EntityNotFound(EntityId),
     InvalidIndexInArchetype(usize, ArchetypeId)
 }
 
 impl core::fmt::Display for DespawnError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> Result<(), core::fmt::Error> {
         match self {
+            Self::EntityNotFound(id) => {
+                write!(f, "Failed to despawn unknown entity {id}")
+            }
             Self::InvalidIndexInArchetype(index, aid) => {
                 write!(f, "Failed to despawn entity at invalid index {index} in archetype {aid}")
             }
