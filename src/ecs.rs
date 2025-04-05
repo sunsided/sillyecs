@@ -78,6 +78,8 @@ pub enum EcsError {
     WorldWithoutArchetypes(String),
     #[error("World {1} uses undefined archetype {0}.")]
     MissingArchetypeInWorld(String, String),
+    #[error("A cycle was detected in the system run order (run_after edges).")]
+    CycleDetectedInSystemRunOrder,
 }
 
 impl Ecs {
@@ -198,28 +200,6 @@ impl Ecs {
     }
 
     pub(crate) fn ensure_system_consistency(&mut self) -> Result<(), EcsError> {
-        // Assign explicit ordering to the systems.
-        let mut order = 1;
-        let mut orders: HashSet<_> = self
-            .systems
-            .iter()
-            .map(|s| s.order)
-            .filter(|&o| o != 0)
-            .collect();
-        for system in &mut self.systems {
-            if system.order != 0 {
-                continue;
-            }
-
-            while orders.contains(&order) {
-                order += 1;
-            }
-
-            system.order = order;
-            order += 1;
-            orders.insert(order);
-        }
-
         for system in &self.systems {
             let required_components: HashSet<_> =
                 system.inputs.iter().chain(&system.outputs).collect();
@@ -255,7 +235,7 @@ impl Ecs {
                 .filter(|s| s.phase == phase.name)
                 .cloned()
                 .collect();
-            let groups = schedule_systems(&systems_in_group);
+            let groups = schedule_systems(&systems_in_group)?;
             let scheduled_systems: Vec<_> = groups
                 .into_iter()
                 .map(|group| {

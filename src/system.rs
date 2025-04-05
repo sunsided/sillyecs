@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::fmt::{Display, Formatter};
 use crate::Name;
 use crate::archetype::{Archetype, ArchetypeId, ArchetypeRef};
@@ -14,61 +15,47 @@ pub struct System {
     /// The ID of the system. Automatically generatedd.
     #[serde(skip_deserializing, default)]
     pub id: SystemId,
-
     /// The name of the system.
     pub name: SystemName,
-
     /// The optional description of the system to use as a documentation comment.
     #[serde(default)]
     pub description: Option<String>,
-
-    /// The order in which systems are executed when they cannot be parallelized.
+    /// Preferably run this system after the specified other systems.
+    /// If no conflict is detected, calls may be parallelized.
     #[serde(default)]
-    pub order: u32,
-
+    pub run_after: HashSet<SystemNameRef>,
     /// Whether the system requires access to entities.
     #[serde(default, rename(serialize = "needs_entities", deserialize = "entities"))]
     pub entities: bool,
-
     /// Whether the system requires access to the frame context.
     #[serde(default, rename(serialize = "needs_context", deserialize = "context"))]
     pub context: bool,
-
     /// Whether the system requires access to the user state.
     #[serde(default, rename(serialize = "needs_state", deserialize = "state"))]
     pub state: bool,
-
     /// The phase in which to run the system.
     pub phase: SystemPhaseRef,
-
     /// The optional input components to the system.
     #[serde(default)]
     pub inputs: Vec<ComponentName>,
-
     /// The optional output components to the system.
     #[serde(default)]
     pub outputs: Vec<ComponentName>,
-
     /// The archetypes this system operates on. Available after a call to [`System::finish`](System::finish).
     #[serde(skip_deserializing, default)]
     pub affected_archetypes: Vec<ArchetypeRef>,
-
     /// The IDs of the affected archetypes in ascending order. Available after a call to [`System::finish`](System::finish).
     #[serde(skip_deserializing, default)]
     pub affected_archetype_ids: Vec<ArchetypeId>,
-
     /// The number of affected archetypes. Available after a call to [`System::finish`](System::finish).
     #[serde(skip_deserializing, default)]
     pub affected_archetype_count: usize,
-
     /// The code to iterate component values. Available after a call to [`System::finish`](System::finish).
     #[serde(skip_deserializing, default)]
     pub component_iter_code: String,
-
     /// The code to untuple component values. Available after a call to [`System::finish`](System::finish).
     #[serde(skip_deserializing, default)]
     pub component_untuple_code: String,
-
     /// The dependencies. Available after a call to [`System::finish_dependencies`](System::finish_dependencies) (e.g. via [`System::finish`](System::finish)).
     #[serde(skip)]
     pub dependencies: Vec<Dependency>
@@ -330,6 +317,8 @@ impl<'de> Deserialize<'de> for SystemPhaseName {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 #[serde(transparent)]
 pub struct SystemName(pub(crate) Name);
+
+pub type SystemNameRef = SystemName;
 
 impl Display for SystemName {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {

@@ -16,6 +16,7 @@
 use crate::component::ComponentName;
 use crate::system::{System, SystemId};
 use std::collections::{HashMap, HashSet};
+use crate::ecs::EcsError;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub enum Access {
@@ -36,45 +37,55 @@ pub enum Resource {
     UserState
 }
 
-/// Schedules systems into parallelizable batches based on their component dependencies and execution order.
+/// Schedules systems into parallelizable batches using resource dependencies and forced `run_after` ordering.
 ///
-/// This function takes a slice of systems and returns a vector of system batches, where each batch contains
-/// systems that can be executed in parallel. Systems are scheduled based on Kahn's algorithm for
-/// topological sorting by:
-///
-/// 1. Component dependencies - Systems reading components written by other systems must execute after them
-/// 2. Explicit ordering - Systems with lower order values execute before those with higher values
-/// 3. Resource conflicts - Systems writing the same components cannot execute in parallel
-///
-/// # Parameters
-///
-/// * `systems` - A slice containing the systems to schedule
-///
-/// # Returns
-///
-/// A `Vec<Vec<SystemId>>` where each inner vector represents a batch of systems that can run in parallel.
-/// The outer vector represents the sequential order in which batches must be executed.
-///
-/// # Algorithm
-///
-/// 1. Builds a dependency graph based on component read/write relationships
-/// 2. Uses a modified topological sort that:
-///    - Handles cycles by falling back to system order
-///    - Groups independent systems into parallel batches
-///    - Respects explicit ordering within batches
-/// 3. Ensures systems writing the same components are in different batches
-pub fn schedule_systems(systems: &[System]) -> Vec<Vec<SystemId>> {
+/// Forced `run_after` edges (from a system referenced in run_after to the current system) are added first.
+/// Then resource–based candidate edges (writer → reader) are collected.
+/// For each unordered pair of systems that share conflicting candidate edges (i.e. edges in both directions),
+/// the conflict is resolved by favoring one candidate if possible; otherwise, a cycle is detected and we panic.
+pub fn schedule_systems(systems: &[System]) -> Result<Vec<Vec<SystemId>>, EcsError> {
+    // The final dependency graph.
     let mut graph: HashMap<SystemId, Vec<SystemId>> = HashMap::new();
+    // in_degree tracks the number of incoming edges per system.
     let mut in_degree: HashMap<SystemId, usize> = HashMap::new();
+    // Convenience lookup.
     let mut systems_by_id: HashMap<SystemId, &System> = HashMap::new();
 
-    let mut readers: HashMap<Resource, HashSet<SystemId>> = HashMap::new();
-    let mut writers: HashMap<Resource, HashSet<SystemId>> = HashMap::new();
+    // Listing order mapping.
+    let id_to_index: HashMap<SystemId, usize> = systems
+        .iter()
+        .enumerate()
+        .map(|(i, sys)| (sys.id, i))
+        .collect();
 
     for sys in systems {
         systems_by_id.insert(sys.id, sys);
-        in_degree.entry(sys.id).or_insert(0);
+        in_degree.insert(sys.id, 0);
+    }
 
+    // --- Step 1: Add Forced run_after Edges ---
+    // For each system, add an edge from every system it must run after.
+    for sys in systems {
+        for run_after_name in &sys.run_after {
+            // Find the system by name.
+            let pred = systems.iter().find(|s| s.name.eq(run_after_name))
+                .expect("Failed to find system specified in run_after");
+            // Add forced edge: pred -> sys.
+            graph.entry(pred.id).or_default().push(sys.id);
+            *in_degree.entry(sys.id).or_default() += 1;
+        }
+    }
+
+    // --- Step 2: Collect Resource–based Candidate Edges ---
+    // We'll collect candidates in a map keyed by an unordered pair (min(id), max(id)).
+    // The value is a tuple (set of candidate directions: true means first->second, false means second->first).
+    type EdgeDir = bool; // true means (a -> b) where a is min(id)
+    let mut candidate_edges: HashMap<(SystemId, SystemId), HashSet<EdgeDir>> = HashMap::new();
+
+    // Build readers and writers maps.
+    let mut readers: HashMap<Resource, HashSet<SystemId>> = HashMap::new();
+    let mut writers: HashMap<Resource, HashSet<SystemId>> = HashMap::new();
+    for sys in systems {
         for dep in &sys.dependencies {
             match dep.access {
                 Access::Read => {
@@ -87,66 +98,98 @@ pub fn schedule_systems(systems: &[System]) -> Vec<Vec<SystemId>> {
         }
     }
 
-    // Build dependency graph: for each resource, any writer must precede systems with any access (read or write)
+    // For each resource, for each writer, add candidate edges to each reader,
+    // except if a forced run_after edge exists between them (in either direction).
     for (resource, writer_ids) in &writers {
         let mut affected = HashSet::new();
-        if let Some(reader_ids) = readers.get(resource) {
-            affected.extend(reader_ids);
+        if let Some(r) = readers.get(resource) {
+            affected.extend(r);
         }
-        if let Some(writer_ids2) = writers.get(resource) {
-            affected.extend(writer_ids2);
+        if let Some(w) = writers.get(resource) {
+            affected.extend(w);
         }
         for &writer in writer_ids {
-            for &dependent in affected.iter() {
-                if writer != dependent {
-                    graph.entry(writer).or_default().push(dependent);
-                    *in_degree.entry(dependent).or_insert(0) += 1;
+            for &reader in &affected {
+                if writer == reader {
+                    continue;
                 }
+                let writer_sys = systems_by_id.get(&writer).unwrap();
+                let reader_sys = systems_by_id.get(&reader).unwrap();
+                // If either system forces the other, skip the resource candidate edge.
+                let forced = writer_sys.run_after.iter().any(|name| name.eq(&reader_sys.name))
+                    || reader_sys.run_after.iter().any(|name| name.eq(&writer_sys.name));
+                if forced {
+                    continue;
+                }
+                // Determine an ordering key (min, max) and candidate direction.
+                let (a, b, direction) = if id_to_index[&writer] < id_to_index[&reader] {
+                    (writer, reader, true) // candidate edge: writer (a) -> reader (b)
+                } else {
+                    (reader, writer, false) // candidate edge: writer (a) -> reader (b) becomes false meaning b->a
+                };
+                candidate_edges.entry((a, b)).or_default().insert(direction);
             }
         }
     }
 
+    // --- Step 3: Resolve Candidate Edge Conflicts ---
+    // For each pair, if candidate_edges yields a single direction, add that edge.
+    // If both directions are present, resolve the conflict using a tie-breaker.
+    for ((a, b), dirs) in candidate_edges {
+        let chosen = if dirs.len() == 1 {
+            dirs.iter().next().unwrap().clone()
+        } else {
+            // Conflict: both directions were proposed.
+            // Tie-breaker: favor the edge that puts the system with a non-empty run_after list later.
+            let sys_a = systems_by_id.get(&a).unwrap();
+            let sys_b = systems_by_id.get(&b).unwrap();
+            // If one of them has forced ordering (non-empty run_after), choose that ordering.
+            if !sys_a.run_after.is_empty() && sys_b.run_after.is_empty() {
+                false // choose b->a, so that a (with run_after) comes later.
+            } else if sys_a.run_after.is_empty() && !sys_b.run_after.is_empty() {
+                true // choose a->b.
+            } else {
+                // Otherwise, fall back to listing order.
+                // Favor the ordering consistent with the listing order.
+                id_to_index[&a] < id_to_index[&b]
+            }
+        };
+        // Now add the chosen edge in the graph.
+        if chosen {
+            // That means: a -> b.
+            graph.entry(a).or_default().push(b);
+            *in_degree.entry(b).or_default() += 1;
+        } else {
+            // Means: b -> a.
+            graph.entry(b).or_default().push(a);
+            *in_degree.entry(a).or_default() += 1;
+        }
+    }
+
+    // --- Step 4: Topological Sort ---
     let mut ready: Vec<SystemId> = in_degree
         .iter()
         .filter_map(|(&id, &deg)| if deg == 0 { Some(id) } else { None })
         .collect();
-
     let mut scheduled: Vec<Vec<SystemId>> = Vec::new();
     let mut visited = HashSet::new();
 
-    while visited.len() < systems.len() {
-        if ready.is_empty() {
-            // Fallback: choose lowest-order unscheduled system
-            let mut remaining: Vec<_> = in_degree
-                .keys()
-                .filter(|&&id| !visited.contains(&id))
-                .collect();
-            remaining.sort_by_key(|id| systems_by_id[id].order);
-            ready.push(*remaining[0]);
-        }
-
+    while !ready.is_empty() {
+        // Sort ready queue by listing order.
+        ready.sort_by_key(|id| id_to_index[id]);
         let mut batch = Vec::new();
         let mut used_writes = HashSet::new();
-
-        ready.sort_by_key(|id| systems_by_id[id].order);
         let mut i = 0;
         while i < ready.len() {
             let candidate = ready[i];
-            if visited.contains(&candidate) {
-                ready.remove(i);
-                continue;
-            }
-            let system = systems_by_id[&candidate];
-
-            // Check for conflicts: if candidate writes a resource already scheduled in this batch
-            let has_conflict = system.dependencies.iter().any(|dep| {
+            let sys = systems_by_id.get(&candidate).unwrap();
+            // Check for conflicts within the batch: systems writing the same resource can't run in parallel.
+            let conflict = sys.dependencies.iter().any(|dep| {
                 matches!(dep.access, Access::Write) && used_writes.contains(&dep.resource)
             });
-
-            if !has_conflict {
+            if !conflict {
                 batch.push(candidate);
-                // Add all resources that candidate writes to the used set
-                for dep in &system.dependencies {
+                for dep in &sys.dependencies {
                     if let Access::Write = dep.access {
                         used_writes.insert(dep.resource.clone());
                     }
@@ -156,8 +199,9 @@ pub fn schedule_systems(systems: &[System]) -> Vec<Vec<SystemId>> {
                 i += 1;
             }
         }
-
-        // Mark systems as visited and update in-degrees
+        if batch.is_empty() {
+            return Err(EcsError::CycleDetectedInSystemRunOrder);
+        }
         for sys_id in &batch {
             visited.insert(*sys_id);
             if let Some(dependents) = graph.get(sys_id) {
@@ -171,13 +215,13 @@ pub fn schedule_systems(systems: &[System]) -> Vec<Vec<SystemId>> {
                 }
             }
         }
-
         scheduled.push(batch);
     }
-
-    scheduled
+    if visited.len() != systems.len() {
+        return Err(EcsError::CycleDetectedInSystemRunOrder);
+    }
+    Ok(scheduled)
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -198,11 +242,11 @@ mod tests {
         SystemPhaseName(Name::new(name.to_string(), "Phase"))
     }
 
-    fn create_system(id: u64, name: &str, order: u32, inputs: Vec<&str>, outputs: Vec<&str>) -> System {
+    fn create_system(id: u64, name: &str, inputs: Vec<&str>, outputs: Vec<&str>, prefer_after: Vec<&str>) -> System {
         let mut system = System {
             id: SystemId(id),
             name: sysname(name),
-            order,
+            run_after: prefer_after.into_iter().map(sysname).collect(),
             context: false,
             state: false,
             entities: false,
@@ -222,16 +266,17 @@ mod tests {
     }
 
     #[test]
-    fn order_one() {
+    fn no_preference_creates_three_groups() {
+        // Systems are free to run in any order that creates the least amount of groups while
+        // attempting to resolve read-write ordering as much as possible.
         let systems = vec![
-            create_system(1, "Producer", 1, vec!["x"], vec![]),
-            // Allow the consumer to run with or after the transformer by ordering.
-            create_system(3, "Consumer", 3, vec!["y"], vec![]),
-            create_system(2, "Transformer", 2, vec!["x"], vec!["y"]),
-            create_system(4, "Backflow", 4, vec!["y"], vec!["x"]), // creates a cycle
+            create_system(1, "Producer", vec!["x"], vec![], vec![]),
+            create_system(2, "Consumer", vec!["y"], vec![], vec![]),
+            create_system(3, "Transformer", vec!["x"], vec!["y"], vec![]),
+            create_system(4, "Backflow", vec!["y"], vec!["x"], vec![]), // creates a cycle
         ];
 
-        let sorted = schedule_systems(&systems);
+        let sorted = schedule_systems(&systems).unwrap();
 
         let mut counter = 0;
         let mut ordered: Vec<(usize, &str)> = vec![];
@@ -245,26 +290,25 @@ mod tests {
 
         assert_eq!(ordered, vec![
             // First group
-            (0, "Producer"),
+            (0, "Transformer"), // reads x, writes y
             // Second group
-            (1, "Transformer"),
+            (1, "Consumer"),    // reads y
+            (1, "Backflow"),    // reads y, writes x
             // Third group
-            (2, "Consumer"),
-            (2, "Backflow")
+            (2, "Producer")     // reads x
         ]);
     }
 
     #[test]
-    fn order_two() {
+    fn preference_forces_two_groups() {
         let systems = vec![
-            create_system(1, "Producer", 1, vec!["x"], vec![]),
-            // Force the consumer to run before the transformer by ordering.
-            create_system(3, "Consumer", 2, vec!["y"], vec![]),
-            create_system(2, "Transformer", 3, vec!["x"], vec!["y"]),
-            create_system(4, "Backflow", 4, vec!["y"], vec!["x"]), // creates a cycle
+            create_system(1, "Producer", vec!["x"], vec![], vec![]),
+            create_system(2, "Transformer", vec!["x"], vec!["y"], vec!["Consumer"]),
+            create_system(3, "Consumer", vec!["y"], vec![], vec![]),
+            create_system(4, "Backflow", vec!["y"], vec!["x"], vec![]), // creates a cycle
         ];
 
-        let sorted = schedule_systems(&systems);
+        let sorted = schedule_systems(&systems).unwrap();
 
         let mut counter = 0;
         let mut ordered: Vec<(usize, &str)> = vec![];
@@ -278,13 +322,11 @@ mod tests {
 
         assert_eq!(ordered, vec![
             // First group
-            (0, "Producer"),
+            (0, "Consumer"),   // reads y
+            (0, "Backflow"),   // reads y, writes x
             // Second group
-            (1, "Consumer"),
-            // Third group
-            (2, "Transformer"),
-            // Fourth group
-            (3, "Backflow")
+            (1, "Producer"),   // reads x
+            (1, "Transformer") // reads x, writes y, forced to run after Consumer
         ]);
     }
 }
