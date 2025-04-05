@@ -125,7 +125,17 @@ impl<E> World for {{ world.name.type }}<E> {
 #[derive(Debug, Clone, Default)]
 pub struct {{ world.name.type }}States {
     {%- for state in world.states %}
-    pub {{ state.field }}: {{ state.type }},
+    {%- if state.description %}
+    /// {{ state.description }}
+    {%- else %}
+    /// A user-defined state.
+    {%- endif %}
+    ///
+    /// The state is used in the following systems:
+    {%- for system in state.systems %}
+    /// - [`{{system.type}}`]
+    {%- endfor %}
+    pub {{ state.name.field }}: {{ state.name.type }},
     {%- endfor %}
 }
 
@@ -172,7 +182,7 @@ impl<E>{{ world.name.type }}<E> {
     pub fn new<S>(
         create_systems: &S,
         {%- for state in world.states %}
-        {{ state.field }}: {{ state.type }},
+        {{ state.name.field }}: {{ state.name.type }},
         {%- endfor %}
         phase_events: Option<E>) -> Self
     where
@@ -192,7 +202,7 @@ impl<E>{{ world.name.type }}<E> {
             {%- if (world.states | length) > 0 %}
             states: {{ world.name.type }}States {
                 {%- for state in world.states %}
-                {{ state.field }},
+                {{ state.name.field }},
                 {%- endfor %}
             },
             {%- endif %}

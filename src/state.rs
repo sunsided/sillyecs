@@ -4,7 +4,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use std::hash::Hash;
 use std::ops::Deref;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct State {
     pub name: StateName,
     #[serde(default)]
@@ -16,7 +16,7 @@ pub struct State {
 impl State {
     pub(crate) fn finish(&mut self, systems: &[System]) {
         for system in systems {
-            if system.states.iter().any(|s| s.state.eq(&self.name)) {
+            if system.states.iter().any(|s| s.name.eq(&self.name)) {
                 self.systems.push(system.name.clone());
             }
         }
@@ -43,6 +43,6 @@ impl<'de> Deserialize<'de> for StateName {
         D: Deserializer<'de>,
     {
         let type_name = String::deserialize(deserializer)?;
-        Ok(Self(Name::new(type_name, "")))
+        Ok(Self(Name::new(type_name, "State")))
     }
 }

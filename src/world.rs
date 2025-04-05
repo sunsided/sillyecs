@@ -6,7 +6,7 @@ use std::collections::HashSet;
 use std::hash::Hash;
 use std::ops::Deref;
 use std::sync::atomic::AtomicU64;
-use crate::state::StateNameRef;
+use crate::state::State;
 
 static WORLD_IDS: AtomicU64 = AtomicU64::new(1);
 
@@ -19,16 +19,16 @@ pub struct World {
     pub description: Option<String>,
     #[serde(skip_serializing, rename(deserialize = "archetypes"))]
     pub archetypes_refs: Vec<ArchetypeRef>,
-    #[serde(skip_deserializing, rename(serialize = "archetypes"))]
+    #[serde(skip_deserializing)]
     pub archetypes: Vec<Archetype>,
-    #[serde(skip_deserializing, rename(serialize = "systems"))]
+    #[serde(skip_deserializing)]
     pub systems: Vec<System>,
-    #[serde(skip_deserializing, rename(serialize = "states"))]
-    pub states: Vec<StateNameRef>,
+    #[serde(skip_deserializing)]
+    pub states: Vec<State>,
 }
 
 impl World {
-    pub(crate) fn finish(&mut self, archetypes: &[Archetype], systems: &[System]) {
+    pub(crate) fn finish(&mut self, archetypes: &[Archetype], systems: &[System], states: &[State]) {
         let mut used_systems = HashSet::new();
         let mut used_states = HashSet::new();
         for archetype in archetypes {
@@ -46,8 +46,15 @@ impl World {
                 }
 
                 for state in system.states.iter() {
-                    if !used_states.insert(state.state.clone()) {
-                        self.states.push(state.state.clone());
+                    if used_states.insert(state.name.clone()) {
+                        let state = states.iter().find(|s| s.name.eq(&state.name)).cloned().expect("Failed to find state that is known to exist");
+
+                        assert!(
+                            !self.states.iter().any(|s| s.name.eq(&state.name)),
+                            "State '{}' is already in the world",
+                            state.name.type_name_raw
+                        );
+                        self.states.push(state.clone());
                     }
                 }
             }

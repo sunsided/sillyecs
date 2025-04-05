@@ -53,7 +53,7 @@ impl Ecs {
         self.scheduled_systems()?;
 
         for world in &mut self.worlds {
-            world.finish(&self.archetypes, &self.systems);
+            world.finish(&self.archetypes, &self.systems, &self.states);
         }
 
         Ok(())
@@ -92,6 +92,10 @@ pub enum EcsError {
     MissingSystemDependency(String, String),
     #[error("A cycle was detected in the system run order (run_after edges): System {0} depends on itself.")]
     SystemDependsOnItself(String),
+    #[error("System {1} requires state '{0}' which is not defined.")]
+    MissingStateInSystem(String, String),
+    #[error("State '{0}' is defined multiple times.")]
+    StateDefinedMultipleTimes(String),
 }
 
 impl Ecs {
@@ -116,6 +120,17 @@ impl Ecs {
 
             if archetype.promotions.contains(&archetype.name) {
                 return Err(EcsError::PromotionToSelf(archetype.name.type_name.clone()));
+            }
+        }
+        Ok(())
+    }
+
+    /// Ensure that all states are valid.
+    pub(crate) fn ensure_state_consistency(&self) -> Result<(), EcsError> {
+        let mut set = HashSet::new();
+        for state in &self.states {
+            if !set.insert(state.name.clone()) {
+                return Err(EcsError::StateDefinedMultipleTimes(state.name.type_name_raw.clone()));
             }
         }
         Ok(())
@@ -216,7 +231,6 @@ impl Ecs {
             let required_components: HashSet<_> =
                 system.inputs.iter().chain(&system.outputs).collect();
 
-
             // Ensure all `run_after` dependencies exist in self.systems
             for dependency in &system.run_after {
                 if !self.systems.iter().any(|s| s.name == *dependency) {
@@ -228,6 +242,15 @@ impl Ecs {
 
                 if dependency == &system.name {
                     return Err(EcsError::SystemDependsOnItself(system.name.type_name.clone()));
+                }
+            }
+
+            for state in &system.states {
+                if !self.states.iter().any(|ecs_state| ecs_state.name.eq(&state.name)) {
+                    return Err(EcsError::MissingStateInSystem(
+                        state.name.type_name_raw.clone(),
+                        system.name.type_name.clone(),
+                    ));
                 }
             }
 

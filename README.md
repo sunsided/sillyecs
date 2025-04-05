@@ -37,6 +37,10 @@ Define your ECS components and systems in a YAML file:
 
 ```yaml
 # ecs.yaml
+states:
+  - name: Render
+    description: The render state
+
 components:
   - name: Position
   - name: Velocity
@@ -87,7 +91,9 @@ systems:
       - Position
   - name: Render
     phase: Render
-    state: true
+    states:
+      - use: Render
+        write: false  # optional
     inputs:
       - Position
 

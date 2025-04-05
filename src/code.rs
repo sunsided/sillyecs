@@ -29,6 +29,7 @@ impl EcsCode {
         R: io::Read,
     {
         let mut ecs: Ecs = serde_yaml::from_reader(reader).expect("Failed to deserialize ecs.yaml");
+        ecs.ensure_state_consistency()?;
         ecs.ensure_component_consistency()?;
         ecs.ensure_distinct_archetype_components()?;
         ecs.ensure_system_consistency()?;

@@ -11,7 +11,7 @@ pub use crate::code::EcsCode;
 use serde::Serialize;
 use std::fmt::{Display, Formatter};
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
+#[derive(Debug, Clone, Eq, PartialOrd, Ord, Hash, Serialize)]
 pub struct Name {
     #[serde(rename = "type")]
     pub type_name: String,
@@ -23,12 +23,23 @@ pub struct Name {
     pub field_name_plural: String,
 }
 
+impl PartialEq for Name {
+    fn eq(&self, other: &Self) -> bool {
+        self.type_name.eq(&other.type_name)
+    }
+}
+
 impl Name {
     pub fn new(type_name: String, type_suffix: &str) -> Self {
         let field_name = pascal_to_snake(&type_name);
         let field_name_plural = pluralize_name(field_name.clone());
+        let adjusted_type_name = if type_name.ends_with(type_suffix) {
+            type_name.clone()
+        } else {
+            format!("{type_name}{type_suffix}")
+        };
         Self {
-            type_name: format!("{type_name}{type_suffix}"),
+            type_name: adjusted_type_name,
             type_name_raw: type_name,
             field_name,
             field_name_plural,

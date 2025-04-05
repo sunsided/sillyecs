@@ -66,7 +66,7 @@ pub struct System {
 pub struct StateUse {
     /// The name of the state.
     #[serde(rename = "use")]
-    pub state: StateName,
+    pub name: StateName,
     /// Whether write access is required.
     #[serde(default)]
     pub write: bool
@@ -97,7 +97,7 @@ impl System {
         }
         for state in &self.states {
             self.dependencies.push(Dependency {
-                resource: Resource::UserState(state.state.clone()),
+                resource: Resource::UserState(state.name.clone()),
                 access: if state.write { Access::Write } else { Access::Read }
             })
         }
