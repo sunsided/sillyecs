@@ -25,6 +25,7 @@ pub struct World {
     pub systems: Vec<System>,
     #[serde(skip_deserializing)]
     pub states: Vec<State>,
+    // TODO: Scheduled systems should be part of the world, not the ECS itself
 }
 
 impl World {

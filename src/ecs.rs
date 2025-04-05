@@ -25,6 +25,8 @@ pub struct Ecs {
     /// The user states.
     #[serde(default)]
     pub states: Vec<State>,
+
+    // TODO: Schedules systems should be part of the world, not the ECS
     /// The systems in scheduling order.
     #[serde(default, skip_deserializing)]
     pub scheduled_systems: HashMap<SystemPhaseRef, Vec<Vec<System>>>,

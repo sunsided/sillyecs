@@ -82,6 +82,17 @@ impl From<ArchetypeId> for u64 {
     }
 }
 
+impl core::fmt::Display for ArchetypeId {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> Result<(), core::fmt::Error> {
+        match self.0.get() {
+            {%- for archetype in ecs.archetypes %}
+            {{ archetype.id }} => write!(f, "{{ archetype.name.raw }} (Archetype ID {{ archetype.id }})"),
+            {%- endfor %}
+            id => write!(f, "Archetype ID {id}")
+        }
+    }
+}
+
 /// A locator for an entity across archetypes.
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct EntityArchetypeRef {

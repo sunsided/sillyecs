@@ -237,7 +237,7 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
         Self {
             archetypes: Default::default(),
             systems: {{ world.name.type }}Systems {
-                {%- for system in ecs.systems %}
+                {%- for system in world.systems %}
                 {{ system.name.field }}: create_systems.create_{{ system.name.field }}(),
                 {%- endfor %}
             },
@@ -435,6 +435,7 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
         {%- for group in ecs.scheduled_systems[phase.name] %}
         {%- set group_number = loop.index %}
         {%- for system in group %}
+        // TODO: Test if {{ system.name.type }} is part of the {{ world.name.type }}.
         // System group {{ group_number }} of {{ ecs.scheduled_systems[phase.name] | length }}
         {
         {%- for archetype in system.affected_archetypes %}
@@ -546,21 +547,40 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
     {%- endfor %}
 
     /// Handles all queued commands.
-    fn handle_commands(&self)
+    fn handle_commands(&mut self)
     where
         Q: WorldCommandReceiver
     {
         loop {
             match self.command_queue.recv() {
-                Ok(Some(cmd)) => todo!(),
+                Ok(Some(cmd)) => {
+                    match cmd {
+                        WorldCommand::SpawnEntity(data) => self.handle_spawn_command(data),
+                        WorldCommand::DespawnEntity(id) => self.handle_despawn_command(id),
+                    }
+                }
                 Ok(None) => break,
-                Err(e) => {
+                Err(error) => {
                     // TODO: Make logging configurable.
-                    tracing::error!(?e, "Failed to dequeue world command");
+                    tracing::error!(?error, "Failed to dequeue world command");
                     break;
                 }
             }
         }
+    }
+
+    fn handle_spawn_command(&mut self, data: ArchetypeEntityData) {
+        match data {
+            // TODO: Accept only archetypes known to the world
+            {%- for archetype in world.archetypes %}
+            ArchetypeEntityData::{{ archetype.name.raw }}(data) => todo!("Spawn {{ archetype.name.raw }} entity"),
+            {%- endfor %}
+            unhandled => panic!("The specified data for archetype {id} is not accepted in this world.", id = unhandled.archetype_id())
+        }
+    }
+
+    fn handle_despawn_command(&mut self, id: EntityId) {
+         todo!("Look up entity in map, instruct archetype to drop");
     }
 }
 {%- endfor  %}
