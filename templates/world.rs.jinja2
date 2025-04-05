@@ -80,6 +80,12 @@ impl<E> Spawn<{{ archetype.name.raw}}EntityData> for {{ world.name.type }}<E> {
 }
 {%- endfor %}
 
+/// Helper trait to prevent accidental abuse of the Archetype's spawning function.
+pub trait WorldEntityRegistry {
+    /// Registers an entity with the world.
+    fn register(&mut self, id: EntityId, archetype: EntityArchetypeRef) -> EntityId;
+}
+
 #[allow(dead_code)]
 impl<E>{{ world.name.type }}<E> {
     /// Creates a new [`{{ world.name.type }}`].
@@ -127,17 +133,22 @@ impl<E>{{ world.name.type }}<E> {
         {{component_name.field}}: {{ component_name.type }},
         {%- endfor %}
     ) -> EntityId {
-        let registry = |entity_id, archetype_ref| {
-            self.entity_locations.insert(entity_id, archetype_ref);
-            entity_id
-        };
+        struct Registry<'a>(&'a mut std::collections::HashMap<EntityId, EntityArchetypeRef>);
+
+        impl WorldEntityRegistry for Registry<'_> {
+            #[inline(always)]
+            fn register(&mut self, id: EntityId, archetype: EntityArchetypeRef) -> EntityId {
+                self.0.insert(id, archetype);
+                id
+            }
+        }
 
         self.archetypes.{{ archetype.name.field }}
             .spawn_with(
                 {%- for component_name in archetype.components %}
                 {{component_name.field}},
                 {%- endfor %}
-                registry
+                Registry(&mut self.entity_locations)
             )
     }
     {%- endfor %}

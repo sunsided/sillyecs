@@ -261,7 +261,7 @@ impl {{ archetype.name.type }} {
         mut world_registry: R
     ) -> EntityId
     where
-        R: FnMut(EntityId, EntityArchetypeRef) -> EntityId
+        R: WorldEntityRegistry
     {
         {%- for component_name in archetype.components %}
         self.{{ component_name.fields }}.push({{component_name.field}});
@@ -277,7 +277,7 @@ impl {{ archetype.name.type }} {
             index: entity_index
         };
 
-        world_registry(entity_id, reference)
+        world_registry.register(entity_id, reference)
     }
 
     {%- for promotion in archetype.promotion_infos %}
