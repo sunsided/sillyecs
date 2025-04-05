@@ -47,7 +47,7 @@ impl World {
                 .iter()
                 .find(|s| s.affected_archetype_ids.contains(&archetype.id))
             {
-                if !used_systems.insert(system.name.clone()) {
+                if used_systems.insert(system.name.clone()) {
                     self.systems.push(system.clone());
                 }
 

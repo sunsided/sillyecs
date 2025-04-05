@@ -11,7 +11,7 @@ pub use crate::code::EcsCode;
 use serde::Serialize;
 use std::fmt::{Display, Formatter};
 
-#[derive(Debug, Clone, Eq, PartialOrd, Ord, Hash, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 pub struct Name {
     #[serde(rename = "type")]
     pub type_name: String,
@@ -21,12 +21,6 @@ pub struct Name {
     pub field_name: String,
     #[serde(rename = "fields")]
     pub field_name_plural: String,
-}
-
-impl PartialEq for Name {
-    fn eq(&self, other: &Self) -> bool {
-        self.type_name.eq(&other.type_name)
-    }
 }
 
 impl Name {

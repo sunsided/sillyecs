@@ -133,7 +133,7 @@ pub struct NoOpPhaseEvents;
 
 impl System{{ phase.name.type }}Events for NoOpPhaseEvents {
     type Result = ();
-    type Error = Infallible;
+    type Error = core::convert::Infallible;
 
     #[inline]
     fn on_begin_phase(
