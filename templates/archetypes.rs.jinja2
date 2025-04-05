@@ -134,6 +134,56 @@ pub trait HasComponent<T: Component> {
     fn get_mut(&mut self) -> &mut T;
 }
 
+/// An enumeration holding variants for entities.
+#[allow(dead_code)]
+pub enum ArchetypeEntity {
+    {%- for archetype in ecs.archetypes %}
+    {%- if archetype.description %}
+    /// {{ archetype.description }}
+    {%- else %}
+    /// An entity in the [`{{ archetype.name.raw }}`]({{ archetype.name.type }}) archetype.
+    {%- endif %}
+    {{ archetype.name.raw }}({{ archetype.name.raw }}Entity),
+    {%- endfor %}
+}
+
+/// An enumeration holding variants for entity data, e.g. when spawning entities.
+#[allow(dead_code)]
+pub enum ArchetypeEntityData {
+    {%- for archetype in ecs.archetypes %}
+    {%- if archetype.description %}
+    /// {{ archetype.description }}
+    {%- else %}
+    /// An entity in the [`{{ archetype.name.raw }}`]({{ archetype.name.type }}) archetype.
+    {%- endif %}
+    {{ archetype.name.raw }}({{ archetype.name.raw }}EntityData),
+    {%- endfor %}
+}
+
+#[allow(dead_code)]
+impl ArchetypeEntity {
+    /// Determines the [`ArchetypeId`] of this [`ArchetypeEntity`] variant.
+    pub const fn archetype_id(&self) -> ArchetypeId {
+        match self {
+            {%- for archetype in ecs.archetypes %}
+            Self::{{ archetype.name.raw }}(_) => {{ archetype.name.type }}::ID,
+            {%- endfor %}
+        }
+    }
+}
+
+#[allow(dead_code)]
+impl ArchetypeEntityData {
+    /// Determines the [`ArchetypeId`] of this [`ArchetypeEntityData`] variant.
+    pub const fn archetype_id(&self) -> ArchetypeId {
+        match self {
+            {%- for archetype in ecs.archetypes %}
+            Self::{{ archetype.name.raw }}(_) => {{ archetype.name.type }}::ID,
+            {%- endfor %}
+        }
+    }
+}
+
 {%- for archetype in ecs.archetypes %}
 {% if archetype.description %}
 /// {{ archetype.description }}
