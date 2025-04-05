@@ -65,7 +65,7 @@ pub enum WorldCommand {
 pub trait WorldCommandSender {
     type Error: core::error::Error;
 
-    /// Sends a command. May block until the send is complete.
+    /// Sends a command. May block until sending is complete.
     fn send(&self, command: WorldCommand) -> Result<(), Self::Error>;
 }
 
@@ -193,7 +193,7 @@ pub struct {{ world.name.type }}<E, Q> {
     /// The archetypes.
     archetypes: {{ world.name.type }}Archetypes,
     /// The systems.
-    systems: {{ world.name.type }}Systems,
+    pub systems: {{ world.name.type }}Systems,
     {%- if ecs.any_phase_on_request %}
     /// Flags for conditional phase execution.
     phase_flags: ConditionalPhaseFlags,
@@ -252,11 +252,46 @@ struct {{ world.name.type }}Archetypes {
 
 /// The systems.
 #[derive(Debug, Clone)]
-struct {{ world.name.type }}Systems {
+pub struct {{ world.name.type }}Systems {
     {%- for system in world.systems %}
-    pub {{ system.name.field }}: {{ system.name.type }},
+    {{ system.name.field }}: {{ system.name.type }},
     {%- endfor %}
 }
+
+impl {{ world.name.type }}Systems {
+    {%- for system in world.systems %}
+
+    /// Gives immutable access to the [`{{ system.name.type }}Data`] of the [`{{ system.name.type }}`].
+    #[inline]
+    pub fn as_{{ system.name.field }}_ref(&self) -> &{{ system.name.type }}Data {
+        use core::ops::Deref;
+        self.{{ system.name.field }}.deref()
+    }
+
+    /// Gives mutable access to the [`{{ system.name.type }}Data`] of the [`{{ system.name.type }}`].
+    #[inline]
+    pub fn as_{{ system.name.field }}_mut(&mut self) -> &mut {{ system.name.type }}Data {
+        use core::ops::DerefMut;
+        self.{{ system.name.field }}.deref_mut()
+    }
+    {%- endfor %}
+}
+{%- for system in world.systems %}
+
+impl AsRef<{{ system.name.type }}Data> for {{ world.name.type }}Systems {
+    #[inline]
+    fn as_ref(&self) -> &{{ system.name.type }}Data {
+        self.as_{{ system.name.field }}_ref()
+    }
+}
+
+impl AsMut<{{ system.name.type }}Data> for {{ world.name.type }}Systems {
+    #[inline]
+    fn as_mut(&mut self) -> &mut {{ system.name.type }}Data {
+        self.as_{{ system.name.field }}_mut()
+    }
+}
+{%- endfor %}
 {%- for archetype in world.archetypes %}
 
 /// Spawns an entity into the world.
