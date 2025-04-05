@@ -119,6 +119,12 @@ impl FrameContext {
             last_frame_start: std::time::Instant::now(),
         }
     }
+
+    /// Resets the frame context, e.g. after the application came back to foreground.
+    fn reset(&mut self) {
+        self.current_frame_start = std::time::Instant::now();
+        self.last_frame_start = std::time::Instant::now();
+    }
 }
 
 /// Marker trait for worlds.
@@ -312,6 +318,11 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
         }
     }
 
+    /// Resets the frame context, e.g. after the application comes back from background.
+    pub fn reset_frame_context(&mut self) {
+        self.context.reset();
+    }
+
     /// Returns the overall number of entities in this world.
     pub fn len(&self) -> usize {
         self.entity_locations.len()
@@ -500,7 +511,7 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
             self.context.fixed_time_secs = SystemPhase::{{ phase.name.field | upper }}_SECS;
             self.fixed_accumulators.{{ phase.name.field }} += self.context.delta_time_secs;
             while self.fixed_accumulators.{{ phase.name.field }} >= SystemPhase::{{ phase.name.field | upper }}_SECS {
-                self.par_apply_system_phase_{{ phase.name.field }}();
+                self.apply_system_phase_{{ phase.name.field }}();
                 self.fixed_accumulators.{{ phase.name.field }} -= SystemPhase::{{ phase.name.field | upper }}_SECS;
             }
         }
@@ -510,7 +521,7 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
         self.context.fixed_time_secs = SystemPhase::{{ phase.name.field | upper }}_SECS;
         self.fixed_accumulators.{{ phase.name.field }} += self.context.delta_time_secs;
         while self.fixed_accumulators.{{ phase.name.field }} >= SystemPhase::{{ phase.name.field | upper }}_SECS {
-            self.par_apply_system_phase_{{ phase.name.field }}();
+            self.apply_system_phase_{{ phase.name.field }}();
             self.fixed_accumulators.{{ phase.name.field }} -= SystemPhase::{{ phase.name.field | upper }}_SECS;
         }
         {%- endif %}
