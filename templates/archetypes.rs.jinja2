@@ -253,12 +253,16 @@ impl {{ archetype.name.type }} {
 
     /// Spawn a new entity into the world. Must be called through the world for proper bookkeeping.
     #[doc(hidden)]
-    pub fn spawn_with(
+    pub fn spawn_with<R>(
         &mut self,
         {%- for component_name in archetype.components %}
         {{component_name.field}}: {{ component_name.type }},
         {%- endfor %}
-    ) -> (EntityId, EntityArchetypeRef) {
+        mut world_registry: R
+    ) -> EntityId
+    where
+        R: FnMut(EntityId, EntityArchetypeRef) -> EntityId
+    {
         {%- for component_name in archetype.components %}
         self.{{ component_name.fields }}.push({{component_name.field}});
         {%- endfor %}
@@ -272,7 +276,8 @@ impl {{ archetype.name.type }} {
             archetype: Self::ID,
             index: entity_index
         };
-        (entity_id, reference)
+
+        world_registry(entity_id, reference)
     }
 
     {%- for promotion in archetype.promotion_infos %}

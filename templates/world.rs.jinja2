@@ -127,15 +127,18 @@ impl<E>{{ world.name.type }}<E> {
         {{component_name.field}}: {{ component_name.type }},
         {%- endfor %}
     ) -> EntityId {
-        let (entity_id, archetype_ref) = self.archetypes.{{ archetype.name.field }}
+        let registry = |entity_id, archetype_ref| {
+            self.entity_locations.insert(entity_id, archetype_ref);
+            entity_id
+        };
+
+        self.archetypes.{{ archetype.name.field }}
             .spawn_with(
                 {%- for component_name in archetype.components %}
                 {{component_name.field}},
                 {%- endfor %}
-            );
-
-        self.entity_locations.insert(entity_id, archetype_ref);
-        entity_id
+                registry
+            )
     }
     {%- endfor %}
 
