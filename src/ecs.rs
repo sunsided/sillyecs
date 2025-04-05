@@ -80,6 +80,8 @@ pub enum EcsError {
     MissingArchetypeInWorld(String, String),
     #[error("A cycle was detected in the system run order (run_after edges).")]
     CycleDetectedInSystemRunOrder,
+    #[error("System {1} depends on undefined system {0}.")]
+    MissingSystemDependency(String, String),
 }
 
 impl Ecs {
@@ -203,6 +205,17 @@ impl Ecs {
         for system in &self.systems {
             let required_components: HashSet<_> =
                 system.inputs.iter().chain(&system.outputs).collect();
+
+
+            // Ensure all `run_after` dependencies exist in self.systems
+            for dependency in &system.run_after {
+                if !self.systems.iter().any(|s| s.name == *dependency) {
+                    return Err(EcsError::MissingSystemDependency(
+                        dependency.type_name_raw.clone(),
+                        system.name.type_name.clone(),
+                    ));
+                }
+            }
 
             if !self.phases.iter().any(|phase| phase.name.eq(&system.phase)) {
                 return Err(EcsError::MissingPhase(
