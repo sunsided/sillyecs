@@ -116,3 +116,45 @@ include!(concat!(env!("OUT_DIR"), "/world_gen.rs"));
 ```
 
 The compiler will tell you which traits and functions to implement.
+
+### Command Queue
+
+You will have to implement a command queue. Below is an example for a queue based on
+[`crossbeam-channel`](https://docs.rs/crossbeam/latest/crossbeam/channel):
+
+```rust
+struct CommandQueue {
+    sender: crossbeam_channel::Sender<WorldCommand>,
+    receiver: crossbeam_channel::Receiver<WorldCommand>,
+}
+
+impl CommandQueue {
+    pub fn new() -> Self {
+        let (sender, receiver) = crossbeam_channel::unbounded();
+        Self {
+            sender,
+            receiver,
+        }
+    }
+}
+
+impl WorldCommandReceiver for CommandQueue {
+    type Error = TryRecvError;
+
+    fn recv(&self) -> Result<Option<WorldCommand>, Self::Error> {
+        match self.receiver.try_recv() {
+            Ok(cmd) => Ok(Some(cmd)),
+            Err(TryRecvError::Empty) => Ok(None),
+            Err(err) => Err(err),
+        }
+    }
+}
+
+impl WorldCommandSender for CommandQueue {
+    type Error = crossbeam_channel::SendError<WorldCommand>;
+
+    fn send(&self, command: WorldCommand) -> Result<(), Self::Error> {
+        self.sender.send(command)
+    }
+}
+```
