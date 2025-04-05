@@ -622,6 +622,18 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
         {%- set group_number = loop.index %}
         {%- for system in group %}
         // System group {{ group_number }} of {{ world.scheduled_systems[phase.name] | length }}
+        self.systems.{{ system.name.field }}.on_begin_phase(
+            {%- if system.needs_context %}
+            &self.context,
+            {%- endif %}
+            {%- for state in system.states %}
+            {%- if state.write %}
+            &mut self.states.{{ state.use.field }},
+            {%- else %}
+            &self.states.{{ state.use.field }},
+            {%- endif %}
+            {%- endfor %}
+        );
         {
         {%- for archetype in system.affected_archetypes %}
             // Apply {{ system.name.type }} to {{ archetype.type }}
@@ -651,6 +663,18 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
             );
             {%- endfor %}
         }
+        self.systems.{{ system.name.field }}.on_end_phase(
+            {%- if system.needs_context %}
+            &self.context,
+            {%- endif %}
+            {%- for state in system.states %}
+            {%- if state.write %}
+            &mut self.states.{{ state.use.field }},
+            {%- else %}
+            &self.states.{{ state.use.field }},
+            {%- endif %}
+            {%- endfor %}
+        );
         {%- endfor %}
         {%- endfor %}
         {%- endif %}
@@ -691,6 +715,18 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
         {%- for group in world.scheduled_systems[phase.name] %}
         {%- set group_number = loop.index %}
         // System group {{ group_number }}
+        self.systems.{{ system.name.field }}.on_begin_phase(
+            {%- if system.needs_context %}
+            &self.context,
+            {%- endif %}
+            {%- for state in system.states %}
+            {%- if state.write %}
+            &mut self.states.{{ state.use.field }},
+            {%- else %}
+            &self.states.{{ state.use.field }},
+            {%- endif %}
+            {%- endfor %}
+        );
         rayon::scope(|s| {
             // TODO: Instead of parallelizing systems (and then have them access archetypes), parallelize archetypes and apply all systems. This should improve data parallelism because it keeps caches hot.
 
@@ -726,6 +762,18 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
             });
             {%- endfor %}
         });
+        self.systems.{{ system.name.field }}.on_end_phase(
+            {%- if system.needs_context %}
+            &self.context,
+            {%- endif %}
+            {%- for state in system.states %}
+            {%- if state.write %}
+            &mut self.states.{{ state.use.field }},
+            {%- else %}
+            &self.states.{{ state.use.field }},
+            {%- endif %}
+            {%- endfor %}
+        );
         {%- endfor %}
         {%- endif %}
 
