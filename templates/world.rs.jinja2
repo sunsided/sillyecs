@@ -460,7 +460,8 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
         {%- for phase in ecs.phases %}
         {%- if phase.manual %}
 
-        // The {{ phase.name.raw }} phase is marked manual and will be skipped here.
+        // NOTE: The {{ phase.name.raw }} phase is marked manual and will be skipped here.
+        //       self.par_apply_system_phase_{{ phase.name.field }}();
         {%- else %}
         {%- if not phase.fixed %}
         {%- if phase.on_request %}
@@ -529,7 +530,8 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
         {%- for phase in ecs.phases %}
         {%- if phase.manual %}
 
-        // The {{ phase.name.raw }} phase is marked manual and will be skipped here.
+        // NOTE: The {{ phase.name.raw }} phase is marked manual and will be skipped here.
+        //       self.par_apply_system_phase_{{ phase.name.field }}();
         {%- else %}
         {%- if not phase.fixed %}
         {%- if phase.on_request %}
