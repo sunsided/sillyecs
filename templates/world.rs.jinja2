@@ -47,6 +47,16 @@ impl From<WorldId> for u64 {
     }
 }
 
+/// A command in the world.
+#[allow(dead_code)]
+pub enum WorldCommand {
+    /// Spawn an entity.
+    SpawnEntity(ArchetypeEntityData),
+    /// Despawn an entity.
+    DespawnEntity(EntityId),
+    // TODO: Allow for user-specified commands.
+}
+
 /// A frame context.
 #[derive(Debug, Clone)]
 #[allow(dead_code)]

@@ -135,6 +135,7 @@ pub trait HasComponent<T: Component> {
 }
 
 /// An enumeration holding variants for entities.
+#[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub enum ArchetypeEntity {
     {%- for archetype in ecs.archetypes %}
@@ -148,6 +149,7 @@ pub enum ArchetypeEntity {
 }
 
 /// An enumeration holding variants for entity data, e.g. when spawning entities.
+#[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub enum ArchetypeEntityData {
     {%- for archetype in ecs.archetypes %}
