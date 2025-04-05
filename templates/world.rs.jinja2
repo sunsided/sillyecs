@@ -47,10 +47,13 @@ impl From<WorldId> for u64 {
     }
 }
 
-/// A command in the world.
+/// A command in the [`World`].
 #[allow(dead_code)]
 pub enum WorldCommand {
     /// Spawn an entity.
+    ///
+    /// # Note:
+    /// Due to the reusability of systems, not all commands are valid in all worlds.
     SpawnEntity(ArchetypeEntityData),
     /// Despawn an entity.
     DespawnEntity(EntityId),
@@ -83,6 +86,7 @@ impl<T> WorldCommandQueue for T
 where
     T: WorldCommandSender + WorldCommandReceiver
 { }
+
 
 /// A frame context.
 #[derive(Debug, Clone)]
