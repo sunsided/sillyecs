@@ -417,9 +417,11 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
     pub fn apply_system_phases(&mut self)
     where
         E: SystemPhaseEvents<{{ world.name.type }}States>,
-        Q: WorldCommandSender
+        Q: WorldCommandSender + WorldCommandReceiver
     {
         self.on_begin_frame();
+        self.handle_commands();
+
         {%- for phase in ecs.phases %}
         {%- if phase.manual %}
 
@@ -464,6 +466,7 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
         {%- endif %}
         {%- endfor %}
         self.on_end_frame();
+        self.handle_commands();
     }
 
     /// Apply all system phases with thread parallelism.
@@ -483,9 +486,11 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
     pub fn par_apply_system_phases(&mut self)
     where
         E: SystemPhaseEvents<{{ world.name.type }}States>,
-        Q: WorldCommandSender
+        Q: WorldCommandSender + WorldCommandReceiver
     {
         self.on_begin_frame();
+        self.handle_commands();
+
         {%- for phase in ecs.phases %}
         {%- if phase.manual %}
 
@@ -530,6 +535,7 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
         {%- endif %}
         {%- endfor %}
         self.on_end_frame();
+        self.handle_commands();
     }
     {%- for phase in ecs.phases %}
 
@@ -554,7 +560,7 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
     fn apply_system_phase_{{ phase.name.field }}(&mut self)
     where
         E: SystemPhaseEvents<{{ world.name.type }}States>,
-        Q: WorldCommandSender
+        Q: WorldCommandSender + WorldCommandReceiver
     {
         if let Some(events) = &mut self.events {
             events.on_begin_phase(SystemPhase::{{ phase.name.raw }}, &self.context, &mut self.states);
@@ -572,7 +578,7 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
     fn apply_system_phase_{{ phase.name.field }}_without_events(&mut self)
     where
         E: SystemPhaseEvents<{{ world.name.type }}States>,
-        Q: WorldCommandSender
+        Q: WorldCommandSender + WorldCommandReceiver
     {
         {%- if world.scheduled_systems[phase.name] | length == 0 %}
         // no systems in this phase
@@ -613,6 +619,9 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
         {%- endfor %}
         {%- endfor %}
         {%- endif %}
+
+        // Process all commands.
+        self.handle_commands();
     }
 
     /// Applies the specified system phase with parallel execution of systems.
@@ -632,7 +641,7 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
     fn par_apply_system_phase_{{ phase.name.field }}(&mut self)
     where
         E: SystemPhaseEvents<{{ world.name.type }}States>,
-        Q: WorldCommandSender
+        Q: WorldCommandSender + WorldCommandReceiver
     {
         if let Some(events) = &mut self.events {
             events.on_begin_phase(SystemPhase::{{ phase.name.raw }}, &self.context, &mut self.states);
@@ -688,6 +697,9 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
         if let Some(events) = &mut self.events {
             events.on_end_phase(SystemPhase::{{ phase.name.raw }}, &self.context, &mut self.states);
         }
+
+        // Process all commands.
+        self.handle_commands();
     }
     {%- endfor %}
 
