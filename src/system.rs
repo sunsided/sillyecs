@@ -218,21 +218,19 @@ impl Default for SystemId {
 pub struct SystemPhase {
     /// The name of the phase.
     pub name: SystemPhaseName,
-
     /// The optional description of the phase.
     pub description: Option<String>,
-
     #[serde(default, skip_serializing, rename(deserialize = "fixed"))]
     pub fixed_input: FixedTiming,
-
+    /// Indicates that this phase is conditionally executed on a request.
+    #[serde(default)]
+    pub on_request: bool,
     /// When nonzero, this phase uses a fixed timing loop with the specified time in seconds.
     #[serde(default, skip_deserializing)]
     pub fixed_secs: f32,
-
     /// Indicates the number of times per second that the fixed loop runs. Available after a call to [`SystemPhase::finish`](SystemPhase::finish).
     #[serde(default, skip_deserializing)]
     pub fixed_hertz: f32,
-
     /// Indicates whether this phase is fixed. Available after a call to [`SystemPhase::finish`](SystemPhase::finish).
     #[serde(default, skip_deserializing)]
     pub fixed: bool

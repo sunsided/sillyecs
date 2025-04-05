@@ -132,6 +132,53 @@ pub trait World {
 /// Marker trait for world states.
 pub trait WorldState { }
 {%- endif %}
+{%- if ecs.any_phase_on_request %}
+
+/// Spawns an entity into the world.
+#[derive(Debug, Default)]
+struct ConditionalPhaseFlags {
+    {%- for phase in ecs.phases %}
+    {%- if phase.on_request %}
+    /// Whether the [`{{ phase.name.raw }}`]({{ phase.name.type }}) phase is requested.
+    pub {{ phase.name.field }}_requested: core::sync::atomic::AtomicBool,
+    {%- endif %}
+    {%- endfor %}
+}
+
+impl ConditionalPhaseFlags {
+    {%- for phase in ecs.phases %}
+    {%- if phase.on_request %}
+    /// Returns whether the [`{{ phase.name.raw }}`]({{ phase.name.type }}) phase was requested
+    /// and atomically sets the flag to `false`.
+    #[inline]
+    pub fn is_{{ phase.name.field }}_requested(&self) -> bool {
+        self.{{ phase.name.field }}_requested.swap(false, core::sync::atomic::Ordering::AcqRel)
+    }
+
+    /// Sets the request status of the [`{{ phase.name.raw }}`]({{ phase.name.type }}) phase.
+    #[inline]
+    pub fn set_{{ phase.name.field }}_requested(&self) {
+        self.{{ phase.name.field }}_requested
+            .store(true, core::sync::atomic::Ordering::Release);
+    }
+    {%- endif %}
+    {%- endfor %}
+}
+
+impl Clone for ConditionalPhaseFlags {
+    fn clone(&self) -> Self {
+        Self {
+            {%- for phase in ecs.phases %}
+            {%- if phase.on_request %}
+            {{ phase.name.field }}_requested: core::sync::atomic::AtomicBool::new(
+                self.{{ phase.name.field }}_requested.load(core::sync::atomic::Ordering::Acquire),
+            ),
+            {%- endif %}
+            {%- endfor %}
+        }
+    }
+}
+{%- endif %}
 {% for world in ecs.worlds %}
 
 /// A world holding all archetypes.
@@ -141,6 +188,10 @@ pub struct {{ world.name.type }}<E, Q> {
     archetypes: {{ world.name.type }}Archetypes,
     /// The systems.
     systems: {{ world.name.type }}Systems,
+    {%- if ecs.any_phase_on_request %}
+    /// Flags for conditional phase execution.
+    phase_flags: ConditionalPhaseFlags,
+    {%- endif %}
     /// The entity locator.
     entity_locations: std::collections::HashMap<EntityId, EntityArchetypeRef>,
     /// The frame context.
@@ -242,6 +293,9 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
                 {%- endfor %}
             },
             entity_locations: Default::default(),
+            {%- if ecs.any_phase_on_request %}
+            phase_flags: ConditionalPhaseFlags::default(),
+            {%- endif %}
             context,
             {%- if (world.states | length) > 0 %}
             states: {{ world.name.type }}States {
@@ -272,7 +326,16 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
     pub fn despawn_by_id(&mut self, id: EntityId) -> Result<(), DespawnError> {
         self.handle_despawn_command(id)
     }
+    {%- for phase in ecs.phases %}
+    {%- if phase.on_request %}
 
+    /// Requests the execution of the [`{{ phase.name.raw }}`]({{ phase.name.type }}) phase.
+    #[inline]
+    pub fn request_{{ phase.name.field }}_phase(&self) {
+        self.phase_flags.set_{{ phase.name.field }}_requested();
+    }
+    {%- endif %}
+    {%- endfor %}
     {%- for archetype in world.archetypes %}
 
     /// Spawn a new `{{ archetype.name.raw }}` entity into the world given its [`{{ archetype.name.raw }}EntityData`].
@@ -348,7 +411,29 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
         self.on_begin_frame();
         {%- for phase in ecs.phases %}
         {%- if not phase.fixed %}
+        {%- if phase.on_request %}
+
+        // The {{ phase.name.raw }} phase is conditional.
+        if self.phase_flags.is_{{ phase.name.field }}_requested() {
+            self.apply_system_phase_{{ phase.name.field }}();
+        }
+        {%- else %}
+        // The {{ phase.name.raw }} phase always runs.
         self.apply_system_phase_{{ phase.name.field }}();
+        {%- endif %}
+        {%- else %}
+        {%- if phase.on_request %}
+
+        // The {{ phase.name.raw }} phase is conditional.
+        if self.phase_flags.is_{{ phase.name.field }}_requested() {
+            // Apply fixed-time loop for phase {{ phase.name.raw }}
+            self.context.fixed_time_secs = SystemPhase::{{ phase.name.field | upper }}_SECS;
+            self.fixed_accumulators.{{ phase.name.field }} += self.context.delta_time_secs;
+            while self.fixed_accumulators.{{ phase.name.field }} >= SystemPhase::{{ phase.name.field | upper }}_SECS {
+                self.apply_system_phase_{{ phase.name.field }}();
+                self.fixed_accumulators.{{ phase.name.field }} -= SystemPhase::{{ phase.name.field | upper }}_SECS;
+            }
+        }
         {%- else %}
 
         // Apply fixed-time loop for phase {{ phase.name.raw }}
@@ -358,7 +443,7 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
             self.apply_system_phase_{{ phase.name.field }}();
             self.fixed_accumulators.{{ phase.name.field }} -= SystemPhase::{{ phase.name.field | upper }}_SECS;
         }
-
+        {%- endif %}
         self.context.fixed_time_secs = 0.0;
         {%- endif %}
         {%- endfor %}
@@ -387,7 +472,29 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
         self.on_begin_frame();
         {%- for phase in ecs.phases %}
         {%- if not phase.fixed %}
+        {%- if phase.on_request %}
+
+        // The {{ phase.name.raw }} phase is conditional.
+        if self.phase_flags.is_{{ phase.name.field }}_requested() {
+            self.par_apply_system_phase_{{ phase.name.field }}();
+        }
+        {%- else %}
+        // The {{ phase.name.raw }} phase always runs.
         self.par_apply_system_phase_{{ phase.name.field }}();
+        {%- endif %}
+        {%- else %}
+        {%- if phase.on_request %}
+
+        // The {{ phase.name.raw }} phase is conditional.
+        if self.phase_flags.is_{{ phase.name.field }}_requested() {
+            // Apply fixed-time loop for phase {{ phase.name.raw }}
+            self.context.fixed_time_secs = SystemPhase::{{ phase.name.field | upper }}_SECS;
+            self.fixed_accumulators.{{ phase.name.field }} += self.context.delta_time_secs;
+            while self.fixed_accumulators.{{ phase.name.field }} >= SystemPhase::{{ phase.name.field | upper }}_SECS {
+                self.par_apply_system_phase_{{ phase.name.field }}();
+                self.fixed_accumulators.{{ phase.name.field }} -= SystemPhase::{{ phase.name.field | upper }}_SECS;
+            }
+        }
         {%- else %}
 
         // Apply fixed-time loop for phase {{ phase.name.raw }}
@@ -397,7 +504,7 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
             self.par_apply_system_phase_{{ phase.name.field }}();
             self.fixed_accumulators.{{ phase.name.field }} -= SystemPhase::{{ phase.name.field | upper }}_SECS;
         }
-
+        {%- endif %}
         self.context.fixed_time_secs = 0.0;
         {%- endif %}
         {%- endfor %}

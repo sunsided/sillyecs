@@ -17,6 +17,9 @@ pub struct Ecs {
     /// Indicates whether any phase has fixed-time steps.
     #[serde(default, skip_deserializing)]
     pub any_phase_fixed: bool,
+    /// Indicates whether any phase os conditional.
+    #[serde(default, skip_deserializing)]
+    pub any_phase_on_request: bool,
     /// The systems.
     pub systems: Vec<System>,
     /// The worlds.
@@ -44,6 +47,7 @@ impl Ecs {
         for phase in &mut self.phases {
             phase.finish();
             self.any_phase_fixed |= phase.fixed;
+            self.any_phase_on_request |= phase.on_request;
         }
 
         for world in &mut self.worlds {

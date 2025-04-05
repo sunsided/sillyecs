@@ -38,8 +38,10 @@ archetypes:
 phases:
   - name: Startup
   - name: FixedUpdate
+    fixed: 60Hz
   - name: Update
   - name: Render
+    on_request: true
 
 systems:
   - name: Physics
