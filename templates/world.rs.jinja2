@@ -620,9 +620,9 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
             &self.context,
             {%- for state in phase.states %}
             {%- if state.write %}
-            &mut self.state.{{ state.use.field }},
+            &mut self.states.{{ state.use.field }},
             {%- else %}
-            &self.state.{{ state.use.field }},
+            &self.states.{{ state.use.field }},
             {%- endif %}
             {%- endfor %}
         )
@@ -637,9 +637,9 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
             &self.context,
             {%- for state in phase.states %}
             {%- if state.write %}
-            &mut self.state.{{ state.use.field }},
+            &mut self.states.{{ state.use.field }},
             {%- else %}
-            &self.state.{{ state.use.field }},
+            &self.states.{{ state.use.field }},
             {%- endif %}
             {%- endfor %}
         )
@@ -766,9 +766,9 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
             &self.context,
             {%- for state in phase.states %}
             {%- if state.write %}
-            &mut self.state.{{ state.use.field }},
+            &mut self.states.{{ state.use.field }},
             {%- else %}
-            &self.state.{{ state.use.field }},
+            &self.states.{{ state.use.field }},
             {%- endif %}
             {%- endfor %}
         )
@@ -871,9 +871,9 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
             &self.context,
             {%- for state in phase.states %}
             {%- if state.write %}
-            &mut self.state.{{ state.use.field }},
+            &mut self.states.{{ state.use.field }},
             {%- else %}
-            &self.state.{{ state.use.field }},
+            &self.states.{{ state.use.field }},
             {%- endif %}
             {%- endfor %}
         )
