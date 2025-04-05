@@ -138,12 +138,12 @@ impl System{{ phase.name.type }}Events for NoOpPhaseEvents {
     #[inline]
     fn on_begin_phase(
         &mut self,
-        context: &FrameContext,
+        _context: &FrameContext,
         {%- for state in phase.states %}
         {%- if state.write %}
-        {{ state.use.field }}: &mut {{ state.use.type }},
+        _{{ state.use.field }}: &mut {{ state.use.type }},
         {%- else %}
-        {{ state.use.field }}: &{{ state.use.type }},
+        _{{ state.use.field }}: &{{ state.use.type }},
         {%- endif %}
         {%- endfor %}
     ) -> Result<(), Self::Error> {
@@ -153,13 +153,13 @@ impl System{{ phase.name.type }}Events for NoOpPhaseEvents {
     #[inline]
     fn on_end_phase(
         &mut self,
-        result: Option<Self::Result>,
-        context: &FrameContext,
+        _result: Option<Self::Result>,
+        _context: &FrameContext,
         {%- for state in phase.states %}
         {%- if state.write %}
-        {{ state.use.field }}: &mut {{ state.use.type }},
+        _{{ state.use.field }}: &mut {{ state.use.type }},
         {%- else %}
-        {{ state.use.field }}: &{{ state.use.type }},
+        _{{ state.use.field }}: &{{ state.use.type }},
         {%- endif %}
         {%- endfor %}
     ) -> Result<(), Self::Error> {
@@ -233,6 +233,7 @@ pub trait Apply{{ system.name.type }}: System {
     /// Always called once per phase before all other functions of this system. If it returns
     /// `true`, the remaining functions are executed, otherwise the system skips the phase.
     #[inline]
+    #[allow(unused_variables)]
     fn is_ready(
         &self,
         {%- if system.needs_context %}
@@ -254,6 +255,7 @@ pub trait Apply{{ system.name.type }}: System {
     /// All calls to [`apply_many`](Self::apply_many) and/or [`apply_single`](Self::apply_single) happen after this
     /// function was executed.
     #[inline]
+    #[allow(unused_variables)]
     fn on_begin_phase(
         &mut self,
         {%- if system.needs_context %}
@@ -275,6 +277,7 @@ pub trait Apply{{ system.name.type }}: System {
     /// All calls to [`apply_many`](Self::apply_many) and/or [`apply_single`](Self::apply_single) happen before this
     /// function is executed.
     #[inline]
+    #[allow(unused_variables)]
     fn on_end_phase(
         &mut self,
         {%- if system.needs_context %}
