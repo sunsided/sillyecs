@@ -7,7 +7,7 @@ homepage = "https://github.com/sunsided/sillyecs"
 repository = "https://github.com/sunsided/sillyecs.git"
 authors = ["Markus Mayer <widemeadows@gmail.com>"]
 license = "EUPL-1.2"
-version = "0.0.3"
+version = "0.0.4"
 edition = "2024"
 
 [dependencies]
