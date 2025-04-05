@@ -28,6 +28,9 @@ pub struct System {
     /// Whether the system requires access to entities.
     #[serde(default, rename(serialize = "needs_entities", deserialize = "entities"))]
     pub entities: bool,
+    /// Whether the system emits commands.
+    #[serde(default, rename(serialize = "emits_commands", deserialize = "commands"))]
+    pub commands: bool,
     /// Whether the system requires access to the frame context.
     #[serde(default, rename(serialize = "needs_context", deserialize = "context"))]
     pub context: bool,

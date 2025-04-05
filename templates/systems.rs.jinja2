@@ -206,6 +206,9 @@ pub trait Apply{{ system.name.type }}: System {
         {%- for output in system.outputs %}
         {{ output.field }}: &mut {{ output.type }},
         {%- endfor %}
+        {%- if system.emits_commands %}
+        commands: &impl WorldCommandSender
+        {%- endif %}
     );
 
     /// Applies the system's business logic to the given entity components.
@@ -238,6 +241,9 @@ pub trait Apply{{ system.name.type }}: System {
         {%- for output in system.outputs %}
         {{ output.fields }}: &mut [{{ output.type }}],
         {%- endfor %}
+        {%- if system.emits_commands %}
+        commands: &impl WorldCommandSender
+        {%- endif %}
     ) {
         {%- set input_count = system.inputs | length %}
         {%- set output_count = system.outputs | length %}
@@ -283,6 +289,9 @@ pub trait Apply{{ system.name.type }}: System {
                 {%- for output in system.outputs %}
                 {{ output.field }},
                 {%- endfor %}
+                {%- if system.emits_commands %}
+                commands
+                {%- endif %}
             );
         }
     }
@@ -313,6 +322,9 @@ impl {{ system.name.type }} {
         {%- for output in system.outputs %}
         {{ output.field }}: &mut {{ output.type }},
         {%- endfor %}
+        {%- if system.emits_commands %}
+        commands: &impl WorldCommandSender
+        {%- endif %}
     ) {
         Apply{{ system.name.type }}::apply_single(
             self,
@@ -331,6 +343,9 @@ impl {{ system.name.type }} {
             {%- for output in system.outputs %}
             {{ output.field }},
             {%- endfor %}
+            {%- if system.emits_commands %}
+            commands
+            {%- endif %}
         );
     }
 
@@ -365,6 +380,9 @@ impl {{ system.name.type }} {
         {%- for output in system.outputs %}
         {{ output.fields }}: &mut [{{ output.type }}],
         {%- endfor %}
+        {%- if system.emits_commands %}
+        commands: &impl WorldCommandSender
+        {%- endif %}
     ) {
         Apply{{ system.name.type }}::apply_many(
             self,
@@ -383,6 +401,9 @@ impl {{ system.name.type }} {
             {%- for output in system.outputs %}
             {{ output.fields }},
             {%- endfor %}
+            {%- if system.emits_commands %}
+            commands
+            {%- endif %}
         );
     }
 
@@ -390,7 +411,8 @@ impl {{ system.name.type }} {
 
     /// Applies this system to the [`{{ archetype.type }}`].
     #[inline]
-    pub fn apply_to_{{ archetype.field }}(
+    #[deprecated]
+    fn apply_to_{{ archetype.field }}(
         &self,
         archetype: &mut {{ archetype.type }},
         {%- if system.needs_context %}
@@ -403,6 +425,9 @@ impl {{ system.name.type }} {
         {{ state.use.field }}: &{{ state.use.type }},
         {%- endif %}
         {%- endfor %}
+        {%- if system.emits_commands %}
+        commands: &impl WorldCommandSender
+        {%- endif %}
     ) {
         self.apply_many(
             {%- if system.needs_context %}
@@ -420,6 +445,9 @@ impl {{ system.name.type }} {
             {%- for output in system.outputs %}
             &mut archetype.{{ output.fields }},
             {%- endfor %}
+            {%- if system.emits_commands %}
+            commands
+            {%- endif %}
         );
     }
     {%- endfor %}

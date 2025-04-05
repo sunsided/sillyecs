@@ -57,6 +57,33 @@ pub enum WorldCommand {
     // TODO: Allow for user-specified commands.
 }
 
+/// Sender of [`WorldCommand`] instances.
+#[allow(dead_code)]
+pub trait WorldCommandSender {
+    type Error;
+
+    /// Sends a command. May block until the send is complete.
+    fn send(&self, command: WorldCommand) -> Result<(), Self::Error>;
+}
+
+/// Sender of [`WorldCommand`] instances.
+#[allow(dead_code)]
+pub trait WorldCommandReceiver {
+    type Error;
+
+    /// Attempts to receive a message from the channel without blocking.
+    fn try_recv(&self) -> Result<WorldCommand, Self::Error>;
+}
+
+/// A sender and receiver of [`WorldCommand`] instances.
+#[allow(dead_code)]
+pub trait WorldCommandQueue: WorldCommandSender + WorldCommandReceiver { }
+
+impl<T> WorldCommandQueue for T
+where
+    T: WorldCommandSender + WorldCommandReceiver
+{ }
+
 /// A frame context.
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
@@ -105,7 +132,7 @@ pub trait WorldState { }
 
 /// A world holding all archetypes.
 #[derive(Debug, Clone)]
-pub struct {{ world.name.type }}<E = ()> {
+pub struct {{ world.name.type }}<E, Q> {
     /// The archetypes.
     archetypes: {{ world.name.type }}Archetypes,
     /// The systems.
@@ -124,9 +151,10 @@ pub struct {{ world.name.type }}<E = ()> {
     /// User-specific data.
     pub states: {{ world.name.type }}States,
     {%- endif %}
+    command_queue: Q
 }
 
-impl<E> World for {{ world.name.type }}<E> {
+impl<E, Q> World for {{ world.name.type }}<E, Q> {
     const ID: WorldId = WorldId(std::num::NonZeroU64::new({{ world.id }}).expect("Invalid ID on ECS construction time"));
 }
 {%- if (world.states | length) > 0 %}
@@ -171,7 +199,7 @@ struct {{ world.name.type }}Systems {
 {%- for archetype in world.archetypes %}
 
 /// Spawns an entity into the world.
-impl<E> Spawn<{{ archetype.name.raw}}EntityData> for {{ world.name.type }}<E> {
+impl<E, Q> Spawn<{{ archetype.name.raw}}EntityData> for {{ world.name.type }}<E, Q> {
     /// Spawn a new entity into the world.
     #[inline]
     fn spawn(&mut self, data: {{ archetype.name.raw}}EntityData) -> EntityId {
@@ -187,17 +215,19 @@ pub trait WorldEntityRegistry {
 }
 
 #[allow(dead_code)]
-impl<E>{{ world.name.type }}<E> {
+impl<E, Q>{{ world.name.type }}<E, Q> {
     /// Creates a new [`{{ world.name.type }}`].
     pub fn new<S>(
         create_systems: &S,
         {%- for state in world.states %}
         {{ state.name.field }}: {{ state.name.type }},
         {%- endfor %}
-        phase_events: Option<E>) -> Self
+        phase_events: Option<E>,
+        command_queue: Q) -> Self
     where
         S: CreateSystems,
-        E: SystemPhaseEvents<{{ world.name.type }}States>
+        E: SystemPhaseEvents<{{ world.name.type }}States>,
+        Q: WorldCommandQueue
     {
         let context = FrameContext::new(Self::ID);
         Self {
@@ -219,7 +249,8 @@ impl<E>{{ world.name.type }}<E> {
             {%- if ecs.any_phase_fixed %}
             fixed_accumulators: Default::default(),
             {%- endif %}
-            events: phase_events
+            events: phase_events,
+            command_queue
         }
     }
     {%- for archetype in world.archetypes %}
@@ -291,7 +322,8 @@ impl<E>{{ world.name.type }}<E> {
     /// - `E`: The type implementing [`SystemPhaseEvents`] for phase lifecycle events
     pub fn apply_system_phases(&mut self)
     where
-        E: SystemPhaseEvents<{{ world.name.type }}States>
+        E: SystemPhaseEvents<{{ world.name.type }}States>,
+        Q: WorldCommandSender
     {
         self.on_begin_frame();
         {%- for phase in ecs.phases %}
@@ -329,7 +361,8 @@ impl<E>{{ world.name.type }}<E> {
     /// - Thread parallelism is implemented using the Rayon library
     pub fn par_apply_system_phases(&mut self)
     where
-        E: SystemPhaseEvents<{{ world.name.type }}States>
+        E: SystemPhaseEvents<{{ world.name.type }}States>,
+        Q: WorldCommandSender
     {
         self.on_begin_frame();
         {%- for phase in ecs.phases %}
@@ -371,7 +404,8 @@ impl<E>{{ world.name.type }}<E> {
     /// - `E`: The type implementing `SystemPhaseEvents` for phase lifecycle events
     fn apply_system_phase_{{ phase.name.field }}(&mut self)
     where
-        E: SystemPhaseEvents<{{ world.name.type }}States>
+        E: SystemPhaseEvents<{{ world.name.type }}States>,
+        Q: WorldCommandSender
     {
         if let Some(events) = &mut self.events {
             events.on_begin_phase(SystemPhase::{{ phase.name.raw }}, &self.context, &mut self.states);
@@ -388,7 +422,8 @@ impl<E>{{ world.name.type }}<E> {
     #[inline]
     fn apply_system_phase_{{ phase.name.field }}_without_events(&mut self)
     where
-        E: SystemPhaseEvents<{{ world.name.type }}States>
+        E: SystemPhaseEvents<{{ world.name.type }}States>,
+        Q: WorldCommandSender
     {
         {%- if ecs.scheduled_systems[phase.name] | length == 0 %}
         // no systems in this phase
@@ -420,6 +455,9 @@ impl<E>{{ world.name.type }}<E> {
                 {%- for output in system.outputs %}
                 &mut self.archetypes.{{ archetype.field }}.{{ output.fields }},
                 {%- endfor %}
+                {%- if system.emits_commands %}
+                &self.command_queue
+                {%- endif %}
             );
             {%- endfor %}
         }
@@ -443,7 +481,8 @@ impl<E>{{ world.name.type }}<E> {
     /// - Phase events are triggered at the start and end of execution
     fn par_apply_system_phase_{{ phase.name.field }}(&mut self)
     where
-        E: SystemPhaseEvents<{{ world.name.type }}States>
+        E: SystemPhaseEvents<{{ world.name.type }}States>,
+        Q: WorldCommandSender
     {
         if let Some(events) = &mut self.events {
             events.on_begin_phase(SystemPhase::{{ phase.name.raw }}, &self.context, &mut self.states);
@@ -485,6 +524,9 @@ impl<E>{{ world.name.type }}<E> {
                     {%- for output in system.outputs %}
                     &mut self.archetypes.{{ archetype.field }}.{{ output.fields }},
                     {%- endfor %}
+                    {%- if system.emits_commands %}
+                    &self.command_queue
+                    {%- endif %}
                 );
             {%- endfor %}
             });
