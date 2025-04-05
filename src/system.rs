@@ -96,13 +96,13 @@ impl System {
             self.dependencies.push(Dependency {
                 resource: Resource::FrameContext,
                 access: Access::Read
-            })
+            });
         }
         for state in &self.states {
             self.dependencies.push(Dependency {
                 resource: Resource::UserState(state.name.clone()),
                 access: if state.write { Access::Write } else { Access::Read }
-            })
+            });
         }
     }
 

@@ -33,8 +33,11 @@ pub struct Dependency {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum Resource {
+    /// The system accesses a component.
     Component(ComponentName),
+    /// The system accesses the frame context.
     FrameContext,
+    /// The system accesses user state.
     UserState(StateNameRef)
 }
 
@@ -101,6 +104,8 @@ pub fn schedule_systems(systems: &[System]) -> Result<Vec<Vec<SystemId>>, EcsErr
 
     // For each resource, for each writer, add candidate edges to each reader,
     // except if a forced run_after edge exists between them (in either direction).
+    // For each resource, for each writer, add candidate edges to each reader,
+    // except if a forced run_after edge exists between them (in either direction).
     for (resource, writer_ids) in &writers {
         let mut affected = HashSet::new();
         if let Some(r) = readers.get(resource) {
@@ -126,7 +131,7 @@ pub fn schedule_systems(systems: &[System]) -> Result<Vec<Vec<SystemId>>, EcsErr
                 let (a, b, direction) = if id_to_index[&writer] < id_to_index[&reader] {
                     (writer, reader, true) // candidate edge: writer (a) -> reader (b)
                 } else {
-                    (reader, writer, false) // candidate edge: writer (a) -> reader (b) becomes false meaning b->a
+                    (reader, writer, false) // candidate edge becomes b -> a
                 };
                 candidate_edges.entry((a, b)).or_default().insert(direction);
             }
