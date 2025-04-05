@@ -5,6 +5,7 @@ use crate::system_scheduler::schedule_systems;
 use crate::world::World;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
+use crate::state::State;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Ecs {
@@ -21,6 +22,9 @@ pub struct Ecs {
     pub systems: Vec<System>,
     /// The worlds.
     pub worlds: Vec<World>,
+    /// The user states.
+    #[serde(default)]
+    pub states: Vec<State>,
     /// The systems in scheduling order.
     #[serde(default, skip_deserializing)]
     pub scheduled_systems: HashMap<SystemPhaseRef, Vec<Vec<System>>>,
@@ -35,6 +39,10 @@ impl Ecs {
 
         for system in &mut self.systems {
             system.finish(&self.archetypes);
+        }
+
+        for state in &mut self.states {
+            state.finish(&self.systems);
         }
 
         for phase in &mut self.phases {

@@ -6,6 +6,7 @@ use crate::component::ComponentName;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::ops::Deref;
 use std::sync::atomic::AtomicU64;
+use crate::state::StateName;
 use crate::system_scheduler::{Access, Dependency, Resource};
 
 static SYSTEM_IDS: AtomicU64 = AtomicU64::new(1);
@@ -30,9 +31,9 @@ pub struct System {
     /// Whether the system requires access to the frame context.
     #[serde(default, rename(serialize = "needs_context", deserialize = "context"))]
     pub context: bool,
-    /// Whether the system requires access to the user state.
-    #[serde(default, rename(serialize = "needs_state", deserialize = "state"))]
-    pub state: bool,
+    /// Whether the system requires access to the user state (and which ones).
+    #[serde(default, rename(serialize = "states", deserialize = "states"))]
+    pub states: Vec<StateUse>,
     /// The phase in which to run the system.
     pub phase: SystemPhaseRef,
     /// The optional input components to the system.
@@ -61,6 +62,16 @@ pub struct System {
     pub dependencies: Vec<Dependency>
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StateUse {
+    /// The name of the state.
+    #[serde(rename = "use")]
+    pub state: StateName,
+    /// Whether write access is required.
+    #[serde(default)]
+    pub write: bool
+}
+
 impl System {
     pub(crate) fn finish_dependencies(&mut self) {
         self.dependencies.clear();
@@ -84,10 +95,10 @@ impl System {
                 access: Access::Read
             })
         }
-        if self.state {
+        for state in &self.states {
             self.dependencies.push(Dependency {
-                resource: Resource::UserState,
-                access: Access::Read
+                resource: Resource::UserState(state.state.clone()),
+                access: if state.write { Access::Write } else { Access::Read }
             })
         }
     }

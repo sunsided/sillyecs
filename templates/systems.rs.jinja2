@@ -113,39 +113,42 @@ pub trait CreateSystems {
 }
 
 /// Trait for constructing system instances.
-pub trait SystemPhaseEvents {
+pub trait SystemPhaseEvents<S>
+where
+    S: WorldState
+{
     /// Marks the beginning of a phase.
     #[inline(always)]
     #[allow(unused_variables)]
-    fn on_begin_phase(&mut self, phase: SystemPhase, context: &FrameContext, state: &mut UserState) {
+    fn on_begin_phase(&mut self, phase: SystemPhase, context: &FrameContext, state: &mut S) {
         // empty placeholder implementation
     }
 
     /// Marks the end of a phase.
     #[inline(always)]
     #[allow(unused_variables)]
-    fn on_end_phase(&mut self, phase: SystemPhase, context: &FrameContext, state: &mut UserState) {
+    fn on_end_phase(&mut self, phase: SystemPhase, context: &FrameContext, state: &mut S) {
         // empty placeholder implementation
     }
 }
 
-/// An alias type for a no-op implementation of [`SystemPhaseEvents`].
-#[allow(dead_code)]
-pub type NoOpPhaseEvents = ();
-
-/// A constant for passing no system type events.
-#[allow(dead_code)]
-const NO_PHASE_EVENTS: Option<NoOpPhaseEvents> = Option::<NoOpPhaseEvents>::None;
+/// A no-op event struct.
+pub struct NoOpPhaseEvents<S> {
+    _phantom: core::marker::PhantomData<S>
+}
 
 #[automatically_derived]
-impl SystemPhaseEvents for NoOpPhaseEvents {
+impl<S> SystemPhaseEvents<S> for NoOpPhaseEvents<S>
+where
+    S: WorldState
+{
     #[inline(always)]
-    fn on_begin_phase(&mut self, _phase: SystemPhase, _context: &FrameContext, _state: &mut UserState) {
+    fn on_begin_phase(&mut self, _phase: SystemPhase, _context: &FrameContext, _state: &mut S) {
         // empty placeholder implementation
     }
 
     #[inline(always)]
-    fn on_end_phase(&mut self, _phase: SystemPhase, _context: &FrameContext, _state: &mut UserState) {
+    fn on_end_phase(&mut self, _phase: SystemPhase, _context: &FrameContext, _state: &mut S) {
         // empty placeholder implementation
     }
 }
@@ -187,9 +190,13 @@ pub trait Apply{{ system.name.type }}: System {
         {%- if system.needs_context %}
         context: &FrameContext,
         {%- endif %}
-        {%- if system.needs_state %}
-        state: &UserState,
+        {%- for state in system.states %}
+        {%- if state.write %}
+        {{ state.use.field }}: &mut {{ state.use.type }},
+        {%- else %}
+        {{ state.use.field }}: &{{ state.use.type }},
         {%- endif %}
+        {%- endfor %}
         {%- if system.needs_entities %}
         entity: EntityId,
         {%- endif %}
@@ -215,9 +222,13 @@ pub trait Apply{{ system.name.type }}: System {
         {%- if system.needs_context %}
         context: &FrameContext,
         {%- endif %}
-        {%- if system.needs_state %}
-        state: &UserState,
+        {%- for state in system.states %}
+        {%- if state.write %}
+        {{ state.use.field }}: &mut {{ state.use.type }},
+        {%- else %}
+        {{ state.use.field }}: &{{ state.use.type }},
         {%- endif %}
+        {%- endfor %}
         {%- if system.needs_entities %}
         entities: &[EntityId],
         {%- endif %}
@@ -260,9 +271,9 @@ pub trait Apply{{ system.name.type }}: System {
                 {%- if system.needs_context %}
                 &context,
                 {%- endif %}
-                {%- if system.needs_state %}
-                &state,
-                {%- endif %}
+                {%- for state in system.states %}
+                {{ state.use.field }},
+                {%- endfor %}
                 {%- if system.needs_entities %}
                 *entity,
                 {%- endif %}
@@ -286,9 +297,13 @@ impl {{ system.name.type }} {
         {%- if system.needs_context %}
         context: &FrameContext,
         {%- endif %}
-        {%- if system.needs_state %}
-        state: &UserState,
+        {%- for state in system.states %}
+        {%- if state.write %}
+        {{ state.use.field }}: &mut {{ state.use.type }},
+        {%- else %}
+        {{ state.use.field }}: &{{ state.use.type }},
         {%- endif %}
+        {%- endfor %}
         {%- if system.needs_entities %}
         entity: EntityId,
         {%- endif %}
@@ -304,9 +319,9 @@ impl {{ system.name.type }} {
             {%- if system.needs_context %}
             context,
             {%- endif %}
-            {%- if system.needs_state %}
-            &state,
-            {%- endif %}
+            {%- for state in system.states %}
+            {{ state.use.field }},
+            {%- endfor %}
             {%- if system.needs_entities %}
             entity,
             {%- endif %}
@@ -334,9 +349,13 @@ impl {{ system.name.type }} {
         {%- if system.needs_context %}
         context: &FrameContext,
         {%- endif %}
-        {%- if system.needs_state %}
-        state: &UserState,
+        {%- for state in system.states %}
+        {%- if state.write %}
+        {{ state.use.field }}: &mut {{ state.use.type }},
+        {%- else %}
+        {{ state.use.field }}: &{{ state.use.type }},
         {%- endif %}
+        {%- endfor %}
         {%- if system.needs_entities %}
         entities: &[EntityId],
         {%- endif %}
@@ -352,9 +371,9 @@ impl {{ system.name.type }} {
             {%- if system.needs_context %}
             context,
             {%- endif %}
-            {%- if system.needs_state %}
-            &state,
-            {%- endif %}
+            {%- for state in system.states %}
+            {{ state.use.field }},
+            {%- endfor %}
             {%- if system.needs_entities %}
             entities,
             {%- endif %}
@@ -377,17 +396,21 @@ impl {{ system.name.type }} {
         {%- if system.needs_context %}
         context: &FrameContext,
         {%- endif %}
-        {%- if system.needs_state %}
-        state: &UserState,
+        {%- for state in system.states %}
+        {%- if state.write %}
+        {{ state.use.field }}: &mut {{ state.use.type }},
+        {%- else %}
+        {{ state.use.field }}: &{{ state.use.type }},
         {%- endif %}
+        {%- endfor %}
     ) {
         self.apply_many(
             {%- if system.needs_context %}
             &context,
             {%- endif %}
-            {%- if system.needs_state %}
-            &state,
-            {%- endif %}
+            {%- for state in system.states %}
+            {{ state.use.field }},
+            {%- endfor %}
             {%- if system.needs_entities %}
             &archetype.entities,
             {%- endif %}

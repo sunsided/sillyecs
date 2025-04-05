@@ -86,6 +86,11 @@ pub trait World {
     /// The ID of this world.
     const ID: WorldId;
 }
+{%- if (ecs.states | length > 0) %}
+
+/// Marker trait for world states.
+pub trait WorldState { }
+{%- endif %}
 {% for world in ecs.worlds %}
 
 /// A world holding all archetypes.
@@ -105,13 +110,28 @@ pub struct {{ world.name.type }}<E = ()> {
     {%- endif %}
     /// The system phase events
     events: Option<E>,
+    {%- if (world.states | length) > 0 %}
     /// User-specific data.
-    pub state: UserState,
+    pub states: {{ world.name.type }}States,
+    {%- endif %}
 }
 
 impl<E> World for {{ world.name.type }}<E> {
     const ID: WorldId = WorldId(std::num::NonZeroU64::new({{ world.id }}).expect("Invalid ID on ECS construction time"));
 }
+{%- if (world.states | length) > 0 %}
+
+/// The user states used in the world.
+#[derive(Debug, Clone, Default)]
+pub struct {{ world.name.type }}States {
+    {%- for state in world.states %}
+    pub {{ state.field }}: {{ state.type }},
+    {%- endfor %}
+}
+
+impl WorldState for {{ world.name.type }}States {
+}
+{%- endif %}
 
 /// The archetypes used in the world.
 #[derive(Debug, Clone, Default)]
@@ -149,10 +169,15 @@ pub trait WorldEntityRegistry {
 #[allow(dead_code)]
 impl<E>{{ world.name.type }}<E> {
     /// Creates a new [`{{ world.name.type }}`].
-    pub fn new<S>(create_systems: &S, state: UserState, phase_events: Option<E>) -> Self
+    pub fn new<S>(
+        create_systems: &S,
+        {%- for state in world.states %}
+        {{ state.field }}: {{ state.type }},
+        {%- endfor %}
+        phase_events: Option<E>) -> Self
     where
         S: CreateSystems,
-        E: SystemPhaseEvents
+        E: SystemPhaseEvents<{{ world.name.type }}States>
     {
         let context = FrameContext::new(Self::ID);
         Self {
@@ -164,7 +189,13 @@ impl<E>{{ world.name.type }}<E> {
             },
             entity_locations: Default::default(),
             context,
-            state,
+            {%- if (world.states | length) > 0 %}
+            states: {{ world.name.type }}States {
+                {%- for state in world.states %}
+                {{ state.field }},
+                {%- endfor %}
+            },
+            {%- endif %}
             {%- if ecs.any_phase_fixed %}
             fixed_accumulators: Default::default(),
             {%- endif %}
@@ -240,7 +271,7 @@ impl<E>{{ world.name.type }}<E> {
     /// - `E`: The type implementing [`SystemPhaseEvents`] for phase lifecycle events
     pub fn apply_system_phases(&mut self)
     where
-        E: SystemPhaseEvents
+        E: SystemPhaseEvents<{{ world.name.type }}States>
     {
         self.on_begin_frame();
         {%- for phase in ecs.phases %}
@@ -278,7 +309,7 @@ impl<E>{{ world.name.type }}<E> {
     /// - Thread parallelism is implemented using the Rayon library
     pub fn par_apply_system_phases(&mut self)
     where
-        E: SystemPhaseEvents
+        E: SystemPhaseEvents<{{ world.name.type }}States>
     {
         self.on_begin_frame();
         {%- for phase in ecs.phases %}
@@ -320,16 +351,16 @@ impl<E>{{ world.name.type }}<E> {
     /// - `E`: The type implementing `SystemPhaseEvents` for phase lifecycle events
     fn apply_system_phase_{{ phase.name.field }}(&mut self)
     where
-        E: SystemPhaseEvents
+        E: SystemPhaseEvents<{{ world.name.type }}States>
     {
         if let Some(events) = &mut self.events {
-            events.on_begin_phase(SystemPhase::{{ phase.name.raw }}, &self.context, &mut self.state);
+            events.on_begin_phase(SystemPhase::{{ phase.name.raw }}, &self.context, &mut self.states);
         }
 
         self.apply_system_phase_{{ phase.name.field }}_without_events();
 
         if let Some(events) = &mut self.events {
-            events.on_end_phase(SystemPhase::{{ phase.name.raw }}, &self.context, &mut self.state);
+            events.on_end_phase(SystemPhase::{{ phase.name.raw }}, &self.context, &mut self.states);
         }
     }
 
@@ -337,7 +368,7 @@ impl<E>{{ world.name.type }}<E> {
     #[inline]
     fn apply_system_phase_{{ phase.name.field }}_without_events(&mut self)
     where
-        E: SystemPhaseEvents
+        E: SystemPhaseEvents<{{ world.name.type }}States>
     {
         {%- if ecs.scheduled_systems[phase.name] | length == 0 %}
         // no systems in this phase
@@ -353,9 +384,13 @@ impl<E>{{ world.name.type }}<E> {
                 {%- if system.needs_context %}
                 &self.context,
                 {%- endif %}
-                {%- if system.needs_state %}
-                &self.state,
+                {%- for state in system.states %}
+                {%- if state.write %}
+                &mut self.states.{{ state.use.field }},
+                {%- else %}
+                &self.states.{{ state.use.field }},
                 {%- endif %}
+                {%- endfor %}
                 {%- if system.needs_entities %}
                 &self.archetypes.{{ archetype.field }}.entities,
                 {%- endif %}
@@ -388,10 +423,10 @@ impl<E>{{ world.name.type }}<E> {
     /// - Phase events are triggered at the start and end of execution
     fn par_apply_system_phase_{{ phase.name.field }}(&mut self)
     where
-        E: SystemPhaseEvents
+        E: SystemPhaseEvents<{{ world.name.type }}States>
     {
         if let Some(events) = &mut self.events {
-            events.on_begin_phase(SystemPhase::{{ phase.name.raw }}, &self.context, &mut self.state);
+            events.on_begin_phase(SystemPhase::{{ phase.name.raw }}, &self.context, &mut self.states);
         }
 
         {%- if ecs.scheduled_systems[phase.name] | length == 0 %}
@@ -414,9 +449,13 @@ impl<E>{{ world.name.type }}<E> {
                     {%- if system.needs_context %}
                     &self.context,
                     {%- endif %}
-                    {%- if system.needs_state %}
-                    &self.state,
+                    {%- for state in system.states %}
+                    {%- if state.write %}
+                    &mut self.states.{{ state.use.field }},
+                    {%- else %}
+                    &self.states.{{ state.use.field }},
                     {%- endif %}
+                    {%- endfor %}
                     {%- if system.needs_entities %}
                     &self.archetypes.{{ archetype.field }}.entities,
                     {%- endif %}
@@ -435,7 +474,7 @@ impl<E>{{ world.name.type }}<E> {
         {%- endif %}
 
         if let Some(events) = &mut self.events {
-            events.on_end_phase(SystemPhase::{{ phase.name.raw }}, &self.context, &mut self.state);
+            events.on_end_phase(SystemPhase::{{ phase.name.raw }}, &self.context, &mut self.states);
         }
     }
     {%- endfor %}

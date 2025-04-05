@@ -5,6 +5,7 @@ mod ecs;
 mod system;
 mod system_scheduler;
 mod world;
+mod state;
 
 pub use crate::code::EcsCode;
 use serde::Serialize;

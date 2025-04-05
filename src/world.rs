@@ -6,6 +6,7 @@ use std::collections::HashSet;
 use std::hash::Hash;
 use std::ops::Deref;
 use std::sync::atomic::AtomicU64;
+use crate::state::StateNameRef;
 
 static WORLD_IDS: AtomicU64 = AtomicU64::new(1);
 
@@ -22,11 +23,14 @@ pub struct World {
     pub archetypes: Vec<Archetype>,
     #[serde(skip_deserializing, rename(serialize = "systems"))]
     pub systems: Vec<System>,
+    #[serde(skip_deserializing, rename(serialize = "states"))]
+    pub states: Vec<StateNameRef>,
 }
 
 impl World {
     pub(crate) fn finish(&mut self, archetypes: &[Archetype], systems: &[System]) {
         let mut used_systems = HashSet::new();
+        let mut used_states = HashSet::new();
         for archetype in archetypes {
             if !self.archetypes_refs.iter().any(|a| a.eq(&archetype.name)) {
                 continue;
@@ -39,6 +43,12 @@ impl World {
             {
                 if !used_systems.insert(system.name.clone()) {
                     self.systems.push(system.clone());
+                }
+
+                for state in system.states.iter() {
+                    if !used_states.insert(state.state.clone()) {
+                        self.states.push(state.state.clone());
+                    }
                 }
             }
         }

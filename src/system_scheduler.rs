@@ -17,6 +17,7 @@ use crate::component::ComponentName;
 use crate::system::{System, SystemId};
 use std::collections::{HashMap, HashSet};
 use crate::ecs::EcsError;
+use crate::state::StateNameRef;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub enum Access {
@@ -34,7 +35,7 @@ pub struct Dependency {
 pub enum Resource {
     Component(ComponentName),
     FrameContext,
-    UserState
+    UserState(StateNameRef)
 }
 
 /// Schedules systems into parallelizable batches using resource dependencies and forced `run_after` ordering.
@@ -248,7 +249,7 @@ mod tests {
             name: sysname(name),
             run_after: prefer_after.into_iter().map(sysname).collect(),
             context: false,
-            state: false,
+            states: vec![],
             entities: false,
             inputs: inputs.into_iter().map(compname).collect(),
             outputs: outputs.into_iter().map(compname).collect(),
