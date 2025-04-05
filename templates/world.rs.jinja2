@@ -216,7 +216,7 @@ impl<E, Q> World for {{ world.name.type }}<E, Q> {
 {%- if (world.states | length) > 0 %}
 
 /// The user states used in the world.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Default)]
 pub struct {{ world.name.type }}States {
     {%- for state in world.states %}
     {%- if state.description %}
