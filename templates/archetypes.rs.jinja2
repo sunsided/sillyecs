@@ -151,7 +151,7 @@ pub struct {{ archetype.name.raw }}Entity {
 #[allow(dead_code)]
 pub struct {{ archetype.name.raw }}EntityData {
     {%- for component_name in archetype.components %}
-    pub {{ component_name.field }}: {{ component_name.type }},
+    pub {{ component_name.field }}: {{ component_name.raw }}Data,
     {%- endfor %}
 }
 
@@ -218,11 +218,11 @@ impl {{ archetype.name.type }} {
     pub fn spawn_with(
         &mut self,
         {%- for component_name in archetype.components %}
-        {{component_name.field}}: {{ component_name.type }},
+        {{component_name.field}}: {{ component_name.raw }}Data,
         {%- endfor %}
     ) -> (EntityId, EntityArchetypeRef) {
         {%- for component_name in archetype.components %}
-        self.{{ component_name.fields }}.push({{component_name.field}});
+        self.{{ component_name.fields }}.push({{component_name.type}}::new({{component_name.field}}));
         {%- endfor %}
 
         let entity_id = EntityId::new();

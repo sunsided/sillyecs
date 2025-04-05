@@ -124,7 +124,7 @@ impl<E>{{ world.name.type }}<E> {
     pub fn spawn_{{ archetype.name.field }}_with(
         &mut self,
         {%- for component_name in archetype.components %}
-        {{component_name.field}}: {{ component_name.type }},
+        {{component_name.field}}: {{ component_name.raw }}Data,
         {%- endfor %}
     ) -> EntityId {
         let (entity_id, archetype_ref) = self.archetypes.{{ archetype.name.field }}
