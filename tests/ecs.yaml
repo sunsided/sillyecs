@@ -63,12 +63,18 @@ systems:
   - name: Physics
     phase: FixedUpdate
     context: true
-    entities: true
-    commands: true
+    # entities: true
+    # commands: true
     inputs:
       - Velocity
     outputs:
       - Position
+
+  - name: BackgroundColorCycle
+    phase: Update
+    context: true
+    outputs:
+      - BackgroundColor
 
   - name: RenderBackground
     phase: Render
@@ -80,8 +86,8 @@ systems:
 
   - name: Render
     phase: Render
-    # run_after:
-    #   - RenderBackground
+    run_after:
+      - RenderBackground
     inputs:
       - Position
     states:

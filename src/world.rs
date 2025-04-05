@@ -43,9 +43,9 @@ impl World {
             }
 
             self.archetypes.push(archetype.clone());
-            if let Some(system) = systems
+            for system in systems
                 .iter()
-                .find(|s| s.affected_archetype_ids.contains(&archetype.id))
+                .filter(|s| s.affected_archetype_ids.contains(&archetype.id))
             {
                 if used_systems.insert(system.name.clone()) {
                     self.systems.push(system.clone());
