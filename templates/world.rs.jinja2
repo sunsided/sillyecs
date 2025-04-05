@@ -575,6 +575,7 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
             {%- for archetype in world.archetypes %}
             ArchetypeEntityData::{{ archetype.name.raw }}(data) => todo!("Spawn {{ archetype.name.raw }} entity"),
             {%- endfor %}
+            #[allow(unreachable_patterns)]
             unhandled => panic!("The specified data for archetype {id} is not accepted in this world.", id = unhandled.archetype_id())
         }
     }
