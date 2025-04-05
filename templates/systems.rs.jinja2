@@ -176,10 +176,32 @@ pub struct {{ system.name.type }}({{ system.name.type }}Data);
 /// Implements the business logic for the [`{{ system.name.type }}`] system.
 #[allow(dead_code)]
 pub trait Apply{{ system.name.type }}: System {
+    /// Indicates whether this system is ready for action.
+    ///
+    /// Always called once per phase before all other functions of this system. If it returns
+    /// `true`, the remaining functions are executed, otherwise the system skips the phase.
+    #[inline]
+    fn is_ready(
+        &mut self,
+        {%- if system.needs_context %}
+        context: &FrameContext,
+        {%- endif %}
+        {%- for state in system.states %}
+        {%- if state.write %}
+        {{ state.use.field }}: &mut {{ state.use.type }},
+        {%- else %}
+        {{ state.use.field }}: &{{ state.use.type }},
+        {%- endif %}
+        {%- endfor %}
+    ) -> bool {
+        true
+    }
+
     /// Executed at the beginning of the phase (for this system).
     ///
     /// All calls to [`apply_many`](Self::apply_many) and/or [`apply_single`](Self::apply_single) happen after this
     /// function was executed.
+    #[inline]
     fn on_begin_phase(
         &mut self,
         {%- if system.needs_context %}
@@ -199,6 +221,7 @@ pub trait Apply{{ system.name.type }}: System {
     ///
     /// All calls to [`apply_many`](Self::apply_many) and/or [`apply_single`](Self::apply_single) happen before this
     /// function is executed.
+    #[inline]
     fn on_end_phase(
         &mut self,
         {%- if system.needs_context %}
