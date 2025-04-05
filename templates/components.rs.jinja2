@@ -1,19 +1,19 @@
 /// The ID of a [`Component`].
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
-pub struct ComponentId(std::num::NonZeroU64);
+pub struct ComponentId(core::num::NonZeroU64);
 
 #[allow(dead_code)]
 impl ComponentId {
     pub const fn new(id: u64) -> Option<Self> {
-        if let Some(id) = std::num::NonZeroU64::new(id) {
+        if let Some(id) = core::num::NonZeroU64::new(id) {
             Some(Self(id))
         } else {
             None
         }
     }
 
-    /// Returns this ID as a [`NonZeroU64`](std::num::NonZeroU64) value.
-    pub const fn as_nonzero_u64(&self) -> std::num::NonZeroU64 {
+    /// Returns this ID as a [`NonZeroU64`](core::num::NonZeroU64) value.
+    pub const fn as_nonzero_u64(&self) -> core::num::NonZeroU64 {
         self.0
     }
 
@@ -23,14 +23,14 @@ impl ComponentId {
     }
 }
 
-impl std::hash::Hash for ComponentId {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+impl core::hash::Hash for ComponentId {
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
         self.0.hash(state);
     }
 }
 
-impl From<ComponentId> for std::num::NonZeroU64 {
-    fn from(value: ComponentId) -> std::num::NonZeroU64 {
+impl From<ComponentId> for core::num::NonZeroU64 {
+    fn from(value: ComponentId) -> core::num::NonZeroU64 {
         value.as_nonzero_u64()
     }
 }
@@ -73,7 +73,7 @@ impl {{ component.name.type }} {
 
 #[automatically_derived]
 impl Component for {{ component.name.type }} {
-    const ID: ComponentId = ComponentId(std::num::NonZeroU64::new({{ component.id }}).expect("A zero component ID was provided"));
+    const ID: ComponentId = ComponentId(core::num::NonZeroU64::new({{ component.id }}).expect("A zero component ID was provided"));
 }
 
 impl PartialEq<ComponentId> for {{ component.name.type }} {
@@ -90,7 +90,7 @@ impl From<{{ component.name.raw }}Data> for {{ component.name.type }} {
 }
 
 #[automatically_derived]
-impl std::ops::Deref for {{ component.name.type }} {
+impl core::ops::Deref for {{ component.name.type }} {
     type Target = {{ component.name.raw }}Data;
 
     fn deref(&self) -> &Self::Target {
@@ -99,35 +99,35 @@ impl std::ops::Deref for {{ component.name.type }} {
 }
 
 #[automatically_derived]
-impl std::ops::DerefMut for {{ component.name.type }} {
+impl core::ops::DerefMut for {{ component.name.type }} {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }
 
 #[automatically_derived]
-impl std::convert::AsRef<{{ component.name.raw }}Data> for {{ component.name.type }} {
+impl core::convert::AsRef<{{ component.name.raw }}Data> for {{ component.name.type }} {
     fn as_ref(&self) -> &{{ component.name.raw }}Data {
         &self.0
     }
 }
 
 #[automatically_derived]
-impl std::convert::AsMut<{{ component.name.raw }}Data> for {{ component.name.type }} {
+impl core::convert::AsMut<{{ component.name.raw }}Data> for {{ component.name.type }} {
     fn as_mut(&mut self) -> &mut {{ component.name.raw }}Data {
         &mut self.0
     }
 }
 
 #[automatically_derived]
-impl std::borrow::Borrow<{{ component.name.raw }}Data> for {{ component.name.type }} {
+impl core::borrow::Borrow<{{ component.name.raw }}Data> for {{ component.name.type }} {
     fn borrow(&self) -> &{{ component.name.raw }}Data {
         &self.0
     }
 }
 
 #[automatically_derived]
-impl std::borrow::BorrowMut<{{ component.name.raw }}Data> for {{ component.name.type }} {
+impl core::borrow::BorrowMut<{{ component.name.raw }}Data> for {{ component.name.type }} {
     fn borrow_mut(&mut self) -> &mut {{ component.name.raw }}Data {
         &mut self.0
     }

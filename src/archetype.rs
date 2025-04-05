@@ -1,8 +1,8 @@
 use crate::Name;
 use crate::component::{Component, ComponentId, ComponentRef};
 use serde::{Deserialize, Deserializer, Serialize};
-use std::ops::Deref;
-use std::sync::atomic::AtomicU64;
+use core::ops::Deref;
+use core::sync::atomic::AtomicU64;
 
 static ARCHETYPE_IDS: AtomicU64 = AtomicU64::new(1);
 
@@ -89,7 +89,7 @@ pub struct ArchetypeId(u64);
 
 impl Default for ArchetypeId {
     fn default() -> Self {
-        Self(ARCHETYPE_IDS.fetch_add(1, std::sync::atomic::Ordering::SeqCst))
+        Self(ARCHETYPE_IDS.fetch_add(1, core::sync::atomic::Ordering::SeqCst))
     }
 }
 

@@ -1,6 +1,6 @@
 /// The ID of an entity.
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
-pub struct EntityId(std::num::NonZeroU64);
+pub struct EntityId(core::num::NonZeroU64);
 
 #[allow(dead_code)]
 impl EntityId {
@@ -13,13 +13,13 @@ impl EntityId {
     /// This function uses a thread-safe counter with sequential consistency ordering
     /// to ensure unique IDs even under concurrent access.
     pub fn new() -> Self {
-        static ENTITY_IDS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
-        let id = ENTITY_IDS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-        EntityId(std::num::NonZeroU64::new(id).expect("ID was zero"))
+        static ENTITY_IDS: core::sync::atomic::AtomicU64 = core::sync::atomic::AtomicU64::new(1);
+        let id = ENTITY_IDS.fetch_add(1, core::sync::atomic::Ordering::SeqCst);
+        EntityId(core::num::NonZeroU64::new(id).expect("ID was zero"))
     }
 
-    /// Returns this ID as a [`NonZeroU64`](std::num::NonZeroU64) value.
-    pub const fn as_nonzero_u64(&self) -> std::num::NonZeroU64 {
+    /// Returns this ID as a [`NonZeroU64`](core::num::NonZeroU64) value.
+    pub const fn as_nonzero_u64(&self) -> core::num::NonZeroU64 {
         self.0
     }
 
@@ -29,14 +29,14 @@ impl EntityId {
     }
 }
 
-impl std::hash::Hash for EntityId {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+impl core::hash::Hash for EntityId {
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
         self.0.hash(state);
     }
 }
 
-impl From<EntityId> for std::num::NonZeroU64 {
-    fn from(value: EntityId) -> std::num::NonZeroU64 {
+impl From<EntityId> for core::num::NonZeroU64 {
+    fn from(value: EntityId) -> core::num::NonZeroU64 {
         value.as_nonzero_u64()
     }
 }
@@ -49,12 +49,12 @@ impl From<EntityId> for u64 {
 
 /// The ID of an [`Archetype`].
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
-pub struct ArchetypeId(std::num::NonZeroU64);
+pub struct ArchetypeId(core::num::NonZeroU64);
 
 #[allow(dead_code)]
 impl ArchetypeId {
-    /// Returns this ID as a [`NonZeroU64`](std::num::NonZeroU64) value.
-    pub const fn as_nonzero_u64(&self) -> std::num::NonZeroU64 {
+    /// Returns this ID as a [`NonZeroU64`](core::num::NonZeroU64) value.
+    pub const fn as_nonzero_u64(&self) -> core::num::NonZeroU64 {
         self.0
     }
 
@@ -64,14 +64,14 @@ impl ArchetypeId {
     }
 }
 
-impl std::hash::Hash for ArchetypeId {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+impl core::hash::Hash for ArchetypeId {
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
         self.0.hash(state);
     }
 }
 
-impl From<ArchetypeId> for std::num::NonZeroU64 {
-    fn from(value: ArchetypeId) -> std::num::NonZeroU64 {
+impl From<ArchetypeId> for core::num::NonZeroU64 {
+    fn from(value: ArchetypeId) -> core::num::NonZeroU64 {
         value.as_nonzero_u64()
     }
 }
@@ -256,7 +256,7 @@ impl {{ archetype.name.raw }}EntityData {
     }
 }
 
-impl std::ops::Deref for {{ archetype.name.raw }}Entity {
+impl core::ops::Deref for {{ archetype.name.raw }}Entity {
     type Target = {{ archetype.name.raw }}EntityData;
 
     fn deref(&self) -> &Self::Target {
@@ -264,7 +264,7 @@ impl std::ops::Deref for {{ archetype.name.raw }}Entity {
     }
 }
 
-impl std::ops::DerefMut for {{ archetype.name.raw }}Entity {
+impl core::ops::DerefMut for {{ archetype.name.raw }}Entity {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.data
     }
@@ -373,7 +373,7 @@ impl HasComponents<{{ component_name.type }}> for {{ archetype.name.type }} {
 #[automatically_derived]
 #[allow(dead_code)]
 impl Archetype for {{ archetype.name.type }} {
-    const ID: ArchetypeId = ArchetypeId(std::num::NonZeroU64::new({{ archetype.id }}).expect("A zero archetype ID was provided"));
+    const ID: ArchetypeId = ArchetypeId(core::num::NonZeroU64::new({{ archetype.id }}).expect("A zero archetype ID was provided"));
 
     fn len(&self) -> usize {
         self.entities.len()

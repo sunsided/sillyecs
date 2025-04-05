@@ -1,10 +1,10 @@
 /// The ID of a [`System`].
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
-pub struct SystemId(std::num::NonZeroU64);
+pub struct SystemId(core::num::NonZeroU64);
 
 impl SystemId {
-    /// Returns this ID as a [`NonZeroU64`](std::num::NonZeroU64) value.
-    pub const fn as_nonzero_u64(&self) -> std::num::NonZeroU64 {
+    /// Returns this ID as a [`NonZeroU64`](core::num::NonZeroU64) value.
+    pub const fn as_nonzero_u64(&self) -> core::num::NonZeroU64 {
         self.0
     }
 
@@ -14,14 +14,14 @@ impl SystemId {
     }
 }
 
-impl std::hash::Hash for SystemId {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+impl core::hash::Hash for SystemId {
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
         self.0.hash(state);
     }
 }
 
-impl From<SystemId> for std::num::NonZeroU64 {
-    fn from(value: SystemId) -> std::num::NonZeroU64 {
+impl From<SystemId> for core::num::NonZeroU64 {
+    fn from(value: SystemId) -> core::num::NonZeroU64 {
         value.as_nonzero_u64()
     }
 }
@@ -455,7 +455,7 @@ impl {{ system.name.type }} {
 
 #[automatically_derived]
 impl System for {{ system.name.type }} {
-    const ID: SystemId = SystemId(std::num::NonZeroU64::new({{ system.id }}).expect("A zero system ID was provided"));
+    const ID: SystemId = SystemId(core::num::NonZeroU64::new({{ system.id }}).expect("A zero system ID was provided"));
 }
 
 impl PartialEq<SystemId> for {{ system.name.type }} {
@@ -472,7 +472,7 @@ impl From<{{ system.name.type }}Data> for {{ system.name.type }} {
 }
 
 #[automatically_derived]
-impl std::ops::Deref for {{ system.name.type }} {
+impl core::ops::Deref for {{ system.name.type }} {
     type Target = {{ system.name.type }}Data;
 
     fn deref(&self) -> &Self::Target {
@@ -481,7 +481,7 @@ impl std::ops::Deref for {{ system.name.type }} {
 }
 
 #[automatically_derived]
-impl std::ops::DerefMut for {{ system.name.type }} {
+impl core::ops::DerefMut for {{ system.name.type }} {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }

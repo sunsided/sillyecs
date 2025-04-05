@@ -251,6 +251,7 @@ mod tests {
             context: false,
             states: vec![],
             entities: false,
+            commands: false,
             inputs: inputs.into_iter().map(compname).collect(),
             outputs: outputs.into_iter().map(compname).collect(),
             phase: phasename("default"),

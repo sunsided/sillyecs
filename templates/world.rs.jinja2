@@ -1,6 +1,6 @@
 /// The ID of a world.
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
-pub struct WorldId(std::num::NonZeroU64);
+pub struct WorldId(core::num::NonZeroU64);
 
 #[allow(dead_code)]
 impl WorldId {
@@ -13,13 +13,13 @@ impl WorldId {
     /// This function uses a thread-safe counter with sequential consistency ordering
     /// to ensure unique IDs even under concurrent access.
     pub fn new() -> Self {
-        static WORLD_IDS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
-        let id = WORLD_IDS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-        WorldId(std::num::NonZeroU64::new(id).expect("ID was zero"))
+        static WORLD_IDS: core::sync::atomic::AtomicU64 = core::sync::atomic::AtomicU64::new(1);
+        let id = WORLD_IDS.fetch_add(1, core::sync::atomic::Ordering::SeqCst);
+        WorldId(core::num::NonZeroU64::new(id).expect("ID was zero"))
     }
 
-    /// Returns this ID as a [`NonZeroU64`](std::num::NonZeroU64) value.
-    pub const fn as_nonzero_u64(&self) -> std::num::NonZeroU64 {
+    /// Returns this ID as a [`NonZeroU64`](core::num::NonZeroU64) value.
+    pub const fn as_nonzero_u64(&self) -> core::num::NonZeroU64 {
         self.0
     }
 
@@ -29,14 +29,14 @@ impl WorldId {
     }
 }
 
-impl std::hash::Hash for WorldId {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+impl core::hash::Hash for WorldId {
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
         self.0.hash(state);
     }
 }
 
-impl From<WorldId> for std::num::NonZeroU64 {
-    fn from(value: WorldId) -> std::num::NonZeroU64 {
+impl From<WorldId> for core::num::NonZeroU64 {
+    fn from(value: WorldId) -> core::num::NonZeroU64 {
         value.as_nonzero_u64()
     }
 }
@@ -63,7 +63,7 @@ pub enum WorldCommand {
 /// Sender of [`WorldCommand`] instances.
 #[allow(dead_code)]
 pub trait WorldCommandSender {
-    type Error;
+    type Error: core::error::Error;
 
     /// Sends a command. May block until the send is complete.
     fn send(&self, command: WorldCommand) -> Result<(), Self::Error>;
@@ -72,10 +72,11 @@ pub trait WorldCommandSender {
 /// Sender of [`WorldCommand`] instances.
 #[allow(dead_code)]
 pub trait WorldCommandReceiver {
-    type Error;
+    type Error: core::error::Error;
 
     /// Attempts to receive a message from the channel without blocking.
-    fn try_recv(&self) -> Result<WorldCommand, Self::Error>;
+    /// Returns [`Ok(None)`] if no command was queued.
+    fn recv(&self) -> Result<Option<WorldCommand>, Self::Error>;
 }
 
 /// A sender and receiver of [`WorldCommand`] instances.
@@ -86,7 +87,6 @@ impl<T> WorldCommandQueue for T
 where
     T: WorldCommandSender + WorldCommandReceiver
 { }
-
 
 /// A frame context.
 #[derive(Debug, Clone)]
@@ -159,7 +159,7 @@ pub struct {{ world.name.type }}<E, Q> {
 }
 
 impl<E, Q> World for {{ world.name.type }}<E, Q> {
-    const ID: WorldId = WorldId(std::num::NonZeroU64::new({{ world.id }}).expect("Invalid ID on ECS construction time"));
+    const ID: WorldId = WorldId(core::num::NonZeroU64::new({{ world.id }}).expect("Invalid ID on ECS construction time"));
 }
 {%- if (world.states | length) > 0 %}
 
@@ -544,6 +544,24 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
         }
     }
     {%- endfor %}
+
+    /// Handles all queued commands.
+    fn handle_commands(&self)
+    where
+        Q: WorldCommandReceiver
+    {
+        loop {
+            match self.command_queue.recv() {
+                Ok(Some(cmd)) => todo!(),
+                Ok(None) => break,
+                Err(e) => {
+                    // TODO: Make logging configurable.
+                    tracing::error!(?e, "Failed to dequeue world command");
+                    break;
+                }
+            }
+        }
+    }
 }
 {%- endfor  %}
 {%- if ecs.any_phase_fixed %}
