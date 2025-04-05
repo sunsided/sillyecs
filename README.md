@@ -91,7 +91,8 @@ systems:
       - Position
   - name: Render
     phase: Render
-    on_request: true  # call world.request_render_phase() to allow execution (resets atomically) 
+    manual: true        # Require manual call to world.apply_system_phase_render()
+    # on_request: true  # call world.request_render_phase() to allow execution (resets atomically) 
     states:
       - use: Render
         write: false  # optional

@@ -222,6 +222,9 @@ pub struct SystemPhase {
     pub description: Option<String>,
     #[serde(default, skip_serializing, rename(deserialize = "fixed"))]
     pub fixed_input: FixedTiming,
+    /// Indicates that this phase is manually called and will never be executed automatically.
+    #[serde(default)]
+    pub manual: bool,
     /// Indicates that this phase is conditionally executed on a request.
     #[serde(default)]
     pub on_request: bool,

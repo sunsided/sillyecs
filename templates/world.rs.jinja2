@@ -399,7 +399,7 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
     /// This method executes all system phases in sequence.
     /// The phases are processed in the following order:
     ///
-    /// {% for phase in ecs.phases %}- {{ phase.name.raw }}
+    /// {% for phase in ecs.phases %}- {% if phase.manual %}~~`{{ phase.name.raw }}`~~ (skipped here, must be executed manually){% else %}`{{ phase.name.raw }}`{% endif %}
     /// {% endfor %}
     /// # Type Parameters
     /// - `E`: The type implementing [`SystemPhaseEvents`] for phase lifecycle events
@@ -410,6 +410,10 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
     {
         self.on_begin_frame();
         {%- for phase in ecs.phases %}
+        {%- if phase.manual %}
+
+        // The {{ phase.name.raw }} phase is marked manual and will be skipped here.
+        {%- else %}
         {%- if not phase.fixed %}
         {%- if phase.on_request %}
 
@@ -446,6 +450,7 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
         {%- endif %}
         self.context.fixed_time_secs = 0.0;
         {%- endif %}
+        {%- endif %}
         {%- endfor %}
         self.on_end_frame();
     }
@@ -455,7 +460,7 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
     /// This method executes all system phases in sequence, but with parallel execution
     /// of systems within each phase. The phases are processed in the following order:
     ///
-    /// {% for phase in ecs.phases %}- {{ phase.name.raw }}
+    /// {% for phase in ecs.phases %}- {% if phase.manual %}~~`{{ phase.name.raw }}`~~ (skipped here, must be executed manually){% else %}`{{ phase.name.raw }}`{% endif %}
     /// {% endfor %}
     /// # Type Parameters
     /// - `E`: The type implementing [`SystemPhaseEvents`] for phase lifecycle events
@@ -471,6 +476,10 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
     {
         self.on_begin_frame();
         {%- for phase in ecs.phases %}
+        {%- if phase.manual %}
+
+        // The {{ phase.name.raw }} phase is marked manual and will be skipped here.
+        {%- else %}
         {%- if not phase.fixed %}
         {%- if phase.on_request %}
 
@@ -507,6 +516,7 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
         {%- endif %}
         self.context.fixed_time_secs = 0.0;
         {%- endif %}
+        {%- endif %}
         {%- endfor %}
         self.on_end_frame();
     }
@@ -529,6 +539,7 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
     ///
     /// # Type Parameters
     /// - `E`: The type implementing `SystemPhaseEvents` for phase lifecycle events
+    {% if phase.manual -%}pub {% endif -%}
     fn apply_system_phase_{{ phase.name.field }}(&mut self)
     where
         E: SystemPhaseEvents<{{ world.name.type }}States>,
@@ -606,6 +617,7 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
     /// - Systems in each group are spawned as parallel tasks
     /// - Each system operates on its affected archetypes concurrently
     /// - Phase events are triggered at the start and end of execution
+    {% if phase.manual -%}pub {% endif -%}
     fn par_apply_system_phase_{{ phase.name.field }}(&mut self)
     where
         E: SystemPhaseEvents<{{ world.name.type }}States>,
