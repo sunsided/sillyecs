@@ -369,32 +369,6 @@ pub trait Apply{{ system.name.type }}: System {
         commands: &impl WorldCommandSender
         {%- endif %}
     ) {
-        {%- set input_count = system.inputs | length %}
-        {%- set output_count = system.outputs | length %}
-        {%- set entity_count = 1 if system.needs_entities else 0 %}
-        {%- set total_count = input_count + output_count + entity_count %}
-        {%- if total_count > 1 %}
-        {%- if input_count == 1 %}
-        {%- set used_inputs = true %}
-        let count = {{ system.inputs[0].fields }}.len();
-        {%- elif output_count == 1 %}
-        {%- set used_outputs = true %}
-        let count = {{ system.outputs[0].fields }}.len();
-        {%- endif %}
-        {%- if input_count > 1 and not used_inputs %}
-        {%- for input in system.inputs %}
-        debug_assert_eq!({{ input.fields }}.len(), count);
-        {%- endfor %}
-        {%- endif %}
-        {%- if output_count > 1 and not used_outputs %}
-        {%- for output in system.outputs %}
-        debug_assert_eq!({{ output.fields }}.len(), count);
-        {%- endfor %}
-        {%- endif %}
-        {%- if system.needs_entities %}
-        debug_assert_eq!(entities.len(), count);
-        {%- endif %}
-        {%- endif %}
         let zipped_iter = {{ system.component_iter_code }};
         for {{ system.component_untuple_code }} in zipped_iter {
             self.apply_single(
