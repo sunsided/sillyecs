@@ -556,7 +556,7 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
                 Ok(Some(cmd)) => {
                     match cmd {
                         WorldCommand::SpawnEntity(data) => self.handle_spawn_command(data),
-                        WorldCommand::DespawnEntity(id) => self.handle_despawn_command(id),
+                        WorldCommand::DespawnEntity(id) => self.handle_despawn_command(id).expect("Failed to despawn"),
                     }
                 }
                 Ok(None) => break,
@@ -573,16 +573,36 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
         match data {
             // Accept only archetypes known to the world
             {%- for archetype in world.archetypes %}
-            ArchetypeEntityData::{{ archetype.name.raw }}(data) => todo!("Spawn {{ archetype.name.raw }} entity"),
+            ArchetypeEntityData::{{ archetype.name.raw }}(data) => {
+                let id = self.spawn_{{ archetype.name.field }}(data);
+                tracing::trace!(%id, "Spawned {{ archetype.name.raw }} entity");
+            },
             {%- endfor %}
             // TODO: Make it a non-panic on release builds?
             #[allow(unreachable_patterns)]
-            unhandled => panic!("The specified data for archetype {id} is not accepted in this world.", id = unhandled.archetype_id())
+            unhandled => panic!("Cannot spawn entity for {id} which is not known to this world.", id = unhandled.archetype_id())
         }
     }
 
-    fn handle_despawn_command(&mut self, id: EntityId) {
-         todo!("Look up entity in map, instruct archetype to drop");
+    fn handle_despawn_command(&mut self, id: EntityId) -> Result<(), DespawnError> {
+         if let Some(loc) = self.entity_locations.remove(&id) {
+            match loc.archetype {
+                {%- for archetype in world.archetypes %}
+                {{ archetype.name.type }}::ID => {
+                    self.archetypes
+                        .{{ archetype.name.field }}
+                        .drop_at_index(loc.index)
+                        .map_err(|index| DespawnError::InvalidIndexInArchetype(index, {{ archetype.name.type }}::ID))?;
+                }
+                {%- endfor %}
+                // TODO: Make it a non-panic on release builds?
+                #[allow(unreachable_patterns)]
+                archetype_id => unreachable!("Cannot remove entity {id} from archetype {archetype_id} which is not known to this world.")
+            }
+         } else {
+            tracing::error!(%id, "Attempted to remove unknown entity");
+         }
+         Ok(())
     }
 }
 {%- endfor  %}
@@ -599,3 +619,20 @@ struct FixedAccumulators {
     {%- endfor %}
 }
 {%- endif %}
+
+#[derive(Debug)]
+pub enum DespawnError {
+    InvalidIndexInArchetype(usize, ArchetypeId)
+}
+
+impl core::fmt::Display for DespawnError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> Result<(), core::fmt::Error> {
+        match self {
+            Self::InvalidIndexInArchetype(index, aid) => {
+                write!(f, "Failed to despawn entity at invalid index {index} in archetype {aid}")
+            }
+        }
+    }
+}
+
+impl core::error::Error for DespawnError { }

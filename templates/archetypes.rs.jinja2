@@ -47,6 +47,12 @@ impl From<EntityId> for u64 {
     }
 }
 
+impl core::fmt::Display for EntityId {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> Result<(), core::fmt::Error> {
+        core::fmt::Display::fmt(&self.0.get(), f)
+    }
+}
+
 /// The ID of an [`Archetype`].
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct ArchetypeId(core::num::NonZeroU64);
@@ -343,9 +349,29 @@ impl {{ archetype.name.type }} {
         world_registry.register(entity_id, reference)
     }
 
+    /// Drop an entity at the specified index. Called by the world upon de-spawning entities.
+    ///
+    /// Returns the ID of the entity that was moved into the hole, or [`None`] if the archetype is now empty.
+    #[doc(hidden)]
+    pub fn drop_at_index(&mut self, index: usize) -> Result<Option<EntityId>, usize> {
+        if index > self.entities.len() {
+            return Err(index);
+        }
+        self.entities.swap_remove(index);
+        {%- for component_name in archetype.components %}
+        self.{{ component_name.fields }}.swap_remove(index);
+        {%- endfor %}
+        if self.entities.is_empty() {
+            Ok(None)
+        }
+        else {
+            Ok(Some(self.entities[index]))
+        }
+    }
     {%- for promotion in archetype.promotion_infos %}
 
     /// Promotes this [`{{ archetype.name.type }}`] to [`{{ promotion.target.type }}`].
+    #[deprecated]
     pub fn promote_to_{{ promotion.target.fields }}(
         self,
         {%- for field in promotion.components_to_add %}
