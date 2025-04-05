@@ -170,19 +170,21 @@ where
 /// ### Mutates
 /// {% for output in system.outputs %}
 /// - [`{{ output.type }}`]{% endfor %}
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct {{ system.name.type }}({{ system.name.type }}Data);
 
 /// Implements the business logic for the [`{{ system.name.type }}`] system.
 #[allow(dead_code)]
 pub trait Apply{{ system.name.type }}: System {
+    type Error;
+
     /// Indicates whether this system is ready for action.
     ///
     /// Always called once per phase before all other functions of this system. If it returns
     /// `true`, the remaining functions are executed, otherwise the system skips the phase.
     #[inline]
     fn is_ready(
-        &mut self,
+        &self,
         {%- if system.needs_context %}
         context: &FrameContext,
         {%- endif %}
@@ -214,7 +216,8 @@ pub trait Apply{{ system.name.type }}: System {
         {{ state.use.field }}: &{{ state.use.type }},
         {%- endif %}
         {%- endfor %}
-    ) {
+    ) -> Result<(), Self::Error> {
+        Ok(())
     }
 
     /// Executed at the end of the phase (for this system).
@@ -234,7 +237,8 @@ pub trait Apply{{ system.name.type }}: System {
         {{ state.use.field }}: &{{ state.use.type }},
         {%- endif %}
         {%- endfor %}
-    ) {
+    ) -> Result<(), Self::Error> {
+        Ok(())
     }
 
     /// Applies the system's business logic to the given entity components.

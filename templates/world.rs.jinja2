@@ -187,8 +187,8 @@ impl Clone for ConditionalPhaseFlags {
 {%- endif %}
 {% for world in ecs.worlds %}
 
-/// A world holding all archetypes.
-#[derive(Debug, Clone)]
+/// A world  all archetypes.
+#[derive(Debug)]
 pub struct {{ world.name.type }}<E, Q> {
     /// The archetypes.
     archetypes: {{ world.name.type }}Archetypes,
@@ -251,7 +251,7 @@ struct {{ world.name.type }}Archetypes {
 }
 
 /// The systems.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct {{ world.name.type }}Systems {
     {%- for system in world.systems %}
     {{ system.name.field }}: {{ system.name.type }},
@@ -540,7 +540,7 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
         }
         {%- else %}
         // The {{ phase.name.raw }} phase always runs.
-        self.par_apply_system_phase_{{ phase.name.field }}();
+        self.apply_system_phase_{{ phase.name.field }}();
         {%- endif %}
         {%- else %}
         {%- if phase.on_request %}
@@ -634,23 +634,7 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
                {%- endif %}
                {%- endfor %}
            );
-        if is_ready {
-            self.systems.{{ system.name.field }}.on_begin_phase(
-                {%- if system.needs_context %}
-                &self.context,
-                {%- endif %}
-                {%- for state in system.states %}
-                {%- if state.write %}
-                &mut self.states.{{ state.use.field }},
-                {%- else %}
-                &self.states.{{ state.use.field }},
-                {%- endif %}
-                {%- endfor %}
-            );
-            {
-            {%- for archetype in system.affected_archetypes %}
-                // Apply {{ system.name.type }} to {{ archetype.type }}
-                self.systems.{{ system.name.field }}.apply_many(
+        if is_ready && self.systems.{{ system.name.field }}.on_begin_phase(
                     {%- if system.needs_context %}
                     &self.context,
                     {%- endif %}
@@ -661,21 +645,38 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
                     &self.states.{{ state.use.field }},
                     {%- endif %}
                     {%- endfor %}
-                    {%- if system.needs_entities %}
-                    &self.archetypes.{{ archetype.field }}.entities,
-                    {%- endif %}
-                    {%- for input in system.inputs %}
-                    &self.archetypes.{{ archetype.field }}.{{ input.fields }},
-                    {%- endfor %}
-                    {%- for output in system.outputs %}
-                    &mut self.archetypes.{{ archetype.field }}.{{ output.fields }},
-                    {%- endfor %}
-                    {%- if system.emits_commands %}
-                    &self.command_queue
-                    {%- endif %}
-                );
+                )
+                .inspect_err(|error| tracing::error!(%error, "{{ system.name.type }}::on_begin_phase returned an error"))
+                .is_ok()
+        {
+        {%- for archetype in system.affected_archetypes %}
+            // Apply {{ system.name.type }} to {{ archetype.type }}
+            self.systems.{{ system.name.field }}.apply_many(
+                {%- if system.needs_context %}
+                &self.context,
+                {%- endif %}
+                {%- for state in system.states %}
+                {%- if state.write %}
+                &mut self.states.{{ state.use.field }},
+                {%- else %}
+                &self.states.{{ state.use.field }},
+                {%- endif %}
                 {%- endfor %}
-            }
+                {%- if system.needs_entities %}
+                &self.archetypes.{{ archetype.field }}.entities,
+                {%- endif %}
+                {%- for input in system.inputs %}
+                &self.archetypes.{{ archetype.field }}.{{ input.fields }},
+                {%- endfor %}
+                {%- for output in system.outputs %}
+                &mut self.archetypes.{{ archetype.field }}.{{ output.fields }},
+                {%- endfor %}
+                {%- if system.emits_commands %}
+                &self.command_queue
+                {%- endif %}
+            );
+            {%- endfor %}
+
             self.systems.{{ system.name.field }}.on_end_phase(
                 {%- if system.needs_context %}
                 &self.context,
@@ -687,7 +688,9 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
                 &self.states.{{ state.use.field }},
                 {%- endif %}
                 {%- endfor %}
-            );
+            )
+            .inspect_err(|error| tracing::error!(%error, "{{ system.name.type }}::on_end_phase returned an error"))
+            .ok();
         }
         {%- endfor %}
         {%- endfor %}
@@ -741,7 +744,7 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
                {%- endif %}
                {%- endfor %}
            );
-        if is_ready {
+        if is_ready &&
             self.systems.{{ system.name.field }}.on_begin_phase(
                 {%- if system.needs_context %}
                 &self.context,
@@ -753,7 +756,10 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
                 &self.states.{{ state.use.field }},
                 {%- endif %}
                 {%- endfor %}
-            );
+            )
+            .inspect_err(|error| tracing::error!(%error, "{{ system.name.type }}::on_begin_phase returned an error"))
+            .is_ok()
+        {
             rayon::scope(|s| {
                 // TODO: Instead of parallelizing systems (and then have them access archetypes), parallelize archetypes and apply all systems. This should improve data parallelism because it keeps caches hot.
 
@@ -800,7 +806,9 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
                 &self.states.{{ state.use.field }},
                 {%- endif %}
                 {%- endfor %}
-            );
+            )
+            .inspect_err(|error| tracing::error!(%error, "{{ system.name.type }}::on_end_phase returned an error"))
+            .ok();
         }
         {%- endfor %}
         {%- endif %}
