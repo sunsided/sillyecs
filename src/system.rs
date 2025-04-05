@@ -65,7 +65,7 @@ pub struct System {
     pub dependencies: Vec<Dependency>
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct StateUse {
     /// The name of the state.
     #[serde(rename = "use")]
@@ -228,6 +228,9 @@ pub struct SystemPhase {
     /// Indicates that this phase is conditionally executed on a request.
     #[serde(default)]
     pub on_request: bool,
+    /// Whether the system requires access to the user state (and which ones).
+    #[serde(default, rename(serialize = "states", deserialize = "states"))]
+    pub states: Vec<StateUse>,
     /// When nonzero, this phase uses a fixed timing loop with the specified time in seconds.
     #[serde(default, skip_deserializing)]
     pub fixed_secs: f32,

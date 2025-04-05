@@ -113,48 +113,98 @@ pub trait CreateSystems {
 }
 
 /// Trait for constructing system instances.
-pub trait SystemPhaseEvents<S>
-where
-    S: WorldState
+pub trait SystemPhaseEvents: {% for phase in ecs.phases %}{% if loop.index > 1 %} + {% endif %}System{{ phase.name.type }}Events{%- endfor %}
 {
-    /// Marks the beginning of a phase.
-    #[inline(always)]
-    #[allow(unused_variables)]
-    fn on_begin_phase(&mut self, phase: SystemPhase, context: &FrameContext, state: &mut S) {
-        // empty placeholder implementation
-    }
-
-    /// Marks the end of a phase.
-    #[inline(always)]
-    #[allow(unused_variables)]
-    fn on_end_phase(&mut self, phase: SystemPhase, context: &FrameContext, state: &mut S) {
-        // empty placeholder implementation
-    }
-}
-
-/// A no-op event struct.
-pub struct NoOpPhaseEvents<S> {
-    _phantom: core::marker::PhantomData<S>
 }
 
 #[automatically_derived]
-impl<S> SystemPhaseEvents<S> for NoOpPhaseEvents<S>
+impl<T> SystemPhaseEvents for T
 where
-    S: WorldState
+    T:
+{%- for phase in ecs.phases %}
+{%- if loop.index > 1 %} +{% endif %} System{{ phase.name.type }}Events
+{%- endfor %}
 {
-    #[inline(always)]
-    fn on_begin_phase(&mut self, _phase: SystemPhase, _context: &FrameContext, _state: &mut S) {
-        // empty placeholder implementation
+}
+
+/// A no-op event struct.
+pub struct NoOpPhaseEvents;
+{%- for phase in ecs.phases %}
+
+impl System{{ phase.name.type }}Events for NoOpPhaseEvents {
+    type Result = ();
+    type Error = Infallible;
+
+    #[inline]
+    fn on_begin_phase(
+        &mut self,
+        context: &FrameContext,
+        {%- for state in phase.states %}
+        {%- if state.write %}
+        {{ state.use.field }}: &mut {{ state.use.type }},
+        {%- else %}
+        {{ state.use.field }}: &{{ state.use.type }},
+        {%- endif %}
+        {%- endfor %}
+    ) -> Result<(), Self::Error> {
+        Ok(())
     }
 
-    #[inline(always)]
-    fn on_end_phase(&mut self, _phase: SystemPhase, _context: &FrameContext, _state: &mut S) {
-        // empty placeholder implementation
+    #[inline]
+    fn on_end_phase(
+        &mut self,
+        result: Option<Self::Result>,
+        context: &FrameContext,
+        {%- for state in phase.states %}
+        {%- if state.write %}
+        {{ state.use.field }}: &mut {{ state.use.type }},
+        {%- else %}
+        {{ state.use.field }}: &{{ state.use.type }},
+        {%- endif %}
+        {%- endfor %}
+    ) -> Result<(), Self::Error> {
+        Ok(())
     }
 }
 
+pub trait System{{ phase.name.type }}Events {
+    type Result;
+    type Error: core::error::Error;
+
+    /// Executed at the beginning of the phase (before all systems).
+    fn on_begin_phase(
+        &mut self,
+        context: &FrameContext,
+        {%- for state in phase.states %}
+        {%- if state.write %}
+        {{ state.use.field }}: &mut {{ state.use.type }},
+        {%- else %}
+        {{ state.use.field }}: &{{ state.use.type }},
+        {%- endif %}
+        {%- endfor %}
+    ) -> Result<Self::Result, Self::Error>;
+
+    /// Executed at the end of the phase (after all systems).
+    ///
+    /// The result from [`System{{ phase.name.type }}Events::on_begin_phase`] is passed in
+    /// as [`Some`] value, if the executed succeeded. If the function failed, the value will be [`None`].
+    fn on_end_phase(
+        &mut self,
+        result: Option<Self::Result>,
+        context: &FrameContext,
+        {%- for state in phase.states %}
+        {%- if state.write %}
+        {{ state.use.field }}: &mut {{ state.use.type }},
+        {%- else %}
+        {{ state.use.field }}: &{{ state.use.type }},
+        {%- endif %}
+        {%- endfor %}
+    ) -> Result<(), Self::Error>;
+}
+{%- endfor %}
 {%- for system in ecs.systems %}
 {% if system.description %}
+
 /// {{ system.description }}
 {%- else %}
 /// A system operating on multiple [`Component`]s.
