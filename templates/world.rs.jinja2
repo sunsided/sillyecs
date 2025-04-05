@@ -202,7 +202,7 @@ pub struct {{ world.name.type }}<E, Q> {
     fixed_accumulators: FixedAccumulators,
     {%- endif %}
     /// The system phase events
-    events: Option<E>,
+    events: E,
     {%- if (world.states | length) > 0 %}
     /// User-specific data.
     pub states: {{ world.name.type }}States,
@@ -303,15 +303,39 @@ pub trait WorldEntityRegistry {
 }
 
 #[allow(dead_code)]
-impl<E, Q>{{ world.name.type }}<E, Q> {
+impl<Q> {{ world.name.type }}<NoOpPhaseEvents, Q> {
     /// Creates a new [`{{ world.name.type }}`].
     pub fn new<S>(
         create_systems: &S,
         {%- for state in world.states %}
         {{ state.name.field }}: {{ state.name.type }},
         {%- endfor %}
-        phase_events: Option<E>,
         command_queue: Q) -> Self
+    where
+        S: CreateSystems,
+        Q: WorldCommandQueue
+    {
+        Self::new_with_events(
+            create_systems,
+            {%- for state in world.states %}
+            {{ state.name.field }},
+            {%- endfor %}
+            command_queue,
+            NoOpPhaseEvents
+        )
+    }
+}
+
+#[allow(dead_code)]
+impl<E, Q> {{ world.name.type }}<E, Q> {
+    /// Creates a new [`{{ world.name.type }}`].
+    pub fn new_with_events<S>(
+        create_systems: &S,
+        {%- for state in world.states %}
+        {{ state.name.field }}: {{ state.name.type }},
+        {%- endfor %}
+        command_queue: Q,
+        phase_events: E) -> Self
     where
         S: CreateSystems,
         E: SystemPhaseEvents,
@@ -591,42 +615,36 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
         E: SystemPhaseEvents,
         Q: WorldCommandSender + WorldCommandReceiver
     {
-        let result = if let Some(events) = &mut self.events {
-            System{{ phase.name.type }}Events::on_begin_phase(
-                events,
-                &self.context,
-                {%- for state in phase.states %}
-                {%- if state.write %}
-                &mut self.state.{{ state.use.field }},
-                {%- else %}
-                &self.state.{{ state.use.field }},
-                {%- endif %}
-                {%- endfor %}
-            )
-            .inspect_err(|error| tracing::error!(%error, "Failed to handle phase begin events"))
-            .ok()
-        } else {
-            None
-        };
+        let result = System{{ phase.name.type }}Events::on_begin_phase(
+            &mut self.events,
+            &self.context,
+            {%- for state in phase.states %}
+            {%- if state.write %}
+            &mut self.state.{{ state.use.field }},
+            {%- else %}
+            &self.state.{{ state.use.field }},
+            {%- endif %}
+            {%- endfor %}
+        )
+        .inspect_err(|error| tracing::error!(%error, "Failed to handle phase begin events"))
+        .ok();
 
         self.apply_system_phase_{{ phase.name.field }}_without_events();
 
-        if let Some(events) = &mut self.events {
-            System{{ phase.name.type }}Events::on_end_phase(
-                events,
-                result,
-                &self.context,
-                {%- for state in phase.states %}
-                {%- if state.write %}
-                &mut self.state.{{ state.use.field }},
-                {%- else %}
-                &self.state.{{ state.use.field }},
-                {%- endif %}
-                {%- endfor %}
-            )
-            .inspect_err(|error| tracing::error!(%error, "Failed to handle phase end events"))
-            .ok();
-        }
+        System{{ phase.name.type }}Events::on_end_phase(
+            &mut self.events,
+            result,
+            &self.context,
+            {%- for state in phase.states %}
+            {%- if state.write %}
+            &mut self.state.{{ state.use.field }},
+            {%- else %}
+            &self.state.{{ state.use.field }},
+            {%- endif %}
+            {%- endfor %}
+        )
+        .inspect_err(|error| tracing::error!(%error, "Failed to handle phase end events"))
+        .ok();
 
         // Process all commands.
         self.handle_commands();
@@ -743,23 +761,19 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
         E: SystemPhaseEvents,
         Q: WorldCommandSender + WorldCommandReceiver
     {
-        let result = if let Some(events) = &mut self.events {
-            System{{ phase.name.type }}Events::on_begin_phase(
-                events,
-                &self.context,
-                {%- for state in phase.states %}
-                {%- if state.write %}
-                &mut self.state.{{ state.use.field }},
-                {%- else %}
-                &self.state.{{ state.use.field }},
-                {%- endif %}
-                {%- endfor %}
-            )
-            .inspect_err(|error| tracing::error!(%error, "Failed to handle phase begin events"))
-            .ok()
-        } else {
-            None
-        };
+        let result = System{{ phase.name.type }}Events::on_begin_phase(
+            &mut self.events,
+            &self.context,
+            {%- for state in phase.states %}
+            {%- if state.write %}
+            &mut self.state.{{ state.use.field }},
+            {%- else %}
+            &self.state.{{ state.use.field }},
+            {%- endif %}
+            {%- endfor %}
+        )
+        .inspect_err(|error| tracing::error!(%error, "Failed to handle phase begin events"))
+        .ok();
 
         {%- if world.scheduled_systems[phase.name] | length == 0 %}
         // no systems in this phase
@@ -851,22 +865,20 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
         {%- endfor %}
         {%- endif %}
 
-        if let Some(events) = &mut self.events {
-            System{{ phase.name.type }}Events::on_end_phase(
-                events,
-                result,
-                &self.context,
-                {%- for state in phase.states %}
-                {%- if state.write %}
-                &mut self.state.{{ state.use.field }},
-                {%- else %}
-                &self.state.{{ state.use.field }},
-                {%- endif %}
-                {%- endfor %}
-            )
-            .inspect_err(|error| tracing::error!(%error, "Failed to handle phase end events"))
-            .ok();
-        }
+        System{{ phase.name.type }}Events::on_end_phase(
+            &mut self.events,
+            result,
+            &self.context,
+            {%- for state in phase.states %}
+            {%- if state.write %}
+            &mut self.state.{{ state.use.field }},
+            {%- else %}
+            &self.state.{{ state.use.field }},
+            {%- endif %}
+            {%- endfor %}
+        )
+        .inspect_err(|error| tracing::error!(%error, "Failed to handle phase end events"))
+        .ok();
 
         // Process all commands.
         self.handle_commands();
