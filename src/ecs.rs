@@ -82,6 +82,8 @@ pub enum EcsError {
     CycleDetectedInSystemRunOrder,
     #[error("System {1} depends on undefined system {0}.")]
     MissingSystemDependency(String, String),
+    #[error("A cycle was detected in the system run order (run_after edges): System {0} depends on itself.")]
+    SystemDependsOnItself(String),
 }
 
 impl Ecs {
@@ -214,6 +216,10 @@ impl Ecs {
                         dependency.type_name_raw.clone(),
                         system.name.type_name.clone(),
                     ));
+                }
+
+                if dependency == &system.name {
+                    return Err(EcsError::SystemDependsOnItself(system.name.type_name.clone()));
                 }
             }
 
