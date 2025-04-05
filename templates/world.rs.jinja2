@@ -445,14 +445,13 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
         E: SystemPhaseEvents<{{ world.name.type }}States>,
         Q: WorldCommandSender
     {
-        {%- if ecs.scheduled_systems[phase.name] | length == 0 %}
+        {%- if world.scheduled_systems[phase.name] | length == 0 %}
         // no systems in this phase
         {%- else %}
-        {%- for group in ecs.scheduled_systems[phase.name] %}
+        {%- for group in world.scheduled_systems[phase.name] %}
         {%- set group_number = loop.index %}
         {%- for system in group %}
-        // TODO: Test if {{ system.name.type }} is part of the {{ world.name.type }}.
-        // System group {{ group_number }} of {{ ecs.scheduled_systems[phase.name] | length }}
+        // System group {{ group_number }} of {{ world.scheduled_systems[phase.name] | length }}
         {
         {%- for archetype in system.affected_archetypes %}
             // Apply {{ system.name.type }} to {{ archetype.type }}
@@ -509,13 +508,13 @@ impl<E, Q>{{ world.name.type }}<E, Q> {
             events.on_begin_phase(SystemPhase::{{ phase.name.raw }}, &self.context, &mut self.states);
         }
 
-        {%- if ecs.scheduled_systems[phase.name] | length == 0 %}
+        {%- if world.scheduled_systems[phase.name] | length == 0 %}
         // no systems in this phase
-        {%- elif ecs.scheduled_systems[phase.name] | length == 1 %}
+        {%- elif world.scheduled_systems[phase.name] | length == 1 %}
         // Only one system in this phase; skip spawning thread.
         self.apply_system_phase_{{ phase.name.field }}_without_events();
         {%- else %}
-        {%- for group in ecs.scheduled_systems[phase.name] %}
+        {%- for group in world.scheduled_systems[phase.name] %}
         {%- set group_number = loop.index %}
         // System group {{ group_number }}
         rayon::scope(|s| {

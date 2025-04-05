@@ -1,7 +1,6 @@
 use crate::archetype::Archetype;
 use crate::component::Component;
-use crate::system::{System, SystemPhase, SystemPhaseRef};
-use crate::system_scheduler::schedule_systems;
+use crate::system::{System, SystemPhase};
 use crate::world::World;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -25,11 +24,6 @@ pub struct Ecs {
     /// The user states.
     #[serde(default)]
     pub states: Vec<State>,
-
-    // TODO: Schedules systems should be part of the world, not the ECS
-    /// The systems in scheduling order.
-    #[serde(default, skip_deserializing)]
-    pub scheduled_systems: HashMap<SystemPhaseRef, Vec<Vec<System>>>,
 }
 
 impl Ecs {
@@ -52,10 +46,8 @@ impl Ecs {
             self.any_phase_fixed |= phase.fixed;
         }
 
-        self.scheduled_systems()?;
-
         for world in &mut self.worlds {
-            world.finish(&self.archetypes, &self.systems, &self.states);
+            world.finish(&self.archetypes, &self.systems, &self.states, &self.phases)?;
         }
 
         Ok(())
@@ -275,38 +267,6 @@ impl Ecs {
                 ));
             }
         }
-        Ok(())
-    }
-
-    pub(crate) fn scheduled_systems(&mut self) -> Result<(), EcsError> {
-        let mut phase_groups = HashMap::new();
-        for phase in &self.phases {
-            let systems_in_group: Vec<_> = self
-                .systems
-                .iter()
-                .filter(|s| s.phase == phase.name)
-                .cloned()
-                .collect();
-            let groups = schedule_systems(&systems_in_group)?;
-            let scheduled_systems: Vec<_> = groups
-                .into_iter()
-                .map(|group| {
-                    group
-                        .iter()
-                        .map(|&system| {
-                            self.systems
-                                .iter()
-                                .find(|s| s.id == system)
-                                .expect("Failed to find system")
-                        })
-                        .cloned()
-                        .collect()
-                })
-                .collect();
-            phase_groups.insert(phase.name.clone(), scheduled_systems);
-        }
-
-        self.scheduled_systems = phase_groups;
         Ok(())
     }
 }
