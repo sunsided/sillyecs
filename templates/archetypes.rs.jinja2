@@ -116,12 +116,22 @@ pub trait Archetype: 'static + Send + Sync {
 
 /// Trait for archetypes containing the specified `Component`.
 #[allow(dead_code)]
-pub trait HasComponent<T: Component> {
+pub trait HasComponents<T: Component> {
     /// Returns a slice of all component values.
     fn get(&self) -> &[T];
 
     /// Returns a mutable slice of all component values.
     fn get_mut(&mut self) -> &mut [T];
+}
+
+/// Trait for entities containing the specified `Component`.
+#[allow(dead_code)]
+pub trait HasComponent<T: Component> {
+    /// Returns the component value.
+    fn get(&self) -> &T;
+
+    /// Mutably returns the component value.
+    fn get_mut(&mut self) -> &mut T;
 }
 
 {%- for archetype in ecs.archetypes %}
@@ -151,10 +161,25 @@ pub struct {{ archetype.name.raw }}Entity {
 #[allow(dead_code)]
 pub struct {{ archetype.name.raw }}EntityData {
     {%- for component_name in archetype.components %}
-    pub {{ component_name.field }}: {{ component_name.raw }}Data,
+    pub {{ component_name.field }}: {{ component_name.type }},
     {%- endfor %}
 }
+{%- for component_name in archetype.components %}
 
+/// Trait for archetypes containing the specified `Component`.
+#[allow(dead_code)]
+impl HasComponent<{{ component_name.type }}> for {{ archetype.name.raw }}EntityData {
+    /// Returns a slice of all component values.
+    fn get(&self) -> &{{ component_name.type }} {
+        &self.{{ component_name.field }}
+    }
+
+    /// Returns a mutable slice of all component values.
+    fn get_mut(&mut self) -> &mut {{ component_name.type }} {
+        &mut self.{{ component_name.field }}
+    }
+}
+{%- endfor %}
 impl {{ archetype.name.raw }}EntityData {
     /// Spawn this entity into the given world.
     #[inline]
@@ -214,15 +239,16 @@ impl {{ archetype.name.type }} {
         {% for id in archetype.component_ids %}id == {{ id }} || {% endfor %}false
     }
 
-    /// Spawn a new entity into the world.
+    /// Spawn a new entity into the world. Must be called through the world for proper bookkeeping.
+    #[doc(hidden)]
     pub fn spawn_with(
         &mut self,
         {%- for component_name in archetype.components %}
-        {{component_name.field}}: {{ component_name.raw }}Data,
+        {{component_name.field}}: {{ component_name.type }},
         {%- endfor %}
     ) -> (EntityId, EntityArchetypeRef) {
         {%- for component_name in archetype.components %}
-        self.{{ component_name.fields }}.push({{component_name.type}}::new({{component_name.field}}));
+        self.{{ component_name.fields }}.push({{component_name.field}});
         {%- endfor %}
 
         let entity_id = EntityId::new();
@@ -262,15 +288,15 @@ impl {{ archetype.name.type }} {
 
 {% for component_name in archetype.components %}
 #[automatically_derived]
-impl HasComponent<{{ component_name.type }}> for {{ archetype.name.type }} {
+impl HasComponents<{{ component_name.type }}> for {{ archetype.name.type }} {
     /// Returns a slice of all [`{{ component_name.type }}`] component values.
     fn get(&self) -> &[{{ component_name.type }}] {
-        &self.{{ component_name.fields }}
+        self.{{ component_name.fields }}.as_slice()
     }
 
     /// Returns a mutable slice of all [`{{ component_name.type }}`] component values.
     fn get_mut(&mut self) -> &mut [{{ component_name.type }}] {
-        &mut self.{{ component_name.fields }}
+        self.{{ component_name.fields }}.as_mut_slice()
     }
 }
 {% endfor %}
