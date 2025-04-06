@@ -104,12 +104,24 @@ impl SystemPhase {
 }
 
 /// Trait for constructing system instances.
-pub trait CreateSystems {
-    {%- for system in ecs.systems %}
+pub trait CreateSystem<S: System> {
+    /// Create an instance of type `S`.
+    fn create(&self) -> S;
+}
 
-    /// Create an instance of type [`{{ system.name.type }}`].
-    fn create_{{ system.name.field }}(&self) -> {{ system.name.type }};
-    {%- endfor %}
+/// Trait for constructing system instances.
+pub trait CreateSystems:
+{%- for system in ecs.systems %}
+{%- if loop.index > 1 %} +{% endif %} CreateSystem<{{ system.name.type }}>{%- endfor %}
+{ }
+
+#[automatically_derived]
+impl<T> CreateSystems for T
+where
+    T:
+{%- for system in ecs.systems %}
+{%- if loop.index > 1 %}     +{% endif %} CreateSystem<{{ system.name.type }}>
+{% endfor %}{
 }
 
 /// Trait for constructing system instances.
@@ -122,9 +134,8 @@ impl<T> SystemPhaseEvents for T
 where
     T:
 {%- for phase in ecs.phases %}
-{%- if loop.index > 1 %} +{% endif %} System{{ phase.name.type }}Events
-{%- endfor %}
-{
+{%- if loop.index > 1 %}     +{% endif %} System{{ phase.name.type }}Events
+{% endfor %}{
 }
 
 /// A no-op event struct.

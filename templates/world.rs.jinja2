@@ -346,7 +346,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
             archetypes: Default::default(),
             systems: {{ world.name.type }}Systems {
                 {%- for system in world.systems %}
-                {{ system.name.field }}: create_systems.create_{{ system.name.field }}(),
+                {{ system.name.field }}: CreateSystem::<{{ system.name.type }}>::create(create_systems),
                 {%- endfor %}
             },
             entity_locations: Default::default(),
