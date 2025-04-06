@@ -337,7 +337,9 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
         command_queue: Q,
         phase_events: E) -> Self
     where
-        S: CreateSystems,
+        {% set systemLoopCount = 0 -%}
+        S: {% for system in world.systems %}{% set systemLoopCount = systemLoopCount + 1 %}{% if systemLoopCount > 1 %}
+         + {% endif %}CreateSystem<{{ system.name.type }}>{% endfor -%},
         E: SystemPhaseEvents,
         Q: WorldCommandQueue
     {
