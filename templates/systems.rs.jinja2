@@ -240,7 +240,7 @@ pub struct {{ system.name.type }}({{ system.name.type }}Data);
 /// Implements the business logic for the [`{{ system.name.type }}`] system.
 #[allow(dead_code)]
 pub trait Apply{{ system.name.type }}: System {
-    type Error;
+    type Error: core::error::Error;
 
     /// Indicates whether this system is ready for action.
     ///

@@ -690,7 +690,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                     {%- endif %}
                     {%- endfor %}
                 )
-                .inspect_err(|error| tracing::error!(%error, "{{ system.name.type }}::on_begin_phase returned an error"))
+                .inspect_err(|error| tracing::error!(?error, "{{ system.name.type }}::on_begin_phase returned an error"))
                 .is_ok()
         {
         {%- for archetype in system.affected_archetypes %}
@@ -733,7 +733,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                 {%- endif %}
                 {%- endfor %}
             )
-            .inspect_err(|error| tracing::error!(%error, "{{ system.name.type }}::on_end_phase returned an error"))
+            .inspect_err(|error| tracing::error!(?error, "{{ system.name.type }}::on_end_phase returned an error"))
             .ok();
         }
         {%- endfor %}
