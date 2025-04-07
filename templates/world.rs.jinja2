@@ -201,6 +201,8 @@ pub struct {{ world.name.type }}<E, Q> {
     /// The fixed-time accumulators.
     fixed_accumulators: FixedAccumulators,
     {%- endif %}
+    /// The phase delta times.
+    delta_timers: DeltaTimers,
     /// The system phase events
     events: E,
     {%- if (world.states | length) > 0 %}
@@ -366,6 +368,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
             {%- if ecs.any_phase_fixed %}
             fixed_accumulators: Default::default(),
             {%- endif %}
+            delta_timers: DeltaTimers::default(),
             events: phase_events,
             command_queue
         }
@@ -457,6 +460,27 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
     fn on_end_frame(&mut self) {
         self.context.last_frame_start = self.context.current_frame_start;
     }
+    {%- for phase in ecs.phases %}
+
+    /// Runs a per-frame update of the frame context at the start of a frame.
+    fn on_begin_{{ phase.name.field }}_phase(&mut self) {
+        let now = std::time::Instant::now();
+        let previous = self.delta_timers.previous_{{ phase.name.field }}_start;
+        self.delta_timers.current_{{ phase.name.field }}_start = now;
+        self.context.current_frame_start = now;
+        self.context.last_frame_start = previous;
+        if self.context.frame_number == 0 {
+            self.context.delta_time_secs = 0.0;
+        } else {
+            self.context.delta_time_secs = (now - previous).as_secs_f32();
+        }
+    }
+
+    /// Runs a per-frame update of the frame context at the end of a frame.
+    fn on_end_{{ phase.name.field }}_phase(&mut self) {
+        self.delta_timers.previous_{{ phase.name.field }}_start = self.delta_timers.current_{{ phase.name.field }}_start;
+    }
+    {%- endfor %}
 
     /// Apply all system phases sequentially.
     ///
@@ -617,6 +641,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
         E: SystemPhaseEvents,
         Q: WorldCommandSender + WorldCommandReceiver
     {
+        self.on_begin_{{ phase.name.field }}_phase();
         let result = System{{ phase.name.type }}Events::on_begin_phase(
             &mut self.events,
             &self.context,
@@ -650,6 +675,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
 
         // Process all commands.
         self.handle_commands();
+        self.on_end_{{ phase.name.field }}_phase();
     }
 
     /// Execute system phase `{{ phase.name.raw }}` without calling events. See [`apply_system_phase_{{ phase.name.field }}`](Self::apply_system_phase_{{ phase.name.field }}).
@@ -763,6 +789,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
         E: SystemPhaseEvents,
         Q: WorldCommandSender + WorldCommandReceiver
     {
+        self.on_begin_{{ phase.name.field }}_phase();
         let result = System{{ phase.name.type }}Events::on_begin_phase(
             &mut self.events,
             &self.context,
@@ -893,6 +920,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
 
         // Process all commands.
         self.handle_commands();
+        self.on_end_{{ phase.name.field }}_phase();
     }
     {%- endfor %}
 
@@ -976,6 +1004,28 @@ struct FixedAccumulators {
     {%- endfor %}
 }
 {%- endif %}
+/// Delta time trackers for all phases.
+#[derive(Debug, Clone)]
+struct DeltaTimers {
+    {%- for phase in ecs.phases %}
+    /// The current start time for the [`{{ phase.name.raw }}`]({{ phase.name.type }}) phase.
+    current_{{ phase.name.field }}_start: std::time::Instant,
+    /// The previous start time for the [`{{ phase.name.raw }}`]({{ phase.name.type }}) phase.
+    previous_{{ phase.name.field }}_start: std::time::Instant,
+    {%- endfor %}
+}
+
+impl Default for DeltaTimers {
+    fn default() -> Self {
+        let now = std::time::Instant::now();
+        Self {
+            {%- for phase in ecs.phases %}
+            current_{{ phase.name.field }}_start: now,
+            previous_{{ phase.name.field }}_start: now,
+            {%- endfor %}
+        }
+    }
+}
 
 #[derive(Debug)]
 pub enum DespawnError {
