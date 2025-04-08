@@ -206,9 +206,14 @@ impl ArchetypeEntityData {
 /// A container for an entity with its associated data.
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
-pub struct EntityWithIdAndData<Data> {
+pub struct EntityWithIdAndData<Data: EntityData> {
     pub id: EntityId,
     pub data: Data,
+}
+
+/// Marker trait for entity data.
+pub trait EntityData {
+    const ARCHETYPE_ID: ArchetypeId;
 }
 
 {%- for archetype in ecs.archetypes %}
@@ -235,6 +240,10 @@ pub struct {{ archetype.name.raw }}EntityData {
     {%- for component_name in archetype.components %}
     pub {{ component_name.field }}: {{ component_name.type }},
     {%- endfor %}
+}
+
+impl EntityData for {{ archetype.name.raw }}EntityData {
+    const ARCHETYPE_ID: ArchetypeId = {{archetype.name.type}}::ID;
 }
 {%- for component_name in archetype.components %}
 
