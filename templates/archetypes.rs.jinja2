@@ -564,8 +564,11 @@ pub trait GetEntityRef {
     where
         Self: 'archetype;
 
-    #[allow(clippy::needless_lifetimes)]
+    #[allow(clippy::needless_lifetimes, dead_code)]
     fn get_at<'archetype>(&'archetype self, index: usize) -> Option<Self::EntityRef<'archetype>>;
+
+    #[allow(clippy::needless_lifetimes, dead_code)]
+    unsafe fn get_at_unchecked<'archetype>(&'archetype self, index: usize) -> Self::EntityRef<'archetype>;
 }
 {%- for archetype in ecs.archetypes %}
 
@@ -661,6 +664,11 @@ pub trait FrontloadEntities:
         frontload_target_idx
     }
 
+    /// Swaps two entities in the archetype.
+    ///
+    /// Note that this function is meant to be called internally and does **not** perform any bookkeeping
+    /// such as updating the world's entity location map.
+    #[doc(hidden)]
     fn swap_entities(&mut self, current_idx: usize, new_idx: usize);
 }
 
@@ -688,9 +696,13 @@ pub trait FrontloadEntitiesScan:
         loop {
             // Move left pointer forward until an invalid entry is found
             while left <= right {
+                {%- if ecs.allow_unsafe %}
+                let reference = unsafe { self.get_at_unchecked(left) };
+                {%- else %}
                 let Some(reference) = self.get_at(left) else {
                     break;
                 };
+                {%- endif %}
                 if should_frontload(&reference) {
                     left += 1;
                 } else {
@@ -700,9 +712,13 @@ pub trait FrontloadEntitiesScan:
 
             // Move right pointer backward until a valid entry is found
             while left <= right {
+                {%- if ecs.allow_unsafe %}
+                let reference = unsafe { self.get_at_unchecked(right) };
+                {%- else %}
                 let Some(reference) = self.get_at(right) else {
                     break;
                 };
+                {%- endif %}
                 if !should_frontload(&reference) {
                     right = right.wrapping_sub(1);
                 } else {
@@ -743,19 +759,22 @@ impl GetEntityRef for {{ archetype.name.type }} {
 
     /// See [`{{ archetype.name.type }}::get_at`]({{ archetype.name.type }}::get_at).
     #[inline(always)]
-    #[allow(clippy::needless_lifetimes)]
+    #[allow(clippy::needless_lifetimes, dead_code)]
     fn get_at<'archetype>(&'archetype self, index: usize) -> Option<Self::EntityRef<'archetype>> {
         self.get_at(index)
+    }
+
+    /// See [`{{ archetype.name.type }}::get_at_unchecked`]({{ archetype.name.type }}::get_at_unchecked).
+    #[inline(always)]
+    #[allow(clippy::needless_lifetimes, dead_code)]
+    unsafe fn get_at_unchecked<'archetype>(&'archetype self, index: usize) -> Self::EntityRef<'archetype> {
+        unsafe { self.get_at_unchecked(index) }
     }
 }
 {%- endfor %}
 {%- for archetype in ecs.archetypes %}
 
 impl FrontloadEntities for {{ archetype.name.type }} {
-    /// Swaps two entities in the archetype.
-    ///
-    /// Note that this function is meant to be called internally and does **not** perform any bookkeeping
-    /// such as updating the world's entity location map.
     #[inline(always)]
     #[doc(hidden)]
     fn swap_entities(&mut self, first: usize, second: usize) {
