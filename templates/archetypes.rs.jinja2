@@ -603,10 +603,28 @@ pub trait FrontloadEntities:
         // TODO: Measure; might be overkill for small numbers
         indices_to_frontload.sort_unstable();
 
+        self.frontload_indices_sorted(entity_lookup, indices_to_frontload, previous_frontload_pivot)
+    }
+
+    /// Frontloads entities provided by their IDs (e.g., from quadtree results).
+    ///
+    /// This function operates directly on indices and assumes that the index list is sorted
+    /// for coherent cache access. It works with unsorted lists but may have degraded performance.
+    ///
+    /// Returns the count of frontloaded entities.
+    fn frontload_indices_sorted<I>(
+        &mut self,
+        entity_lookup: &mut EntityLocationMap<EntityId, EntityArchetypeRef>,
+        indices_to_frontload: I,
+        previous_frontload_pivot: Option<usize>
+    ) -> usize
+    where
+        I: AsRef<[usize]>
+    {
         let mut frontload_target_idx = previous_frontload_pivot.unwrap_or_default();
         let mut swaps_made = Vec::new();
 
-        for current_idx in indices_to_frontload {
+        for &current_idx in indices_to_frontload.as_ref() {
             // If already frontloaded, skip
             if current_idx < frontload_target_idx {
                 continue;
@@ -658,10 +676,10 @@ pub trait FrontloadEntitiesScan:
     fn frontload_scan<F>(
         &mut self,
         entity_lookup: &mut EntityLocationMap<EntityId, EntityArchetypeRef>,
-        should_frontload: F,
+        mut should_frontload: F,
     ) -> usize
     where
-        for<'archetype> F: Fn(&<Self as GetEntityRef>::EntityRef<'archetype>) -> bool,
+        for<'archetype> F: FnMut(&<Self as GetEntityRef>::EntityRef<'archetype>) -> bool,
     {
         let mut left = 0;
         let mut right = self.len().wrapping_sub(1);
