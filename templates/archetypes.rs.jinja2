@@ -292,12 +292,23 @@ impl<'archetype> Iterator for {{ archetype.name.raw }}EntityIterator<'archetype>
         let idx = self.current;
         self.current += 1;
 
+        {%- if ecs.allow_unsafe %}
+        unsafe {
+            Some({{ archetype.name.raw }}EntityRef {
+                entity_id: self.archetype.entities[idx],
+                {%- for component_name in archetype.components %}
+                {{ component_name.field }}: &self.archetype.{{ component_name.fields }}.get_unchecked(idx),
+                {%- endfor %}
+            })
+        }
+        {%- else %}
         Some({{ archetype.name.raw }}EntityRef {
             entity_id: self.archetype.entities[idx],
             {%- for component_name in archetype.components %}
             {{ component_name.field }}: &self.archetype.{{ component_name.fields }}[idx],
             {%- endfor %}
         })
+        {%- endif %}
     }
 }
 

@@ -27,6 +27,9 @@ pub struct Ecs {
     /// The user states.
     #[serde(default)]
     pub states: Vec<State>,
+    /// Allow the generation of unsafe code.
+    #[serde(default)]
+    pub allow_unsafe: bool
 }
 
 impl Ecs {
