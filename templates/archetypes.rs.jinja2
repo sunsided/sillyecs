@@ -69,17 +69,20 @@ pub enum ArchetypeId {
     {%- endfor %}
 }
 
-#[allow(dead_code)]
 impl ArchetypeId {
     {%- for archetype in ecs.archetypes %}
-    pub const {{ archetype.name.raw | upper }}_ID: core::num::NonZeroU64 = core::num::NonZeroU64::new({{ archetype.id }}).expect("Error at ECS construction time");
+    /// A [`NonZeroU64`](core::num::NonZeroU64) representation of [`ArchetypeId::{{ archetype.name.raw }}`](ArchetypeId::{{ archetype.name.raw }}) archetype.
+    pub const {{ archetype.name.field | upper }}_ID_VALUE: core::num::NonZeroU64 = core::num::NonZeroU64::new({{ archetype.id }}).expect("Error at ECS construction time");
     {%- endfor %}
+}
 
+#[allow(dead_code)]
+impl ArchetypeId {
     /// Returns this ID as a [`NonZeroU64`](core::num::NonZeroU64) value.
     pub const fn as_nonzero_u64(&self) -> core::num::NonZeroU64 {
         match self {
             {%- for archetype in ecs.archetypes %}
-            Self::{{ archetype.name.raw }} => Self::{{ archetype.name.raw | upper }}_ID,
+            Self::{{ archetype.name.raw }} => Self::{{ archetype.name.field | upper }}_ID_VALUE,
             {%- endfor %}
         }
     }
@@ -440,9 +443,9 @@ impl core::ops::DerefMut for {{ archetype.name.raw }}Entity {
 #[allow(dead_code)]
 impl {{ archetype.name.type }} {
     /// The IDs of the components used by this archetype, in ascending order.
-    pub const COMPONENT_IDS: [ComponentId; {{ archetype.component_count }}] = [
+    pub const COMPONENTS: [ComponentId; {{ archetype.component_count }}] = [
         {%- for id in archetype.component_ids %}
-        ComponentId::new({{- id -}}).expect("Invalid ID on ECS construction time"),
+        ComponentId::COMPONENT_{{- id -}},
         {%- endfor %}
     ];
 

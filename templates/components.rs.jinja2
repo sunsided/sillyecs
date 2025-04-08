@@ -1,31 +1,69 @@
 /// The ID of a [`Component`].
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
-pub struct ComponentId(core::num::NonZeroU64);
+#[repr(u32)]
+pub enum ComponentId {
+    {%- for component in ecs.components %}
+    {%- if component.description %}
+    /// {{ component.description }}
+    ///
+    /// For details, see the [`{{ component.name.type }}`]({{ component.name.type }}) Struct.
+    {%- else %}
+    /// The [`{{ component.name.raw }}`]({{ component.name.type }}) component.
+    {%- endif %}
+    {%- if component.affected_archetype_count > 0 %}
+    ///
+    /// # Archetype Use
+    /// This component is used by the following archetypes:
+    /// {% for archetype in component.affected_archetypes %}
+    /// - [`{{archetype.type}}`] ([`ArchetypeId::{{archetype.raw}}`]){%- endfor %}
+    {%- endif %}
+    {%- if component.affected_archetype_count > 0 %}
+    ///
+    /// # System Use
+    /// This component is used by the following systems:
+    /// {% for system in component.affected_systems %}
+    /// - [`{{system.type}}`] ([`SystemId::{{system.raw}}`]){%- endfor %}
+    {%- endif %}
+    {{ component.name.raw }} = {{ component.id }},
+    {%- endfor %}
+}
 
 #[allow(dead_code)]
 impl ComponentId {
-    pub const fn new(id: u64) -> Option<Self> {
-        if let Some(id) = core::num::NonZeroU64::new(id) {
-            Some(Self(id))
-        } else {
-            None
-        }
-    }
+    {%- for component in ecs.components %}
+    /// A [`NonZeroU64`](core::num::NonZeroU64) representation of [`ComponentId::{{ component.name.raw }}`](ComponentId::{{ component.name.raw }}) component.
+    pub const {{ component.name.field | upper }}_ID_VALUE: core::num::NonZeroU64 = core::num::NonZeroU64::new({{ component.id }}).expect("Error at ECS construction time");
+    {%- endfor %}
+}
 
+#[allow(dead_code)]
+impl ComponentId {
+    {%- for component in ecs.components %}
+    /// Compile-time constant lookup of [`ComponentId::{{ component.name.raw }}`](ComponentId::{{ component.name.raw }}).
+    const COMPONENT_{{ component.id }}: ComponentId = ComponentId::{{ component.name.raw }};
+    {%- endfor %}
+}
+
+#[allow(dead_code)]
+impl ComponentId {
     /// Returns this ID as a [`NonZeroU64`](core::num::NonZeroU64) value.
     pub const fn as_nonzero_u64(&self) -> core::num::NonZeroU64 {
-        self.0
+        match self {
+            {%- for component in ecs.components %}
+            Self::{{ component.name.raw }} => Self::{{ component.name.field | upper }}_ID_VALUE,
+            {%- endfor %}
+        }
     }
 
     /// Returns this ID as a `u64` value.
     pub const fn as_u64(&self) -> u64 {
-            self.0.get()
+        self.as_nonzero_u64().get()
     }
 }
 
 impl core::hash::Hash for ComponentId {
     fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
-        self.0.hash(state);
+        self.as_u64().hash(state);
     }
 }
 
@@ -38,6 +76,16 @@ impl From<ComponentId> for core::num::NonZeroU64 {
 impl From<ComponentId> for u64 {
     fn from(value: ComponentId) -> u64 {
         value.as_u64()
+    }
+}
+
+impl core::fmt::Display for ComponentId {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> Result<(), core::fmt::Error> {
+        match self {
+            {%- for component in ecs.components %}
+            Self::{{ component.name.raw }} => write!(f, "{{ component.name.raw }} (ID {{ component.id }})"),
+            {%- endfor %}
+        }
     }
 }
 
@@ -58,10 +106,24 @@ pub trait Component: 'static + Send + Sync {
 {% if component.description %}
 /// {{ component.description }}
 {%- else %}
-/// A component.
+/// A `{{ component.name.raw }}` component.
 {%- endif %}
 ///
 /// See also [`{{ component.name.raw }}Data`] for the actual data.
+{%- if component.affected_archetype_count > 0 %}
+///
+/// # Archetype Use
+/// This component is used by the following archetypes:
+/// {% for archetype in component.affected_archetypes %}
+/// - [`{{archetype.type}}`] ([`ArchetypeId::{{archetype.raw}}`]){%- endfor %}
+{%- endif %}
+{%- if component.affected_archetype_count > 0 %}
+///
+/// # System Use
+/// This component is used by the following systems:
+/// {% for system in component.affected_systems %}
+/// - [`{{system.type}}`] ([`SystemId::{{system.raw}}`]){%- endfor %}
+{%- endif %}
 #[derive(Debug, Clone)]
 pub struct {{ component.name.type }}({{ component.name.raw }}Data);
 
@@ -80,7 +142,7 @@ impl {{ component.name.type }} {
 
 #[automatically_derived]
 impl Component for {{ component.name.type }} {
-    const ID: ComponentId = ComponentId(core::num::NonZeroU64::new({{ component.id }}).expect("A zero component ID was provided"));
+    const ID: ComponentId = ComponentId::{{ component.name.raw }};
 }
 
 impl PartialEq<ComponentId> for {{ component.name.type }} {

@@ -1,10 +1,10 @@
 use crate::archetype::Archetype;
 use crate::component::Component;
+use crate::state::State;
 use crate::system::{System, SystemPhase};
 use crate::world::World;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
-use crate::state::State;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Ecs {
@@ -29,7 +29,7 @@ pub struct Ecs {
     pub states: Vec<State>,
     /// Allow the generation of unsafe code.
     #[serde(default)]
-    pub allow_unsafe: bool
+    pub allow_unsafe: bool,
 }
 
 impl Ecs {
@@ -41,6 +41,10 @@ impl Ecs {
 
         for system in &mut self.systems {
             system.finish(&self.archetypes);
+        }
+
+        for component in &mut self.components {
+            component.finish(&self.archetypes, &self.systems);
         }
 
         for state in &mut self.states {
@@ -91,7 +95,9 @@ pub enum EcsError {
     CycleDetectedInSystemRunOrder,
     #[error("System {1} depends on undefined system {0}.")]
     MissingSystemDependency(String, String),
-    #[error("A cycle was detected in the system run order (run_after edges): System {0} depends on itself.")]
+    #[error(
+        "A cycle was detected in the system run order (run_after edges): System {0} depends on itself."
+    )]
     SystemDependsOnItself(String),
     #[error("System {1} requires state '{0}' which is not defined.")]
     MissingStateInSystem(String, String),
@@ -131,7 +137,9 @@ impl Ecs {
         let mut set = HashSet::new();
         for state in &self.states {
             if !set.insert(state.name.clone()) {
-                return Err(EcsError::StateDefinedMultipleTimes(state.name.type_name_raw.clone()));
+                return Err(EcsError::StateDefinedMultipleTimes(
+                    state.name.type_name_raw.clone(),
+                ));
             }
         }
         Ok(())
@@ -242,12 +250,18 @@ impl Ecs {
                 }
 
                 if dependency == &system.name {
-                    return Err(EcsError::SystemDependsOnItself(system.name.type_name.clone()));
+                    return Err(EcsError::SystemDependsOnItself(
+                        system.name.type_name.clone(),
+                    ));
                 }
             }
 
             for state in &system.states {
-                if !self.states.iter().any(|ecs_state| ecs_state.name.eq(&state.name)) {
+                if !self
+                    .states
+                    .iter()
+                    .any(|ecs_state| ecs_state.name.eq(&state.name))
+                {
                     return Err(EcsError::MissingStateInSystem(
                         state.name.type_name_raw.clone(),
                         system.name.type_name.clone(),
