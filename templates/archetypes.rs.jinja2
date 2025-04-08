@@ -606,7 +606,7 @@ pub trait FrontloadEntities:
         // TODO: Measure; might be overkill for small numbers
         indices_to_frontload.sort_unstable();
 
-        self.frontload_indices_sorted(entity_lookup, indices_to_frontload, previous_frontload_pivot)
+        self.frontload_by_indices_sorted(entity_lookup, indices_to_frontload, previous_frontload_pivot)
     }
 
     /// Frontloads entities provided by their IDs (e.g., from quadtree results).
@@ -615,7 +615,7 @@ pub trait FrontloadEntities:
     /// for coherent cache access. It works with unsorted lists but may have degraded performance.
     ///
     /// Returns the count of frontloaded entities.
-    fn frontload_indices_sorted<I>(
+    fn frontload_by_indices_sorted<I>(
         &mut self,
         entity_lookup: &mut EntityLocationMap<EntityId, EntityArchetypeRef>,
         indices_to_frontload: I,

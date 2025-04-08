@@ -1057,5 +1057,56 @@ impl core::fmt::Display for DespawnError {
         }
     }
 }
-
 impl core::error::Error for DespawnError { }
+{%- for world in ecs.worlds %}
+
+impl<E, Q> {{ world.name.type }}<E, Q> {
+{%- for archetype in world.archetypes %}
+
+    /// Frontloads entities provided by their IDs (e.g., from quadtree results).
+    /// Returns the count of frontloaded entities.
+    #[inline]
+    #[allow(dead_code)]
+    pub fn frontload_{{ archetype.name.fields }}(
+        &mut self,
+        entities_to_frontload: &[EntityId],
+        previous_frontload_pivot: Option<usize>
+    ) -> usize {
+        self.archetypes.{{ archetype.name.field }}.frontload(&mut self.entity_locations, entities_to_frontload, previous_frontload_pivot)
+    }
+
+    /// Frontloads entities provided by their IDs (e.g., from quadtree results).
+    ///
+    /// This function operates directly on indices and assumes that the index list is sorted
+    /// for coherent cache access. It works with unsorted lists but may have degraded performance.
+    ///
+    /// Returns the count of frontloaded entities.
+    #[inline]
+    #[allow(dead_code)]
+    pub fn frontload_{{ archetype.name.fields }}_by_indices_sorted<I>(
+        &mut self,
+        indices_to_frontload: I,
+        previous_frontload_pivot: Option<usize>
+    ) -> usize
+    where
+        I: AsRef<[usize]>
+    {
+        self.archetypes.{{ archetype.name.field }}.frontload_by_indices_sorted(&mut self.entity_locations, indices_to_frontload, previous_frontload_pivot)
+    }
+
+    /// Frontloads entities satisfying `should_frontload`.
+    /// Returns the number of entities frontloaded.
+    #[inline]
+    #[allow(dead_code)]
+    pub fn frontload_{{ archetype.name.fields }}_by_scan<F>(
+        &mut self,
+        should_frontload: F,
+    ) -> usize
+    where
+        for<'archetype> F: FnMut(&{{ archetype.name.raw }}EntityRef<'archetype>) -> bool,
+    {
+        self.archetypes.{{ archetype.name.field }}.frontload_scan(&mut self.entity_locations, should_frontload)
+    }
+{%- endfor %}
+}
+{%- endfor %}
