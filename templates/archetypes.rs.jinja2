@@ -60,6 +60,8 @@ pub enum ArchetypeId {
     {%- for archetype in ecs.archetypes %}
     {%- if archetype.description %}
     /// {{ archetype.description }}
+    ///
+    /// For details, see the [`{{ archetype.name.type }}`]({{ archetype.name.type }}) Struct.
     {%- else %}
     /// The [`{{ archetype.name.raw }}`]({{ archetype.name.type }}) archetype.
     {%- endif %}
