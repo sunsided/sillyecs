@@ -109,6 +109,9 @@ worlds:
       - Player
       - ForegroundObject
       - BackgroundObject
+  
+# Optional, if you're feeling lucky
+allow_unsafe: true
 ```
 
 Include the compile-time generated files:
