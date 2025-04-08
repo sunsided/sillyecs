@@ -55,24 +55,42 @@ impl core::fmt::Display for EntityId {
 
 /// The ID of an [`Archetype`].
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
-pub struct ArchetypeId(core::num::NonZeroU64);
+#[repr(u32)]
+pub enum ArchetypeId {
+    {%- for archetype in ecs.archetypes %}
+    {%- if archetype.description %}
+    /// {{ archetype.description }}
+    {%- else %}
+    /// The [`{{ archetype.name.raw }}`]({{ archetype.name.type }}) archetype.
+    {%- endif %}
+    {{ archetype.name.raw }} = {{ archetype.id }},
+    {%- endfor %}
+}
 
 #[allow(dead_code)]
 impl ArchetypeId {
+    {%- for archetype in ecs.archetypes %}
+    pub const {{ archetype.name.raw | upper }}_ID: core::num::NonZeroU64 = core::num::NonZeroU64::new({{ archetype.id }}).expect("Error at ECS construction time");
+    {%- endfor %}
+
     /// Returns this ID as a [`NonZeroU64`](core::num::NonZeroU64) value.
     pub const fn as_nonzero_u64(&self) -> core::num::NonZeroU64 {
-        self.0
+        match self {
+            {%- for archetype in ecs.archetypes %}
+            Self::{{ archetype.name.raw }} => Self::{{ archetype.name.raw | upper }}_ID,
+            {%- endfor %}
+        }
     }
 
     /// Returns this ID as a `u64` value.
     pub const fn as_u64(&self) -> u64 {
-            self.0.get()
+        self.as_nonzero_u64().get()
     }
 }
 
 impl core::hash::Hash for ArchetypeId {
     fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
-        self.0.hash(state);
+        self.as_u64().hash(state);
     }
 }
 
@@ -90,11 +108,10 @@ impl From<ArchetypeId> for u64 {
 
 impl core::fmt::Display for ArchetypeId {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> Result<(), core::fmt::Error> {
-        match self.0.get() {
+        match self {
             {%- for archetype in ecs.archetypes %}
-            {{ archetype.id }} => write!(f, "{{ archetype.name.raw }} (Archetype ID {{ archetype.id }})"),
+            Self::{{ archetype.name.raw }} => write!(f, "{{ archetype.name.raw }} (ID {{ archetype.id }})"),
             {%- endfor %}
-            id => write!(f, "Archetype ID {id}")
         }
     }
 }
@@ -541,7 +558,7 @@ impl HasComponents<{{ component_name.type }}> for {{ archetype.name.type }} {
 #[automatically_derived]
 #[allow(dead_code)]
 impl Archetype for {{ archetype.name.type }} {
-    const ID: ArchetypeId = ArchetypeId(core::num::NonZeroU64::new({{ archetype.id }}).expect("A zero archetype ID was provided"));
+    const ID: ArchetypeId = ArchetypeId::{{ archetype.name.raw }};
 
     fn len(&self) -> usize {
         self.entities.len()
