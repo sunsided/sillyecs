@@ -203,6 +203,14 @@ impl ArchetypeEntityData {
     }
 }
 
+/// A container for an entity with its associated data.
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
+pub struct EntityWithIdAndData<Data> {
+    pub id: EntityId,
+    pub data: Data,
+}
+
 {%- for archetype in ecs.archetypes %}
 {% if archetype.description %}
 /// {{ archetype.description }}
@@ -218,12 +226,7 @@ pub struct {{ archetype.name.type }} {
 }
 
 /// An entity of the [`{{ archetype.name.type }}`].
-#[derive(Debug, Clone)]
-#[allow(dead_code)]
-pub struct {{ archetype.name.raw }}Entity {
-    pub id: EntityId,
-    pub data: {{ archetype.name.raw }}EntityData,
-}
+pub type {{ archetype.name.raw }}Entity = EntityWithIdAndData<{{ archetype.name.raw }}EntityData>;
 
 /// An entity of the [`{{ archetype.name.type }}`].
 #[derive(Debug, Clone)]
