@@ -36,6 +36,13 @@ impl From<SystemId> for u64 {
 pub trait System: 'static + Send + Sync {
     /// The ID of this system.
     const ID: SystemId;
+
+    /// The ID of this system.
+    #[inline]
+    #[allow(dead_code)]
+    fn id(&self) -> SystemId {
+        Self::ID
+    }
 }
 
 /// The system phases.

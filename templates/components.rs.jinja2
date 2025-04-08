@@ -45,6 +45,13 @@ impl From<ComponentId> for u64 {
 pub trait Component: 'static + Send + Sync {
     /// The ID of this component.
     const ID: ComponentId;
+
+    /// The ID of this component.
+    #[inline]
+    #[allow(dead_code)]
+    fn id(&self) -> ComponentId {
+        Self::ID
+    }
 }
 
 {%- for component in ecs.components %}

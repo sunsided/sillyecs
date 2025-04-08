@@ -132,6 +132,13 @@ impl FrameContext {
 pub trait World {
     /// The ID of this world.
     const ID: WorldId;
+
+    /// The ID of this world.
+    #[inline]
+    #[allow(dead_code)]
+    fn id(&self) -> WorldId {
+        Self::ID
+    }
 }
 {%- if ecs.any_phase_on_request %}
 

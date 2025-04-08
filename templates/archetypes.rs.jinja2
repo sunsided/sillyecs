@@ -122,6 +122,13 @@ pub trait Archetype: 'static + Send + Sync {
     /// The ID of this archetype.
     const ID: ArchetypeId;
 
+    /// The ID of this archetype.
+    #[inline]
+    #[allow(dead_code)]
+    fn id(&self) -> ArchetypeId {
+        Self::ID
+    }
+
     /// Returns the number of entities in this archetype.
     fn len(&self) -> usize;
 
@@ -244,6 +251,58 @@ pub struct {{ archetype.name.raw }}EntityData {
 
 impl EntityData for {{ archetype.name.raw }}EntityData {
     const ARCHETYPE_ID: ArchetypeId = {{archetype.name.type}}::ID;
+}
+
+/// A reference to an entity of the [`{{ archetype.name.type }}`].
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
+pub struct {{ archetype.name.raw }}EntityRef<'archetype> {
+    pub entity_id: EntityId,
+    {%- for component_name in archetype.components %}
+    pub {{ component_name.field }}: &'archetype {{ component_name.type }},
+    {%- endfor %}
+}
+
+/// An iterator for entities in the [`{{ archetype.name.type }}`].
+pub struct {{ archetype.name.raw }}EntityIterator<'archetype> {
+    entity_iter: std::slice::Iter<'archetype, EntityId>,
+    {%- for component_name in archetype.components %}
+    {{ component_name.field }}_iter: std::slice::Iter<'archetype, {{ component_name.type }}>,
+    {%- endfor %}
+}
+
+impl<'archetype> {{ archetype.name.raw }}EntityIterator<'archetype> {
+    fn new(archetype: &'archetype {{ archetype.name.type }}) -> Self {
+        Self {
+            entity_iter: archetype.entities.iter(),
+            {%- for component_name in archetype.components %}
+            {{ component_name.field }}_iter: archetype.{{ component_name.fields }}.iter(),
+            {%- endfor %}
+        }
+    }
+}
+
+impl<'archetype> Iterator for {{ archetype.name.raw }}EntityIterator<'archetype> {
+    type Item = {{ archetype.name.raw }}EntityRef<'archetype>;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        Some({{ archetype.name.raw }}EntityRef {
+            entity_id: *self.entity_iter.next()?,
+            {%- for component_name in archetype.components %}
+            {{ component_name.field }}: self.{{ component_name.field }}_iter.next()?,
+            {%- endfor %}
+        })
+    }
+}
+
+impl {{ archetype.name.type }} {
+    /// Iterates all entities in this archetype.
+    #[inline]
+    #[allow(dead_code)]
+    pub fn iter(&self) -> {{ archetype.name.raw }}EntityIterator {
+        {{ archetype.name.raw }}EntityIterator::new(self)
+    }
 }
 {%- for component_name in archetype.components %}
 
