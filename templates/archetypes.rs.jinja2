@@ -265,19 +265,17 @@ pub struct {{ archetype.name.raw }}EntityRef<'archetype> {
 
 /// An iterator for entities in the [`{{ archetype.name.type }}`].
 pub struct {{ archetype.name.raw }}EntityIterator<'archetype> {
-    entity_iter: std::slice::Iter<'archetype, EntityId>,
-    {%- for component_name in archetype.components %}
-    {{ component_name.field }}_iter: std::slice::Iter<'archetype, {{ component_name.type }}>,
-    {%- endfor %}
+    archetype: &'archetype {{ archetype.name.type }},
+    current: usize,
+    length: usize,
 }
 
 impl<'archetype> {{ archetype.name.raw }}EntityIterator<'archetype> {
     fn new(archetype: &'archetype {{ archetype.name.type }}) -> Self {
         Self {
-            entity_iter: archetype.entities.iter(),
-            {%- for component_name in archetype.components %}
-            {{ component_name.field }}_iter: archetype.{{ component_name.fields }}.iter(),
-            {%- endfor %}
+            archetype,
+            current: 0,
+            length: archetype.len()
         }
     }
 }
@@ -287,10 +285,17 @@ impl<'archetype> Iterator for {{ archetype.name.raw }}EntityIterator<'archetype>
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
+        if self.current >= self.length {
+            return None;
+        }
+
+        let idx = self.current;
+        self.current += 1;
+
         Some({{ archetype.name.raw }}EntityRef {
-            entity_id: *self.entity_iter.next()?,
+            entity_id: self.archetype.entities[idx],
             {%- for component_name in archetype.components %}
-            {{ component_name.field }}: self.{{ component_name.field }}_iter.next()?,
+            {{ component_name.field }}: &self.archetype.{{ component_name.fields }}[idx],
             {%- endfor %}
         })
     }
