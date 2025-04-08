@@ -293,14 +293,7 @@ impl<'archetype> Iterator for {{ archetype.name.raw }}EntityIterator<'archetype>
         self.current += 1;
 
         {%- if ecs.allow_unsafe %}
-        unsafe {
-            Some({{ archetype.name.raw }}EntityRef {
-                entity_id: self.archetype.entities[idx],
-                {%- for component_name in archetype.components %}
-                {{ component_name.field }}: &self.archetype.{{ component_name.fields }}.get_unchecked(idx),
-                {%- endfor %}
-            })
-        }
+        Some(unsafe { self.archetype.get_at_unchecked(idx) })
         {%- else %}
         Some({{ archetype.name.raw }}EntityRef {
             entity_id: self.archetype.entities[idx],
@@ -318,6 +311,36 @@ impl {{ archetype.name.type }} {
     #[allow(dead_code)]
     pub fn iter(&self) -> {{ archetype.name.raw }}EntityIterator {
         {{ archetype.name.raw }}EntityIterator::new(self)
+    }
+
+    /// Gets the entity at the specified index.
+    #[allow(dead_code)]
+    pub fn get_at(&self, index: usize) -> Option<{{ archetype.name.raw }}EntityRef> {
+        if index > self.len() {
+            return None;
+        }
+
+        {%- if ecs.allow_unsafe %}
+        Some(unsafe { self.get_at_unchecked(index) })
+        {%- else %}
+        Some({{ archetype.name.raw }}EntityRef {
+            entity_id: self.entities[index],
+            {%- for component_name in archetype.components %}
+            {{ component_name.field }}: &self.{{ component_name.fields }}[index],
+            {%- endfor %}
+        })
+        {%- endif %}
+    }
+
+    /// Gets the entity at the specified index.
+    #[allow(dead_code)]
+    pub unsafe fn get_at_unchecked(&self, index: usize) -> {{ archetype.name.raw }}EntityRef {
+        {{ archetype.name.raw }}EntityRef {
+            entity_id: *self.entities.get_unchecked(index),
+            {%- for component_name in archetype.components %}
+            {{ component_name.field }}: self.{{ component_name.fields }}.get_unchecked(index),
+            {%- endfor %}
+        }
     }
 }
 {%- for component_name in archetype.components %}
