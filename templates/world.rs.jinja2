@@ -1061,6 +1061,27 @@ impl core::error::Error for DespawnError { }
 {%- for world in ecs.worlds %}
 
 impl<E, Q> {{ world.name.type }}<E, Q> {
+    /// Frontloads entities provided by their archetype IDs and indexes (e.g., from quadtree results,
+    /// followed by entity location lookups). Performs best when the indices are presorted in ascending order.
+    ///
+    /// Returns the count of frontloaded entities.
+    #[allow(dead_code)]
+    pub fn frontload(
+        &mut self,
+        archetype: ArchetypeId,
+        indices_to_frontload: &[usize],
+        previous_frontload_pivot: Option<usize>
+    ) -> usize {
+        match archetype {
+            {%- for archetype in world.archetypes %}
+            {{ archetype.name.type }}::ID => {
+                self.frontload_{{ archetype.name.fields }}_by_indices_sorted(indices_to_frontload, previous_frontload_pivot)
+            },
+            {%- endfor %}
+            _ => unreachable!("The valid Archetype IDs are known at compile time")
+        }
+    }
+
 {%- for archetype in world.archetypes %}
 
     /// Frontloads entities provided by their IDs (e.g., from quadtree results).
