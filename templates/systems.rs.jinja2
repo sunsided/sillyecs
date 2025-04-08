@@ -10,6 +10,25 @@ pub enum SystemId {
     {%- else %}
     /// The [`{{ system.name.raw }}`]({{ system.name.type }}) system.
     {%- endif %}
+    {%- if (system.inputs | length > 0) %}
+    ///
+    /// ### Reads
+    /// {% for input in system.inputs %}
+    /// - [`{{ input.type }}`]{% endfor %}
+    {%- endif %}
+    {%- if (system.outputs | length > 0) %}
+    ///
+    /// ### Mutates
+    /// {% for output in system.outputs %}
+    /// - [`{{ output.type }}`]{% endfor %}
+    {%- endif %}
+    {%- if system.affected_archetype_count > 0 %}
+    ///
+    /// # Archetype Use
+    /// This component processes components in the following archetypes:
+    /// {% for archetype in system.affected_archetypes %}
+    /// - [`{{archetype.type}}`] ([`ArchetypeId::{{archetype.raw}}`]){%- endfor %}
+    {%- endif %}
     {{ system.name.raw }} = {{ system.id }},
     {%- endfor %}
 }
@@ -266,14 +285,25 @@ pub trait System{{ phase.name.type }}Events {
 ///
 /// The business logic is implemented via the [`Apply{{ system.name.type }}`] trait.
 /// See also [`{{ system.name.raw }}Data`] for the systems-specific data.
+{%- if (system.inputs | length > 0) %}
 ///
 /// ### Reads
 /// {% for input in system.inputs %}
 /// - [`{{ input.type }}`]{% endfor %}
+{%- endif %}
+{%- if (system.outputs | length > 0) %}
 ///
 /// ### Mutates
 /// {% for output in system.outputs %}
 /// - [`{{ output.type }}`]{% endfor %}
+{%- endif %}
+{%- if system.affected_archetype_count > 0 %}
+///
+/// # Archetype Use
+/// This component processes components in the following archetypes:
+/// {% for archetype in system.affected_archetypes %}
+/// - [`{{archetype.type}}`] ([`ArchetypeId::{{archetype.raw}}`]){%- endfor %}
+{%- endif %}
 #[derive(Debug)]
 pub struct {{ system.name.type }}({{ system.name.type }}Data);
 
