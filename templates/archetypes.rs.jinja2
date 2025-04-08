@@ -688,7 +688,9 @@ pub trait FrontloadEntitiesScan:
         loop {
             // Move left pointer forward until an invalid entry is found
             while left <= right {
-                let reference = self.get_at(left).unwrap();
+                let Some(reference) = self.get_at(left) else {
+                    break;
+                };
                 if should_frontload(&reference) {
                     left += 1;
                 } else {
@@ -698,7 +700,9 @@ pub trait FrontloadEntitiesScan:
 
             // Move right pointer backward until a valid entry is found
             while left <= right {
-                let reference = self.get_at(right).unwrap();
+                let Some(reference) = self.get_at(right) else {
+                    break;
+                };
                 if !should_frontload(&reference) {
                     right = right.wrapping_sub(1);
                 } else {
@@ -734,6 +738,19 @@ pub trait FrontloadEntitiesScan:
 }
 {%- for archetype in ecs.archetypes %}
 
+impl GetEntityRef for {{ archetype.name.type }} {
+    type EntityRef<'archetype> = {{ archetype.name.raw }}EntityRef<'archetype>;
+
+    /// See [`{{ archetype.name.type }}::get_at`]({{ archetype.name.type }}::get_at).
+    #[inline(always)]
+    #[allow(clippy::needless_lifetimes)]
+    fn get_at<'archetype>(&'archetype self, index: usize) -> Option<Self::EntityRef<'archetype>> {
+        self.get_at(index)
+    }
+}
+{%- endfor %}
+{%- for archetype in ecs.archetypes %}
+
 impl FrontloadEntities for {{ archetype.name.type }} {
     /// Swaps two entities in the archetype.
     ///
@@ -749,15 +766,5 @@ impl FrontloadEntities for {{ archetype.name.type }} {
     }
 }
 
-impl GetEntityRef for {{ archetype.name.type }} {
-    type EntityRef<'archetype> = {{ archetype.name.raw }}EntityRef<'archetype>;
-
-    #[allow(clippy::needless_lifetimes)]
-    fn get_at<'archetype>(&'archetype self, index: usize) -> Option<Self::EntityRef<'archetype>> {
-        self.get_at(index)
-    }
-}
-
-impl FrontloadEntitiesScan for {{ archetype.name.type }} {
-}
+impl FrontloadEntitiesScan for {{ archetype.name.type }} { }
 {%- endfor %}
