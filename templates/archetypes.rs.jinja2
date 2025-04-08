@@ -558,6 +558,15 @@ impl PartialEq<ArchetypeId> for {{ archetype.name.type }} {
     }
 }
 {%- endfor %}
+
+pub trait GetEntityRef {
+    type EntityRef<'archetype>
+    where
+        Self: 'archetype;
+
+    #[allow(clippy::needless_lifetimes)]
+    fn get_at<'archetype>(&'archetype self, index: usize) -> Option<Self::EntityRef<'archetype>>;
+}
 {%- for archetype in ecs.archetypes %}
 
 impl core::ops::Index<usize> for {{ archetype.name.type }} {
@@ -569,10 +578,14 @@ impl core::ops::Index<usize> for {{ archetype.name.type }} {
 }
 {%- endfor %}
 
-pub trait FrontloadEntities: Archetype + core::ops::Index<usize, Output = EntityId> {
+#[allow(dead_code)]
+pub trait FrontloadEntities:
+    Archetype
+    + core::ops::Index<usize, Output = EntityId>
+{
     /// Frontloads entities provided by their IDs (e.g., from quadtree results).
     /// Returns the count of frontloaded entities.
-    fn frontload_entities_by_ids(
+    fn frontload(
         &mut self,
         entity_lookup: &mut EntityLocationMap<EntityId, EntityArchetypeRef>,
         entities_to_frontload: &[EntityId],
@@ -632,6 +645,75 @@ pub trait FrontloadEntities: Archetype + core::ops::Index<usize, Output = Entity
 
     fn swap_entities(&mut self, current_idx: usize, new_idx: usize);
 }
+
+#[allow(dead_code)]
+pub trait FrontloadEntitiesScan:
+    Archetype
+    + FrontloadEntities
+    + GetEntityRef
+    + core::ops::Index<usize, Output = EntityId>
+{
+    /// Frontloads entities satisfying `should_frontload`.
+    /// Returns the number of entities frontloaded.
+    fn frontload_scan<F>(
+        &mut self,
+        entity_lookup: &mut EntityLocationMap<EntityId, EntityArchetypeRef>,
+        should_frontload: F,
+    ) -> usize
+    where
+        for<'archetype> F: Fn(&<Self as GetEntityRef>::EntityRef<'archetype>) -> bool,
+    {
+        let mut left = 0;
+        let mut right = self.len().wrapping_sub(1);
+        let mut swaps_made = Vec::new();
+
+        loop {
+            // Move left pointer forward until an invalid entry is found
+            while left <= right {
+                let reference = self.get_at(left).unwrap();
+                if should_frontload(&reference) {
+                    left += 1;
+                } else {
+                    break;
+                }
+            }
+
+            // Move right pointer backward until a valid entry is found
+            while left <= right {
+                let reference = self.get_at(right).unwrap();
+                if !should_frontload(&reference) {
+                    right = right.wrapping_sub(1);
+                } else {
+                    break;
+                }
+            }
+
+            if left >= right {
+                break;
+            }
+
+            // Swap entities and record swapped indices
+            self.swap_entities(left, right);
+            swaps_made.push((left, self[left]));
+            swaps_made.push((right, self[right]));
+
+            left += 1;
+            right = right.wrapping_sub(1);
+        }
+
+        // Only update indices for swapped entities
+        for (index, entity_id) in swaps_made {
+            let reference = EntityArchetypeRef {
+                archetype: Self::ID,
+                index,
+            };
+            entity_lookup.insert(entity_id, reference);
+        }
+
+        // At this point, `left` indicates how many entities are valid (frontloaded)
+        left
+    }
+}
 {%- for archetype in ecs.archetypes %}
 
 impl FrontloadEntities for {{ archetype.name.type }} {
@@ -649,7 +731,15 @@ impl FrontloadEntities for {{ archetype.name.type }} {
     }
 }
 
-impl {{ archetype.name.type }} {
+impl GetEntityRef for {{ archetype.name.type }} {
+    type EntityRef<'archetype> = {{ archetype.name.raw }}EntityRef<'archetype>;
 
+    #[allow(clippy::needless_lifetimes)]
+    fn get_at<'archetype>(&'archetype self, index: usize) -> Option<Self::EntityRef<'archetype>> {
+        self.get_at(index)
+    }
+}
+
+impl FrontloadEntitiesScan for {{ archetype.name.type }} {
 }
 {%- endfor %}
