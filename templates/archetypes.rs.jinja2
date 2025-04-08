@@ -69,13 +69,15 @@ pub enum ArchetypeId {
     {%- endfor %}
 }
 
-#[allow(dead_code)]
 impl ArchetypeId {
     {%- for archetype in ecs.archetypes %}
     /// A [`NonZeroU64`](core::num::NonZeroU64) representation of [`ArchetypeId::{{ archetype.name.raw }}`](ArchetypeId::{{ archetype.name.raw }}) archetype.
     pub const {{ archetype.name.field | upper }}_ID_VALUE: core::num::NonZeroU64 = core::num::NonZeroU64::new({{ archetype.id }}).expect("Error at ECS construction time");
     {%- endfor %}
+}
 
+#[allow(dead_code)]
+impl ArchetypeId {
     /// Returns this ID as a [`NonZeroU64`](core::num::NonZeroU64) value.
     pub const fn as_nonzero_u64(&self) -> core::num::NonZeroU64 {
         match self {

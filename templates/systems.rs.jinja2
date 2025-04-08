@@ -1,22 +1,45 @@
 /// The ID of a [`System`].
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
-pub struct SystemId(core::num::NonZeroU64);
+#[repr(u32)]
+pub enum SystemId {
+    {%- for system in ecs.systems %}
+    {%- if system.description %}
+    /// {{ system.description }}
+    ///
+    /// For details, see the [`{{ system.name.type }}`]({{ system.name.type }}) Struct.
+    {%- else %}
+    /// The [`{{ system.name.raw }}`]({{ system.name.type }}) system.
+    {%- endif %}
+    {{ system.name.raw }} = {{ system.id }},
+    {%- endfor %}
+}
+
+impl SystemId {
+    {%- for system in ecs.systems %}
+    /// A [`NonZeroU64`](core::num::NonZeroU64) representation of [`SystemId::{{ system.name.raw }}`](SystemId::{{ system.name.raw }}) system.
+    pub const {{ system.name.field | upper }}_ID_VALUE: core::num::NonZeroU64 = core::num::NonZeroU64::new({{ system.id }}).expect("Error at ECS construction time");
+    {%- endfor %}
+}
 
 impl SystemId {
     /// Returns this ID as a [`NonZeroU64`](core::num::NonZeroU64) value.
     pub const fn as_nonzero_u64(&self) -> core::num::NonZeroU64 {
-        self.0
+        match self {
+            {%- for system in ecs.systems %}
+            Self::{{ system.name.raw }} => Self::{{ system.name.field | upper }}_ID_VALUE,
+            {%- endfor %}
+        }
     }
 
     /// Returns this ID as a `u64` value.
     pub const fn as_u64(&self) -> u64 {
-        self.0.get()
+        self.as_nonzero_u64().get()
     }
 }
 
 impl core::hash::Hash for SystemId {
     fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
-        self.0.hash(state);
+        self.as_u64().hash(state);
     }
 }
 
@@ -29,6 +52,16 @@ impl From<SystemId> for core::num::NonZeroU64 {
 impl From<SystemId> for u64 {
     fn from(value: SystemId) -> u64 {
         value.as_u64()
+    }
+}
+
+impl core::fmt::Display for SystemId {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> Result<(), core::fmt::Error> {
+        match self {
+            {%- for system in ecs.systems %}
+            Self::{{ system.name.raw }} => write!(f, "{{ system.name.raw }} (ID {{ system.id }})"),
+            {%- endfor %}
+        }
     }
 }
 
@@ -574,7 +607,7 @@ impl {{ system.name.type }} {
 
 #[automatically_derived]
 impl System for {{ system.name.type }} {
-    const ID: SystemId = SystemId(core::num::NonZeroU64::new({{ system.id }}).expect("A zero system ID was provided"));
+    const ID: SystemId = SystemId::{{ system.name.raw }};
 }
 
 impl PartialEq<SystemId> for {{ system.name.type }} {

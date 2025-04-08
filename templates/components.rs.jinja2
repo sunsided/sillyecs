@@ -79,6 +79,16 @@ impl From<ComponentId> for u64 {
     }
 }
 
+impl core::fmt::Display for ComponentId {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> Result<(), core::fmt::Error> {
+        match self {
+            {%- for component in ecs.components %}
+            Self::{{ component.name.raw }} => write!(f, "{{ component.name.raw }} (ID {{ component.id }})"),
+            {%- endfor %}
+        }
+    }
+}
+
 /// Marker trait for components.
 pub trait Component: 'static + Send + Sync {
     /// The ID of this component.
