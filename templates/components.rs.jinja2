@@ -10,6 +10,20 @@ pub enum ComponentId {
     {%- else %}
     /// The [`{{ component.name.raw }}`]({{ component.name.type }}) component.
     {%- endif %}
+    {%- if component.affected_archetype_count > 0 %}
+    ///
+    /// # Archetype Use
+    /// This component is used by the following archetypes:
+    /// {% for archetype in component.affected_archetypes %}
+    /// - [`{{archetype.type}}`] ([`ArchetypeId::{{archetype.raw}}`]){%- endfor %}
+    {%- endif %}
+    {%- if component.affected_archetype_count > 0 %}
+    ///
+    /// # System Use
+    /// This component is used by the following systems:
+    /// {% for system in component.affected_systems %}
+    /// - [`{{system.type}}`] ([`SystemId::{{system.raw}}`]){%- endfor %}
+    {%- endif %}
     {{ component.name.raw }} = {{ component.id }},
     {%- endfor %}
 }
@@ -82,10 +96,24 @@ pub trait Component: 'static + Send + Sync {
 {% if component.description %}
 /// {{ component.description }}
 {%- else %}
-/// A component.
+/// A `{{ component.name.raw }}` component.
 {%- endif %}
 ///
 /// See also [`{{ component.name.raw }}Data`] for the actual data.
+{%- if component.affected_archetype_count > 0 %}
+///
+/// # Archetype Use
+/// This component is used by the following archetypes:
+/// {% for archetype in component.affected_archetypes %}
+/// - [`{{archetype.type}}`] ([`ArchetypeId::{{archetype.raw}}`]){%- endfor %}
+{%- endif %}
+{%- if component.affected_archetype_count > 0 %}
+///
+/// # System Use
+/// This component is used by the following systems:
+/// {% for system in component.affected_systems %}
+/// - [`{{system.type}}`] ([`SystemId::{{system.raw}}`]){%- endfor %}
+{%- endif %}
 #[derive(Debug, Clone)]
 pub struct {{ component.name.type }}({{ component.name.raw }}Data);
 
