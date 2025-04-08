@@ -201,7 +201,12 @@ pub struct {{ world.name.type }}<E, Q> {
     phase_flags: ConditionalPhaseFlags,
     {%- endif %}
     /// The entity locator.
-    entity_locations: std::collections::HashMap<EntityId, EntityArchetypeRef>,
+    //
+    // Hashmap type not provided by design. Provide your own implementation such as fxhash::FxHashMap via type alias.
+    // Example:
+    //      type EntityLocationMap<K, V> = fxhash::FxHashMap<K, V>;
+    //
+    entity_locations: EntityLocationMap<EntityId, EntityArchetypeRef>,
     /// The frame context.
     context: FrameContext,
     {%- if ecs.any_phase_fixed %}
@@ -432,7 +437,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
         {{component_name.field}}: {{ component_name.type }},
         {%- endfor %}
     ) -> EntityId {
-        struct Registry<'a>(&'a mut std::collections::HashMap<EntityId, EntityArchetypeRef>);
+        struct Registry<'a>(&'a mut EntityLocationMap<EntityId, EntityArchetypeRef>);
 
         impl WorldEntityRegistry for Registry<'_> {
             #[inline(always)]
