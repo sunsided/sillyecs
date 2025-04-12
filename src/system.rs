@@ -1,13 +1,13 @@
-use std::collections::HashSet;
-use std::fmt::{Display, Formatter};
 use crate::Name;
 use crate::archetype::{Archetype, ArchetypeId, ArchetypeRef};
 use crate::component::ComponentName;
-use serde::{Deserialize, Deserializer, Serialize};
-use std::ops::Deref;
-use std::sync::atomic::AtomicU64;
 use crate::state::StateName;
 use crate::system_scheduler::{Access, Dependency, Resource};
+use serde::{Deserialize, Deserializer, Serialize};
+use std::collections::HashSet;
+use std::fmt::{Display, Formatter};
+use std::ops::Deref;
+use std::sync::atomic::AtomicU64;
 
 static SYSTEM_IDS: AtomicU64 = AtomicU64::new(1);
 
@@ -26,10 +26,16 @@ pub struct System {
     #[serde(default)]
     pub run_after: HashSet<SystemNameRef>,
     /// Whether the system requires access to entities.
-    #[serde(default, rename(serialize = "needs_entities", deserialize = "entities"))]
+    #[serde(
+        default,
+        rename(serialize = "needs_entities", deserialize = "entities")
+    )]
     pub entities: bool,
     /// Whether the system emits commands.
-    #[serde(default, rename(serialize = "emits_commands", deserialize = "commands"))]
+    #[serde(
+        default,
+        rename(serialize = "emits_commands", deserialize = "commands")
+    )]
     pub commands: bool,
     /// Whether the system requires access to the frame context.
     #[serde(default, rename(serialize = "needs_context", deserialize = "context"))]
@@ -62,7 +68,7 @@ pub struct System {
     pub component_untuple_code: String,
     /// The dependencies. Available after a call to [`System::finish_dependencies`](System::finish_dependencies) (e.g. via [`System::finish`](System::finish)).
     #[serde(skip)]
-    pub dependencies: Vec<Dependency>
+    pub dependencies: Vec<Dependency>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
@@ -72,7 +78,7 @@ pub struct StateUse {
     pub name: StateName,
     /// Whether write access is required.
     #[serde(default)]
-    pub write: bool
+    pub write: bool,
 }
 
 impl System {
@@ -80,28 +86,34 @@ impl System {
         self.dependencies.clear();
 
         // Add inputs as dependencies.
-        self.dependencies.extend(self.inputs.iter().map(|input| Dependency {
-            resource: Resource::Component(input.clone()),
-            access: Access::Read
-        }));
+        self.dependencies
+            .extend(self.inputs.iter().map(|input| Dependency {
+                resource: Resource::Component(input.clone()),
+                access: Access::Read,
+            }));
 
         // Add outputs as dependencies.
-        self.dependencies.extend(self.outputs.iter().map(|output| Dependency {
-            resource: Resource::Component(output.clone()),
-            access: Access::Write
-        }));
+        self.dependencies
+            .extend(self.outputs.iter().map(|output| Dependency {
+                resource: Resource::Component(output.clone()),
+                access: Access::Write,
+            }));
 
         // Add frame context and state to dependencies
         if self.context {
             self.dependencies.push(Dependency {
                 resource: Resource::FrameContext,
-                access: Access::Read
+                access: Access::Read,
             });
         }
         for state in &self.states {
             self.dependencies.push(Dependency {
                 resource: Resource::UserState(state.name.clone()),
-                access: if state.write { Access::Write } else { Access::Read }
+                access: if state.write {
+                    Access::Write
+                } else {
+                    Access::Read
+                },
             });
         }
     }
@@ -147,8 +159,7 @@ impl System {
             if self.entities {
                 self.component_iter_code = "entities".to_string();
                 self.component_untuple_code = "entity".to_string();
-            }
-            else if let Some(output) = self.outputs.first() {
+            } else if let Some(output) = self.outputs.first() {
                 self.component_iter_code = format!("{name}", name = output.field_name_plural);
                 self.component_untuple_code = format!("{name}", name = output.field_name);
             } else if let Some(input) = self.inputs.first() {
@@ -191,9 +202,7 @@ impl System {
                     iter_stack = "entities.iter()".to_string();
                     untuple_stack = "entity".to_string();
                 } else {
-                    iter_stack = format!(
-                        "entities.iter().zip({iter_stack})",
-                    );
+                    iter_stack = format!("entities.iter().zip({iter_stack})",);
                     untuple_stack = format!("(entity, {untuple_stack})");
                 }
             }
@@ -239,7 +248,7 @@ pub struct SystemPhase {
     pub fixed_hertz: f32,
     /// Indicates whether this phase is fixed. Available after a call to [`SystemPhase::finish`](SystemPhase::finish).
     #[serde(default, skip_deserializing)]
-    pub fixed: bool
+    pub fixed: bool,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Default)]
@@ -254,7 +263,7 @@ pub enum FixedTiming {
 impl<'de> Deserialize<'de> for FixedTiming {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: Deserializer<'de>
+        D: Deserializer<'de>,
     {
         let str = String::deserialize(deserializer)?;
         let str = str.to_ascii_lowercase();
@@ -263,26 +272,42 @@ impl<'de> Deserialize<'de> for FixedTiming {
         } else if str == "true" {
             Ok(FixedTiming::Fixed)
         } else if let Some(number) = str.strip_suffix("hz") {
-            let hertz = number.trim().parse::<f32>().map_err(serde::de::Error::custom)?;
+            let hertz = number
+                .trim()
+                .parse::<f32>()
+                .map_err(serde::de::Error::custom)?;
             Ok(FixedTiming::FixedHertz(hertz))
         } else if let Some(number) = str.strip_suffix("seconds") {
-            let secs = number.trim().parse::<f32>().map_err(serde::de::Error::custom)?;
+            let secs = number
+                .trim()
+                .parse::<f32>()
+                .map_err(serde::de::Error::custom)?;
             Ok(FixedTiming::FixedSecs(secs))
         } else if let Some(number) = str.strip_suffix("secs") {
-            let secs = number.trim().parse::<f32>().map_err(serde::de::Error::custom)?;
+            let secs = number
+                .trim()
+                .parse::<f32>()
+                .map_err(serde::de::Error::custom)?;
             Ok(FixedTiming::FixedSecs(secs))
         } else if let Some(number) = str.strip_suffix("sec") {
-            let secs = number.trim().parse::<f32>().map_err(serde::de::Error::custom)?;
+            let secs = number
+                .trim()
+                .parse::<f32>()
+                .map_err(serde::de::Error::custom)?;
             Ok(FixedTiming::FixedSecs(secs))
         } else if let Some(number) = str.strip_suffix("s") {
-            let secs = number.trim().parse::<f32>().map_err(serde::de::Error::custom)?;
+            let secs = number
+                .trim()
+                .parse::<f32>()
+                .map_err(serde::de::Error::custom)?;
             Ok(FixedTiming::FixedSecs(secs))
         } else {
-            Err(serde::de::Error::custom(format!("Invalid fixed timing: {str}")))
+            Err(serde::de::Error::custom(format!(
+                "Invalid fixed timing: {str}"
+            )))
         }
     }
 }
-
 
 impl SystemPhase {
     pub(crate) fn finish(&mut self) {
@@ -330,7 +355,6 @@ impl<'de> Deserialize<'de> for SystemPhaseName {
         Ok(Self(Name::new(type_name, "Phase")))
     }
 }
-
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 #[serde(transparent)]

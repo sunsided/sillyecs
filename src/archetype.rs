@@ -1,8 +1,8 @@
 use crate::Name;
 use crate::component::{Component, ComponentId, ComponentRef};
-use serde::{Deserialize, Deserializer, Serialize};
 use core::ops::Deref;
 use core::sync::atomic::AtomicU64;
+use serde::{Deserialize, Deserializer, Serialize};
 
 static ARCHETYPE_IDS: AtomicU64 = AtomicU64::new(1);
 

@@ -586,6 +586,8 @@ pub trait GetEntityRef {
     where
         Self: 'archetype;
 
+    fn is_empty(&self) -> bool;
+
     #[allow(clippy::needless_lifetimes, dead_code)]
     fn get_at<'archetype>(&'archetype self, index: usize) -> Option<Self::EntityRef<'archetype>>;
 
@@ -711,6 +713,10 @@ pub trait FrontloadEntitiesScan:
     where
         for<'archetype> F: FnMut(&<Self as GetEntityRef>::EntityRef<'archetype>) -> bool,
     {
+        if Archetype::is_empty(self) {
+            return 0;
+        }
+
         let mut left = 0;
         let mut right = self.len().wrapping_sub(1);
         let mut swaps_made = Vec::new();
@@ -778,6 +784,10 @@ pub trait FrontloadEntitiesScan:
 
 impl GetEntityRef for {{ archetype.name.type }} {
     type EntityRef<'archetype> = {{ archetype.name.raw }}EntityRef<'archetype>;
+
+    fn is_empty(&self) -> bool {
+       self.is_empty()
+    }
 
     /// See [`{{ archetype.name.type }}::get_at`]({{ archetype.name.type }}::get_at).
     #[inline(always)]

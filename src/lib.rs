@@ -2,10 +2,10 @@ mod archetype;
 mod code;
 mod component;
 mod ecs;
+mod state;
 mod system;
 mod system_scheduler;
 mod world;
-mod state;
 
 pub use crate::code::EcsCode;
 use serde::Serialize;

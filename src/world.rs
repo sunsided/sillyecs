@@ -1,14 +1,14 @@
 use crate::Name;
 use crate::archetype::{Archetype, ArchetypeRef};
+use crate::ecs::EcsError;
+use crate::state::State;
 use crate::system::{System, SystemPhase, SystemPhaseRef};
+use crate::system_scheduler::schedule_systems;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 use std::ops::Deref;
 use std::sync::atomic::AtomicU64;
-use crate::ecs::EcsError;
-use crate::state::State;
-use crate::system_scheduler::schedule_systems;
 
 static WORLD_IDS: AtomicU64 = AtomicU64::new(1);
 
@@ -34,7 +34,13 @@ pub struct World {
 }
 
 impl World {
-    pub(crate) fn finish(&mut self, archetypes: &[Archetype], systems: &[System], states: &[State], phases: &[SystemPhase]) -> Result<(), EcsError> {
+    pub(crate) fn finish(
+        &mut self,
+        archetypes: &[Archetype],
+        systems: &[System],
+        states: &[State],
+        phases: &[SystemPhase],
+    ) -> Result<(), EcsError> {
         let mut used_systems = HashSet::new();
         let mut used_states = HashSet::new();
         for archetype in archetypes {
@@ -53,7 +59,11 @@ impl World {
 
                 for state in system.states.iter() {
                     if used_states.insert(state.name.clone()) {
-                        let state = states.iter().find(|s| s.name.eq(&state.name)).cloned().expect("Failed to find state that is known to exist");
+                        let state = states
+                            .iter()
+                            .find(|s| s.name.eq(&state.name))
+                            .cloned()
+                            .expect("Failed to find state that is known to exist");
 
                         assert!(
                             !self.states.iter().any(|s| s.name.eq(&state.name)),

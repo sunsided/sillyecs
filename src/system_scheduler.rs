@@ -14,10 +14,10 @@
 //! respecting all dependencies and constraints.
 
 use crate::component::ComponentName;
-use crate::system::{System, SystemId};
-use std::collections::{HashMap, HashSet};
 use crate::ecs::EcsError;
 use crate::state::StateNameRef;
+use crate::system::{System, SystemId};
+use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub enum Access {
@@ -38,7 +38,7 @@ pub enum Resource {
     /// The system accesses the frame context.
     FrameContext,
     /// The system accesses user state.
-    UserState(StateNameRef)
+    UserState(StateNameRef),
 }
 
 /// Schedules systems into parallelizable batches using resource dependencies and forced `run_after` ordering.
@@ -72,8 +72,13 @@ pub fn schedule_systems(systems: &[System]) -> Result<Vec<Vec<SystemId>>, EcsErr
     for sys in systems {
         for run_after_name in &sys.run_after {
             // Find the system by name.
-            let pred = systems.iter().find(|s| s.name.eq(run_after_name))
-                .expect(&format!("Failed to find system {name} specified in run_after", name = run_after_name.type_name_raw));
+            let pred = systems
+                .iter()
+                .find(|s| s.name.eq(run_after_name))
+                .expect(&format!(
+                    "Failed to find system {name} specified in run_after",
+                    name = run_after_name.type_name_raw
+                ));
             // Add forced edge: pred -> sys.
             graph.entry(pred.id).or_default().push(sys.id);
             *in_degree.entry(sys.id).or_default() += 1;
@@ -93,10 +98,16 @@ pub fn schedule_systems(systems: &[System]) -> Result<Vec<Vec<SystemId>>, EcsErr
         for dep in &sys.dependencies {
             match dep.access {
                 Access::Read => {
-                    readers.entry(dep.resource.clone()).or_default().insert(sys.id);
+                    readers
+                        .entry(dep.resource.clone())
+                        .or_default()
+                        .insert(sys.id);
                 }
                 Access::Write => {
-                    writers.entry(dep.resource.clone()).or_default().insert(sys.id);
+                    writers
+                        .entry(dep.resource.clone())
+                        .or_default()
+                        .insert(sys.id);
                 }
             }
         }
@@ -122,8 +133,14 @@ pub fn schedule_systems(systems: &[System]) -> Result<Vec<Vec<SystemId>>, EcsErr
                 let writer_sys = systems_by_id.get(&writer).unwrap();
                 let reader_sys = systems_by_id.get(&reader).unwrap();
                 // If either system forces the other, skip the resource candidate edge.
-                let forced = writer_sys.run_after.iter().any(|name| name.eq(&reader_sys.name))
-                    || reader_sys.run_after.iter().any(|name| name.eq(&writer_sys.name));
+                let forced = writer_sys
+                    .run_after
+                    .iter()
+                    .any(|name| name.eq(&reader_sys.name))
+                    || reader_sys
+                        .run_after
+                        .iter()
+                        .any(|name| name.eq(&writer_sys.name));
                 if forced {
                     continue;
                 }
@@ -231,10 +248,10 @@ pub fn schedule_systems(systems: &[System]) -> Result<Vec<Vec<SystemId>>, EcsErr
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::Name;
     use crate::component::ComponentName;
     use crate::system::{System, SystemId, SystemName, SystemPhaseName, SystemPhaseRef};
-    use super::*;
 
     fn sysname(name: &str) -> SystemName {
         SystemName(Name::new(name.to_string(), "System"))
@@ -248,7 +265,13 @@ mod tests {
         SystemPhaseName(Name::new(name.to_string(), "Phase"))
     }
 
-    fn create_system(id: u64, name: &str, inputs: Vec<&str>, outputs: Vec<&str>, prefer_after: Vec<&str>) -> System {
+    fn create_system(
+        id: u64,
+        name: &str,
+        inputs: Vec<&str>,
+        outputs: Vec<&str>,
+        prefer_after: Vec<&str>,
+    ) -> System {
         let mut system = System {
             id: SystemId(id),
             name: sysname(name),
@@ -266,7 +289,7 @@ mod tests {
             component_iter_code: String::new(),
             component_untuple_code: String::new(),
             description: None,
-            dependencies: Default::default()
+            dependencies: Default::default(),
         };
         system.finish_dependencies();
         system
@@ -295,15 +318,18 @@ mod tests {
             counter += 1;
         }
 
-        assert_eq!(ordered, vec![
-            // First group
-            (0, "Transformer"), // reads x, writes y
-            // Second group
-            (1, "Consumer"),    // reads y
-            (1, "Backflow"),    // reads y, writes x
-            // Third group
-            (2, "Producer")     // reads x
-        ]);
+        assert_eq!(
+            ordered,
+            vec![
+                // First group
+                (0, "Transformer"), // reads x, writes y
+                // Second group
+                (1, "Consumer"), // reads y
+                (1, "Backflow"), // reads y, writes x
+                // Third group
+                (2, "Producer") // reads x
+            ]
+        );
     }
 
     #[test]
@@ -327,13 +353,16 @@ mod tests {
             counter += 1;
         }
 
-        assert_eq!(ordered, vec![
-            // First group
-            (0, "Consumer"),   // reads y
-            (0, "Backflow"),   // reads y, writes x
-            // Second group
-            (1, "Producer"),   // reads x
-            (1, "Transformer") // reads x, writes y, forced to run after Consumer
-        ]);
+        assert_eq!(
+            ordered,
+            vec![
+                // First group
+                (0, "Consumer"), // reads y
+                (0, "Backflow"), // reads y, writes x
+                // Second group
+                (1, "Producer"),    // reads x
+                (1, "Transformer")  // reads x, writes y, forced to run after Consumer
+            ]
+        );
     }
 }
