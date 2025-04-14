@@ -155,6 +155,7 @@ pub trait Archetype: 'static + Send + Sync {
     fn len(&self) -> usize;
 
     /// Indicates whether this archetype has no entities.
+    #[allow(dead_code)]
     fn is_empty(&self) -> bool {
         self.len() == 0
     }
@@ -457,6 +458,7 @@ impl {{ archetype.name.type }} {
 
     /// Indicates whether this archetype has no entities.
     #[inline(always)]
+    #[allow(dead_code)]
     pub fn is_empty(&self) -> bool {
         self.entities.is_empty()
     }
@@ -586,6 +588,7 @@ pub trait GetEntityRef {
     where
         Self: 'archetype;
 
+    #[allow(dead_code)]
     fn is_empty(&self) -> bool;
 
     #[allow(clippy::needless_lifetimes, dead_code)]
@@ -785,6 +788,7 @@ pub trait FrontloadEntitiesScan:
 impl GetEntityRef for {{ archetype.name.type }} {
     type EntityRef<'archetype> = {{ archetype.name.raw }}EntityRef<'archetype>;
 
+    #[allow(dead_code)]
     fn is_empty(&self) -> bool {
        self.is_empty()
     }
