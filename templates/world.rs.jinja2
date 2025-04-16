@@ -200,13 +200,6 @@ pub struct {{ world.name.type }}<E, Q> {
     /// Flags for conditional phase execution.
     phase_flags: ConditionalPhaseFlags,
     {%- endif %}
-    /// The entity locator.
-    //
-    // Hashmap type not provided by design. Provide your own implementation such as fxhash::FxHashMap via type alias.
-    // Example:
-    //      type EntityLocationMap<K, V> = fxhash::FxHashMap<K, V>;
-    //
-    entity_locations: EntityLocationMap<EntityId, EntityArchetypeRef>,
     /// The frame context.
     context: FrameContext,
     {%- if ecs.any_phase_fixed %}
@@ -251,6 +244,20 @@ pub struct {{ world.name.type }}States {
 /// The archetypes used in the world.
 #[derive(Debug, Clone, Default)]
 struct {{ world.name.type }}Archetypes {
+    /// The entity locator.
+    //
+    // Hashmap type not provided by design. Provide your own implementation such as fxhash::FxHashMap via type alias.
+    // Example:
+    //      type EntityLocationMap<K, V> = fxhash::FxHashMap<K, V>;
+    //
+    entity_locations: EntityLocationMap<EntityId, EntityArchetypeRef>,
+
+    pub collection: {{ world.name.type }}ArchetypeCollection
+}
+
+/// The archetypes used in the world.
+#[derive(Debug, Clone, Default)]
+struct {{ world.name.type }}ArchetypeCollection {
     {%- for archetype in ecs.archetypes %}
     pub {{ archetype.name.field | snake_case }}: {{ archetype.name.type }},
     {%- endfor %}
@@ -365,7 +372,6 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                 {{ system.name.field }}: CreateSystem::<{{ system.name.type }}>::create(create_systems),
                 {%- endfor %}
             },
-            entity_locations: Default::default(),
             {%- if ecs.any_phase_on_request %}
             phase_flags: ConditionalPhaseFlags::default(),
             {%- endif %}
@@ -393,12 +399,12 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
 
     /// Returns the overall number of entities in this world.
     pub fn len(&self) -> usize {
-        self.entity_locations.len()
+        self.archetypes.entity_locations.len()
     }
 
     /// Indicates whether there are no entities in this world.
     pub fn is_empty(&self) -> bool {
-        self.entity_locations.is_empty()
+        self.archetypes.entity_locations.is_empty()
     }
 
     /// De-spawns an entity given by its [`EntityId`]. Returns an error if the entity was unknown in this world.
@@ -415,37 +421,6 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
     }
     {%- endif %}
     {%- endfor %}
-    {%- for component, archetypes in world.components|items %}
-
-    /// Gets the `{{component.raw}}` component of the specified entity.
-    #[allow(dead_code)]
-    #[inline]
-    pub fn get_{{component.field}}_component(&self, entity_id: EntityId) -> Option<&{{component.type}}> {
-        let ear = self.entity_locations.get(&entity_id)?;
-        match ear.archetype {
-            {%- for archetype in archetypes %}
-            {{ archetype.type }}::ID => self.archetypes.{{ archetype.field }}.get_{{component.field}}_component_at(ear.index),
-            {%- endfor %}
-            #[allow(dead_code)]
-            _ => None
-        }
-    }
-
-    /// Mutably gets the `{{component.raw}}` component of the specified entity.
-    #[allow(dead_code)]
-    #[inline]
-    pub fn get_{{component.field}}_component_mut(&mut self, entity_id: EntityId) -> Option<&mut {{component.type}}> {
-        let ear = self.entity_locations.get(&entity_id)?;
-        match ear.archetype {
-            {%- for archetype in archetypes %}
-            {{ archetype.type }}::ID => self.archetypes.{{ archetype.field }}.get_{{component.field}}_component_at_mut(ear.index),
-            {%- endfor %}
-            #[allow(dead_code)]
-            _ => None
-        }
-    }
-
-    {%- endfor %}
     {%- for archetype in world.archetypes %}
 
     /// Accesses the `{{ archetype.name.raw }}` entity with the given ID if it exists in this archetype.
@@ -453,12 +428,12 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
         &self,
         entity_id: EntityId
     ) -> Option<{{ archetype.name.raw }}EntityRef> {
-        let ear = self.entity_locations.get(&entity_id)?;
+        let ear = self.archetypes.entity_locations.get(&entity_id)?.clone();
         if ear.archetype != {{ archetype.name.type }}::ID {
             return None;
         }
-        self
-            .archetypes
+        self.archetypes
+            .collection
             .{{ archetype.name.field }}
             .get_entity_at(ear.index)
     }
@@ -468,12 +443,12 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
         &mut self,
         entity_id: EntityId
     ) -> Option<{{ archetype.name.raw }}EntityMut> {
-        let ear = self.entity_locations.get(&entity_id)?;
+        let ear = self.archetypes.entity_locations.get(&entity_id)?.clone();
         if ear.archetype != {{ archetype.name.type }}::ID {
             return None;
         }
-        self
-            .archetypes
+        self.archetypes
+            .collection
             .{{ archetype.name.field }}
             .get_entity_at_mut(ear.index)
     }
@@ -508,12 +483,15 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
             }
         }
 
-        self.archetypes.{{ archetype.name.field }}
+        let registry = Registry(&mut self.archetypes.entity_locations);
+        self.archetypes
+            .collection
+            .{{ archetype.name.field }}
             .spawn_with(
                 {%- for component_name in archetype.components %}
                 {{component_name.field}},
                 {%- endfor %}
-                Registry(&mut self.entity_locations)
+                registry
             )
     }
     {%- endfor %}
@@ -815,13 +793,13 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                 {%- endif %}
                 {%- endfor %}
                 {%- if system.needs_entities %}
-                &self.archetypes.{{ archetype.field }}.entities,
+                &self.archetypes.collection.{{ archetype.field }}.entities,
                 {%- endif %}
                 {%- for input in system.inputs %}
-                &self.archetypes.{{ archetype.field }}.{{ input.fields }},
+                &self.archetypes.collection.{{ archetype.field }}.{{ input.fields }},
                 {%- endfor %}
                 {%- for output in system.outputs %}
-                &mut self.archetypes.{{ archetype.field }}.{{ output.fields }},
+                &mut self.archetypes.collection.{{ archetype.field }}.{{ output.fields }},
                 {%- endfor %}
                 {%- if system.emits_commands %}
                 &self.command_queue
@@ -949,13 +927,13 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                             {%- endif %}
                             {%- endfor %}
                             {%- if system.needs_entities %}
-                            &self.archetypes.{{ archetype.field }}.entities,
+                            &self.archetypes.collection.{{ archetype.field }}.entities,
                             {%- endif %}
                             {%- for input in system.inputs %}
-                            &self.archetypes.{{ archetype.field }}.{{ input.fields }},
+                            &self.archetypes.collection.{{ archetype.field }}.{{ input.fields }},
                             {%- endfor %}
                             {%- for output in system.outputs %}
-                            &mut self.archetypes.{{ archetype.field }}.{{ output.fields }},
+                            &mut self.archetypes.collection.{{ archetype.field }}.{{ output.fields }},
                             {%- endfor %}
                             {%- if system.emits_commands %}
                             &self.command_queue
@@ -1048,11 +1026,12 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
     }
 
     fn handle_despawn_command(&mut self, id: EntityId) -> Result<(), DespawnError> {
-         if let Some(loc) = self.entity_locations.remove(&id) {
+         if let Some(loc) = self.archetypes.entity_locations.remove(&id) {
             let result = match loc.archetype {
                 {%- for archetype in world.archetypes %}
                 {{ archetype.name.type }}::ID => {
                     self.archetypes
+                        .collection
                         .{{ archetype.name.field }}
                         .drop_at_index(loc.index)
                         .map_err(|index| DespawnError::InvalidIndexInArchetype(index, {{ archetype.name.type }}::ID))?
@@ -1064,7 +1043,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
             };
 
             if let Some(moved_entity) = result {
-                self.entity_locations.insert(moved_entity, EntityArchetypeRef {
+                self.archetypes.entity_locations.insert(moved_entity, EntityArchetypeRef {
                     archetype: loc.archetype,
                     index: loc.index
                 });
@@ -1173,9 +1152,10 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
         previous_frontload_pivot: Option<usize>
     ) -> usize {
         self.archetypes
+            .collection
             .{{ archetype.name.field }}
             .frontload(
-                &mut self.entity_locations,
+                &mut self.archetypes.entity_locations,
                 entities_to_frontload,
                 previous_frontload_pivot
             )
@@ -1198,9 +1178,10 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
         I: AsRef<[usize]>
     {
         self.archetypes
+            .collection
             .{{ archetype.name.field }}
             .frontload_by_indices_sorted(
-                &mut self.entity_locations,
+                &mut self.archetypes.entity_locations,
                 indices_to_frontload,
                 previous_frontload_pivot
             )
@@ -1218,9 +1199,10 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
         for<'archetype> F: FnMut(&{{ archetype.name.raw }}EntityRef<'archetype>) -> bool,
     {
         self.archetypes
+            .collection
             .{{ archetype.name.field }}
             .frontload_scan(
-                &mut self.entity_locations,
+                &mut self.archetypes.entity_locations,
                 should_frontload
             )
     }
@@ -1254,14 +1236,14 @@ pub trait ComponentAccessMut: ComponentAccess {
 {%- for world in ecs.worlds %}
 
 //noinspection RsSortImplTraitMembers
-impl ComponentAccess for {{ world.name.type }}Archetypes {
+impl<E, Q> ComponentAccess for {{ world.name.type }}<E, Q> {
     {%- for component in world.components %}
 
     /// Gets the [`{{component.raw}}`]({{component.type}}) component of the specified entity.
     #[allow(dead_code, unused)]
     #[inline]
     fn get_{{component.field}}_component(&self, entity_id: EntityId) -> Option<&{{component.type}}> {
-        self.get_{{component.field}}_component(entity_id)
+        self.archetypes.get_{{component.field}}_component(entity_id)
     }
     {%- endfor %}
 }
@@ -1269,14 +1251,56 @@ impl ComponentAccess for {{ world.name.type }}Archetypes {
 {%- for world in ecs.worlds %}
 
 //noinspection RsSortImplTraitMembers
-impl ComponentAccessMut for {{ world.name.type }} {
+impl<E, Q> ComponentAccessMut for {{ world.name.type }}<E, Q> {
     {%- for component in world.components %}
 
     /// Mutably gets the [`{{component.raw}}`]({{component.type}}) component of the specified entity.
     #[allow(dead_code, unused)]
     #[inline]
     fn get_{{component.field}}_component_mut(&mut self, entity_id: EntityId) -> Option<&mut {{component.type}}> {
-        self.get_{{component.field}}_component_mut(entity_id)
+        self.archetypes.get_{{component.field}}_component_mut(entity_id)
+    }
+    {%- endfor %}
+}
+{%- endfor %}
+{%- for world in ecs.worlds %}
+
+//noinspection RsSortImplTraitMembers
+impl ComponentAccess for {{ world.name.type }}Archetypes {
+    {%- for component, archetypes in world.components|items %}
+
+    /// Gets the `{{component.raw}}` component of the specified entity.
+    #[allow(dead_code)]
+    fn get_{{component.field}}_component(&self, entity_id: EntityId) -> Option<&{{component.type}}> {
+        let ear = self.entity_locations.get(&entity_id)?.clone();
+        match ear.archetype {
+            {%- for archetype in archetypes %}
+            {{ archetype.type }}::ID => self.collection.{{ archetype.field }}.get_{{component.field}}_component_at(ear.index),
+            {%- endfor %}
+            #[allow(dead_code)]
+            _ => None
+        }
+    }
+    {%- endfor %}
+}
+{%- endfor %}
+{%- for world in ecs.worlds %}
+
+//noinspection RsSortImplTraitMembers
+impl ComponentAccessMut for {{ world.name.type }}Archetypes {
+    {%- for component, archetypes in world.components|items %}
+
+    /// Mutably gets the `{{component.raw}}` component of the specified entity.
+    #[allow(dead_code)]
+    fn get_{{component.field}}_component_mut(&mut self, entity_id: EntityId) -> Option<&mut {{component.type}}> {
+        let ear = self.entity_locations.get(&entity_id)?.clone();
+        match ear.archetype {
+            {%- for archetype in archetypes %}
+            {{ archetype.type }}::ID => self.collection.{{ archetype.field }}.get_{{component.field}}_component_at_mut(ear.index),
+            {%- endfor %}
+            #[allow(dead_code)]
+            _ => None
+        }
     }
     {%- endfor %}
 }
