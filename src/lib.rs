@@ -59,7 +59,7 @@ fn pluralize_name(field_name: String) -> String {
 }
 
 fn snake_case_filter(value: String) -> String {
-    pascal_to_snake(&value.trim())
+    pascal_to_snake(value.trim())
 }
 
 fn pascal_to_snake(type_name: &str) -> String {

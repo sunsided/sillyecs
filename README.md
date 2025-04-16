@@ -5,6 +5,18 @@ A silly little compile-time generated archetype ECS in Rust.
 [![Crates.io](https://img.shields.io/crates/v/sillyecs)](https://crates.io/crates/sillyecs)
 [![License](https://img.shields.io/badge/license-EUPL--1.2-blue.svg)](LICENSE)
 
+## Table of Contents
+
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+
+- [Installation](#installation)
+- [Usage](#usage)
+  - [Command Queue](#command-queue)
+- [Example Case: WGPU Shader Compilation](#example-case-wgpu-shader-compilation)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 ## Installation
 
 `sillyecs` is a build-time dependency. To use it, add this to your `Cargo.toml`:
@@ -95,7 +107,7 @@ systems:
   - name: Render
     phase: Render
     manual: true        # Require manual call to world.apply_system_phase_render()
-    # on_request: true  # call world.request_render_phase() to allow execution (resets atomically) 
+    # on_request: true  # call world.request_render_phase() to allow execution (resets atomically)
     states:
       - use: WgpuRender
         write: false  # optional
@@ -109,7 +121,7 @@ worlds:
       - Player
       - ForegroundObject
       - BackgroundObject
-  
+
 # Optional, if you're feeling lucky
 allow_unsafe: true
 ```
@@ -265,7 +277,7 @@ impl ApplyWgpuInitShaderSystem for WgpuInitShaderSystem {
             if shader.module.is_some() && !device_changed {
                 continue;
             }
-            
+
             let module = device.device().create_shader_module(shader.descriptor.clone());
             shader.module = Some(module);
         }

@@ -160,7 +160,7 @@ pub fn schedule_systems(systems: &[System]) -> Result<Vec<Vec<SystemId>>, EcsErr
     // If both directions are present, resolve the conflict using a tie-breaker.
     for ((a, b), dirs) in candidate_edges {
         let chosen = if dirs.len() == 1 {
-            dirs.iter().next().unwrap().clone()
+            *dirs.iter().next().unwrap()
         } else {
             // Conflict: both directions were proposed.
             // Tie-breaker: favor the edge that puts the system with a non-empty run_after list later.

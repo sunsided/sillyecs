@@ -174,7 +174,7 @@ impl System {
             for output in self.outputs.iter().rev() {
                 if iter_stack.is_empty() {
                     iter_stack = format!("{name}.iter_mut()", name = output.field_name_plural);
-                    untuple_stack = format!("{name}", name = output.field_name);
+                    untuple_stack = output.field_name.to_string();
                 } else {
                     iter_stack = format!(
                         "{name}.iter_mut().zip({iter_stack})",
@@ -187,7 +187,7 @@ impl System {
             for input in self.inputs.iter().rev() {
                 if iter_stack.is_empty() {
                     iter_stack = format!("{name}.iter()", name = input.field_name_plural);
-                    untuple_stack = format!("{name}", name = input.field_name);
+                    untuple_stack = input.field_name.to_string();
                 } else {
                     iter_stack = format!(
                         "{name}.iter().zip({iter_stack})",
