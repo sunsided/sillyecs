@@ -167,7 +167,10 @@ impl WorldCommandSender for CommandQueue {
 }
 ```
 
-## Example Case
+## Example Case: WGPU Shader Compilation
+
+Define the `WgpuRender` state, the `WgpuShader` component, a `WgpuShader` archetype that holds it, a `WgpuReinit`
+system phase and a `WgpuInitShader` system that uses the state to update the component:
 
 ```yaml
 
@@ -205,7 +208,7 @@ systems:
       - WgpuShader
 ```
 
-Define `WgpuShaderData`:
+Implement `WgpuShaderData` to hold shader definitions and the handle:
 
 ```rust
 use wgpu::{ShaderModule, ShaderModuleDescriptor, ShaderSource};
@@ -223,7 +226,7 @@ impl WgpuShaderData {
 }
 ```
 
-Define the `WgpuInitShaderSystem`:
+Implement the `WgpuInitShaderSystem` to compile and upload the shader:
 
 ```rust
 use std::convert::Infallible;
