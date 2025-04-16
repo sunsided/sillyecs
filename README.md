@@ -244,7 +244,7 @@ Implement the `WgpuInitShaderSystem` to compile and upload the shader:
 
 ```rust
 use std::convert::Infallible;
-use wgpu_resource_manager::{DeviceAndQueue, DeviceId};
+use wgpu_resource_manager::DeviceId;
 use crate::engine::{ApplyWgpuInitShaderSystem, CreateSystem, PhaseEvents, SystemFactory, SystemWgpuReinitPhaseEvents, WgpuInitShaderSystem, WgpuShaderComponent};
 use crate::engine::phases::render::WgpuRenderState;
 
