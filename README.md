@@ -13,7 +13,8 @@ A silly little compile-time generated archetype ECS in Rust.
 - [Installation](#installation)
 - [Usage](#usage)
   - [Command Queue](#command-queue)
-- [Example Case: WGPU Shader Compilation](#example-case-wgpu-shader-compilation)
+- [Examples](#examples)
+  - [WGPU Shader Compilation](#wgpu-shader-compilation)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -179,7 +180,9 @@ impl WorldCommandSender for CommandQueue {
 }
 ```
 
-## Example Case: WGPU Shader Compilation
+## Examples
+
+### WGPU Shader Compilation
 
 Define the `WgpuRender` state, the `WgpuShader` component, a `WgpuShader` archetype that holds it, a `WgpuReinit`
 system phase and a `WgpuInitShader` system that uses the state to update the component:
