@@ -12,7 +12,7 @@ A silly little compile-time generated archetype ECS in Rust.
 
 - [Installation](#installation)
 - [Usage](#usage)
-  - [Command Queue](#command-queue)
+  - [Command Queue and Application-Specific Commands](#command-queue-and-application-specific-commands)
 - [Examples](#examples)
   - [WGPU Shader Compilation](#wgpu-shader-compilation)
 
@@ -143,18 +143,18 @@ include!(concat!(env!("OUT_DIR"), "/world_gen.rs"));
 
 The compiler will tell you which traits and functions to implement.
 
-### Command Queue
+### Command Queue and Application-Specific Commands
 
 You will have to implement a command queue. Below is an example for a queue based on
 [`crossbeam-channel`](https://docs.rs/crossbeam/latest/crossbeam/channel):
 
 ```rust
-struct CommandQueue {
-    sender: crossbeam_channel::Sender<WorldCommand>,
-    receiver: crossbeam_channel::Receiver<WorldCommand>,
+struct CommandQueue<UserCommand> {
+    sender: crossbeam_channel::Sender<WorldCommand<UserCommand>>,
+    receiver: crossbeam_channel::Receiver<WorldCommand<UserCommand>>,
 }
 
-impl CommandQueue {
+impl<UserCommand> CommandQueue<UserCommand> {
     pub fn new() -> Self {
         let (sender, receiver) = crossbeam_channel::unbounded();
         Self {
@@ -164,7 +164,17 @@ impl CommandQueue {
     }
 }
 
-impl WorldCommandReceiver for CommandQueue {
+impl<UserCommand> WorldUserCommand for CommandQueue<UserCommand>
+where
+        UserCommand: Send + Debug
+{
+  type UserCommand = UserCommand;
+}
+
+impl<UserCommand> WorldCommandReceiver for CommandQueue<UserCommand>
+where
+        UserCommand: Send + Debug
+{
     type Error = TryRecvError;
 
     fn recv(&self) -> Result<Option<WorldCommand>, Self::Error> {
@@ -176,11 +186,28 @@ impl WorldCommandReceiver for CommandQueue {
     }
 }
 
-impl WorldCommandSender for CommandQueue {
+impl<UserCommand> WorldCommandSender for CommandQueue<UserCommand>
+where
+    UserCommand: Send + Debug
+{
     type Error = crossbeam_channel::SendError<WorldCommand>;
 
     fn send(&self, command: WorldCommand) -> Result<(), Self::Error> {
         self.sender.send(command)
+    }
+}
+```
+
+For each world, the `WorldUserCommandHandler` trait must be implemented:
+
+```rust
+
+impl<E, Q> WorldUserCommandHandler for MainWorld<E, Q>
+where
+    Q: WorldUserCommand
+{
+    fn handle_user_command(&mut self, command: Self::UserCommand) {
+        warn!(?command, "Unhandled user command");
     }
 }
 ```
