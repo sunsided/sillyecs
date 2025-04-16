@@ -46,6 +46,12 @@ pub struct System {
     /// Whether the system requires access to components of other entities, and which ones.
     #[serde(default)]
     pub lookup: Vec<ComponentRef>,
+    /// Whether the system uses a preflight phase.
+    #[serde(default)]
+    pub preflight: bool,
+    /// Whether the system uses a postflight phase.
+    #[serde(default)]
+    pub postflight: bool,
     /// The phase in which to run the system.
     pub phase: SystemPhaseRef,
     /// The optional input components to the system.

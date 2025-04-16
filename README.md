@@ -100,11 +100,16 @@ systems:
   - name: Physics
     phase: FixedUpdate
     context: true
-    run_after: []  # optional
+    run_after: []    # optional
+    preflight: true  # optional, extra scan before system run
+    postflight: true # optional, extra scan after system run
+    lookup:          # optional
+      - Particle     # request random access to particles in pre- or postflight
     inputs:
       - Velocity
     outputs:
       - Position
+
   - name: Render
     phase: Render
     manual: true        # Require manual call to world.apply_system_phase_render()

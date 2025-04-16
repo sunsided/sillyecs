@@ -377,8 +377,12 @@ pub trait Apply{{ system.name.type }}: System {
     ) -> Result<(), Self::Error> {
         Ok(())
     }
+    {%- if system.preflight %}
 
     /// Inspects all components before the actual operation starts.
+    ///
+    /// This function can be called multiple times, depending on the number of archetypes providing
+    /// the necessary components.
     ///
     /// ### Reads
     /// {% for input in system.inputs %}
@@ -387,7 +391,6 @@ pub trait Apply{{ system.name.type }}: System {
     /// ### Reads output to be mutated by the system
     /// {% for output in system.outputs %}
     /// - `{{ output.field }}`: A mutable slice of the components of type [`{{ output.type }}`].{% endfor %}
-    #[inline]
     #[allow(unused_variables)]
     fn preflight(
         &mut self,
@@ -416,12 +419,14 @@ pub trait Apply{{ system.name.type }}: System {
         {%- if system.emits_commands %}
         commands: &impl WorldCommandSender
         {%- endif %}
-    ) {
-        // Intentionally left blank.
-        // TODO: Make optional
-    }
+    );
+    {%- endif %}
+    {%- if system.postflight %}
 
     /// Inspects all components after the actual operation finished.
+    ///
+    /// This function can be called multiple times, depending on the number of archetypes providing
+    /// the necessary components.
     ///
     /// ### Reads
     /// {% for input in system.inputs %}
@@ -430,7 +435,6 @@ pub trait Apply{{ system.name.type }}: System {
     /// ### Reads output to be mutated by the system
     /// {% for output in system.outputs %}
     /// - `{{ output.field }}`: A mutable slice of the components of type [`{{ output.type }}`].{% endfor %}
-    #[inline]
     #[allow(unused_variables)]
     fn postflight(
         &mut self,
@@ -459,10 +463,8 @@ pub trait Apply{{ system.name.type }}: System {
         {%- if system.emits_commands %}
         commands: &impl WorldCommandSender
         {%- endif %}
-    ) {
-        // Intentionally left blank.
-        // TODO: Make optional
-    }
+    );
+    {%- endif %}
 
     /// Applies the system's business logic to the given entity components.
     ///

@@ -740,33 +740,112 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
             .inspect_err(|error| tracing::error!(?error, "{{ system.name.type }}::on_begin_phase returned an error"))
             .is_ok()
         {
-        {%- for archetype in system.affected_archetypes %}
-            // Apply {{ system.name.type }} to {{ archetype.type }}
-            self.systems.{{ system.name.field }}.apply_many(
-                {%- if system.needs_context %}
-                &self.context,
-                {%- endif %}
-                {%- for state in system.states %}
-                {%- if state.write %}
-                &mut self.states.{{ state.use.field }},
+            // Preflight
+            {
+                {%- if system.preflight %}
+                {%- for archetype in system.affected_archetypes %}
+                // Preflight of {{ system.name.type }} for {{ archetype.type }}
+                self.systems.{{ system.name.field }}.preflight(
+                    {%- if system.needs_context %}
+                    &self.context,
+                    {%- endif %}
+                    {%- if (system.lookup | count) > 0 %}
+                    Box::new(&self.archetypes),
+                    {%- endif -%}
+                    {%- for state in system.states %}
+                    {%- if state.write %}
+                    &mut self.states.{{ state.use.field }},
+                    {%- else %}
+                    &self.states.{{ state.use.field }},
+                    {%- endif %}
+                    {%- endfor %}
+                    {%- if system.needs_entities %}
+                    &self.archetypes.collection.{{ archetype.field }}.entities,
+                    {%- endif %}
+                    {%- for input in system.inputs %}
+                    &self.archetypes.collection.{{ archetype.field }}.{{ input.fields }},
+                    {%- endfor %}
+                    {%- for output in system.outputs %}
+                    &self.archetypes.collection.{{ archetype.field }}.{{ output.fields }},
+                    {%- endfor %}
+                    {%- if system.emits_commands %}
+                    &self.command_queue
+                    {%- endif %}
+                );
+                {%- endfor %}
                 {%- else %}
-                &self.states.{{ state.use.field }},
+                // System has no preflight step
                 {%- endif %}
+            }
+
+            // Systems
+            {
+                {%- for archetype in system.affected_archetypes %}
+                // Apply {{ system.name.type }} to {{ archetype.type }}
+                self.systems.{{ system.name.field }}.apply_many(
+                    {%- if system.needs_context %}
+                    &self.context,
+                    {%- endif %}
+                    {%- for state in system.states %}
+                    {%- if state.write %}
+                    &mut self.states.{{ state.use.field }},
+                    {%- else %}
+                    &self.states.{{ state.use.field }},
+                    {%- endif %}
+                    {%- endfor %}
+                    {%- if system.needs_entities %}
+                    &self.archetypes.collection.{{ archetype.field }}.entities,
+                    {%- endif %}
+                    {%- for input in system.inputs %}
+                    &self.archetypes.collection.{{ archetype.field }}.{{ input.fields }},
+                    {%- endfor %}
+                    {%- for output in system.outputs %}
+                    &mut self.archetypes.collection.{{ archetype.field }}.{{ output.fields }},
+                    {%- endfor %}
+                    {%- if system.emits_commands %}
+                    &self.command_queue
+                    {%- endif %}
+                );
                 {%- endfor %}
-                {%- if system.needs_entities %}
-                &self.archetypes.collection.{{ archetype.field }}.entities,
+            }
+
+            // Postflight
+            {
+                {%- if system.postflight %}
+                {%- for archetype in system.affected_archetypes %}
+                // Postflight of {{ system.name.type }} for {{ archetype.type }}
+                self.systems.{{ system.name.field }}.postflight(
+                    {%- if system.needs_context %}
+                    &self.context,
+                    {%- endif %}
+                    {%- if (system.lookup | count) > 0 %}
+                    Box::new(&self.archetypes),
+                    {%- endif -%}
+                    {%- for state in system.states %}
+                    {%- if state.write %}
+                    &mut self.states.{{ state.use.field }},
+                    {%- else %}
+                    &self.states.{{ state.use.field }},
+                    {%- endif %}
+                    {%- endfor %}
+                    {%- if system.needs_entities %}
+                    &self.archetypes.collection.{{ archetype.field }}.entities,
+                    {%- endif %}
+                    {%- for input in system.inputs %}
+                    &self.archetypes.collection.{{ archetype.field }}.{{ input.fields }},
+                    {%- endfor %}
+                    {%- for output in system.outputs %}
+                    &self.archetypes.collection.{{ archetype.field }}.{{ output.fields }},
+                    {%- endfor %}
+                    {%- if system.emits_commands %}
+                    &self.command_queue
+                    {%- endif %}
+                );
+                {%- endfor %}
+                {%- else %}
+                // System has no preflight step
                 {%- endif %}
-                {%- for input in system.inputs %}
-                &self.archetypes.collection.{{ archetype.field }}.{{ input.fields }},
-                {%- endfor %}
-                {%- for output in system.outputs %}
-                &mut self.archetypes.collection.{{ archetype.field }}.{{ output.fields }},
-                {%- endfor %}
-                {%- if system.emits_commands %}
-                &self.command_queue
-                {%- endif %}
-            );
-            {%- endfor %}
+            }
 
             self.systems.{{ system.name.field }}.on_end_phase(
                 {%- if system.needs_context %}
@@ -871,33 +950,112 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                 {%- for system in group %}
                 if is_{{ system.name.field }}_ready {
                     s.spawn(|_| {
-                        {%- for archetype in system.affected_archetypes %}
-                        // Apply {{ system.name.type }} to {{ archetype.type }}
-                        self.systems.{{ system.name.field }}.apply_many(
-                            {%- if system.needs_context %}
-                            &self.context,
-                            {%- endif %}
-                            {%- for state in system.states %}
-                            {%- if state.write %}
-                            &mut self.states.{{ state.use.field }},
+                        // Preflight
+                        {
+                            {%- if system.preflight %}
+                            {%- for archetype in system.affected_archetypes %}
+                            // Preflight of {{ system.name.type }} for {{ archetype.type }}
+                            self.systems.{{ system.name.field }}.preflight(
+                                {%- if system.needs_context %}
+                                &self.context,
+                                {%- endif %}
+                                {%- if (system.lookup | count) > 0 %}
+                                Box::new(&self.archetypes),
+                                {%- endif -%}
+                                {%- for state in system.states %}
+                                {%- if state.write %}
+                                &mut self.states.{{ state.use.field }},
+                                {%- else %}
+                                &self.states.{{ state.use.field }},
+                                {%- endif %}
+                                {%- endfor %}
+                                {%- if system.needs_entities %}
+                                &self.archetypes.collection.{{ archetype.field }}.entities,
+                                {%- endif %}
+                                {%- for input in system.inputs %}
+                                &self.archetypes.collection.{{ archetype.field }}.{{ input.fields }},
+                                {%- endfor %}
+                                {%- for output in system.outputs %}
+                                &self.archetypes.collection.{{ archetype.field }}.{{ output.fields }},
+                                {%- endfor %}
+                                {%- if system.emits_commands %}
+                                &self.command_queue
+                                {%- endif %}
+                            );
+                            {%- endfor %}
                             {%- else %}
-                            &self.states.{{ state.use.field }},
+                            // System has no preflight step
                             {%- endif %}
+                        }
+
+                        // Systems
+                        {
+                            {%- for archetype in system.affected_archetypes %}
+                            // Apply {{ system.name.type }} to {{ archetype.type }}
+                            self.systems.{{ system.name.field }}.apply_many(
+                                {%- if system.needs_context %}
+                                &self.context,
+                                {%- endif %}
+                                {%- for state in system.states %}
+                                {%- if state.write %}
+                                &mut self.states.{{ state.use.field }},
+                                {%- else %}
+                                &self.states.{{ state.use.field }},
+                                {%- endif %}
+                                {%- endfor %}
+                                {%- if system.needs_entities %}
+                                &self.archetypes.collection.{{ archetype.field }}.entities,
+                                {%- endif %}
+                                {%- for input in system.inputs %}
+                                &self.archetypes.collection.{{ archetype.field }}.{{ input.fields }},
+                                {%- endfor %}
+                                {%- for output in system.outputs %}
+                                &mut self.archetypes.collection.{{ archetype.field }}.{{ output.fields }},
+                                {%- endfor %}
+                                {%- if system.emits_commands %}
+                                &self.command_queue
+                                {%- endif %}
+                            );
                             {%- endfor %}
-                            {%- if system.needs_entities %}
-                            &self.archetypes.collection.{{ archetype.field }}.entities,
+                        }
+
+                        // Postflight
+                        {
+                            {%- if system.postflight %}
+                            {%- for archetype in system.affected_archetypes %}
+                            // Postflight of {{ system.name.type }} for {{ archetype.type }}
+                            self.systems.{{ system.name.field }}.postflight(
+                                {%- if system.needs_context %}
+                                &self.context,
+                                {%- endif %}
+                                {%- if (system.lookup | count) > 0 %}
+                                Box::new(&self.archetypes),
+                                {%- endif -%}
+                                {%- for state in system.states %}
+                                {%- if state.write %}
+                                &mut self.states.{{ state.use.field }},
+                                {%- else %}
+                                &self.states.{{ state.use.field }},
+                                {%- endif %}
+                                {%- endfor %}
+                                {%- if system.needs_entities %}
+                                &self.archetypes.collection.{{ archetype.field }}.entities,
+                                {%- endif %}
+                                {%- for input in system.inputs %}
+                                &self.archetypes.collection.{{ archetype.field }}.{{ input.fields }},
+                                {%- endfor %}
+                                {%- for output in system.outputs %}
+                                &self.archetypes.collection.{{ archetype.field }}.{{ output.fields }},
+                                {%- endfor %}
+                                {%- if system.emits_commands %}
+                                &self.command_queue
+                                {%- endif %}
+                            );
+                            {%- endfor %}
+                            {%- else %}
+                            // System has no preflight step
                             {%- endif %}
-                            {%- for input in system.inputs %}
-                            &self.archetypes.collection.{{ archetype.field }}.{{ input.fields }},
-                            {%- endfor %}
-                            {%- for output in system.outputs %}
-                            &mut self.archetypes.collection.{{ archetype.field }}.{{ output.fields }},
-                            {%- endfor %}
-                            {%- if system.emits_commands %}
-                            &self.command_queue
-                            {%- endif %}
-                        );
-                        {%- endfor %}
+                        }
                     });
                 }
                 {%- endfor %}
