@@ -296,7 +296,7 @@ fn register_example_shader<E, Q>(world: &MainWorld<E, Q>) -> WgpuShaderEntityRef
     });
 
     // Get it back
-    self.get_wgpu_shader(entity_id).unwrap()
+    self.get_wgpu_shader_entity(entity_id).unwrap()
 }
 ```
 
