@@ -166,3 +166,127 @@ impl WorldCommandSender for CommandQueue {
     }
 }
 ```
+
+## Example Case
+
+```yaml
+
+allow_unsafe: true
+
+states:
+  - name: WgpuRender
+    description: The WGPU render state (e.g. device, queue, ...)
+
+components:
+  - name: WgpuShader
+
+worlds:
+  - name: Main
+    archetypes:
+      - WgpuShader
+
+archetypes:
+  - name: WgpuShader
+    components:
+      - WgpuShader
+
+phases:
+  - name: WgpuReinit
+    manual: true
+
+systems:
+  - name: WgpuInitShader
+    phase: WgpuReinit
+    entities: true
+    states:
+      - use: WgpuRender
+        write: true
+    outputs:
+      - WgpuShader
+```
+
+Define `WgpuShaderData`:
+
+```rust
+use wgpu::{ShaderModule, ShaderModuleDescriptor, ShaderSource};
+
+#[derive(Debug, Clone)]
+pub struct WgpuShaderData {
+    pub descriptor: ShaderModuleDescriptor<'static>,
+    pub module: Option<ShaderModule>
+}
+
+impl WgpuShaderData {
+    pub const fn new(descriptor: ShaderModuleDescriptor<'static>) -> Self {
+        Self { descriptor, module: None }
+    }
+}
+```
+
+Define the `WgpuInitShaderSystem`:
+
+```rust
+use std::convert::Infallible;
+use wgpu_resource_manager::{DeviceAndQueue, DeviceId};
+use crate::engine::{ApplyWgpuInitShaderSystem, CreateSystem, EntityId, PhaseEvents, SystemFactory, SystemWgpuReinitPhaseEvents, WgpuInitShaderSystem, WgpuShaderComponent};
+use crate::engine::phases::render::WgpuRenderState;
+
+#[derive(Debug, Default)]
+pub struct WgpuInitShaderSystemData {
+    device_id: DeviceId
+}
+
+impl CreateSystem<WgpuInitShaderSystem> for SystemFactory {
+    fn create(&self) -> WgpuInitShaderSystem {
+        WgpuInitShaderSystem(WgpuInitShaderSystemData::default())
+    }
+}
+
+impl ApplyWgpuInitShaderSystem for WgpuInitShaderSystem {
+    type Error = Infallible;
+
+    fn is_ready(&self, gpu: &mut WgpuRenderState) -> bool {
+        gpu.is_ready()
+    }
+
+    fn apply_many(&mut self, gpu: &mut WgpuRenderState, entities: &[EntityId], shaders: &mut [WgpuShaderComponent]) {
+        let Ok(device) = gpu.device() else {
+            return;
+        };
+
+        let device_changed = device.id() != self.device_id;
+        self.device_id = device.id();
+
+        for (entity_id, shader) in entities.iter().zip(shaders) {
+            // Skip over all already initialized shaders.
+            if shader.module.is_some() && !device_changed {
+                continue;
+            }
+            
+            let module = device.device().create_shader_module(shader.descriptor.clone());
+            shader.module = Some(module);
+        }
+    }
+}
+```
+
+In your world, you can now instantiate shaders and get them back:
+
+```rust
+fn register_example_shader<E, Q>(world: &MainWorld<E, Q>) -> WgpuShaderEntityRef {
+    let entity_id = world.spawn_wgpu_shader(WgpuShaderEntityData {
+        wgpu_shader: WgpuShaderData::new(include_wgsl!("shader.wgsl")).into(),
+    });
+
+    // Get it back
+    self.get_wgpu_shader(entity_id).unwrap()
+}
+```
+
+Since the phase is marked manual, it has to be called explicitly:
+
+```rust
+fn initialize_gpu_resources<E, Q>(world: &MainWorld<E, Q>) {
+    world.apply_system_phase_wgpu_reinit();
+}
+```
