@@ -769,6 +769,9 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                {%- if system.needs_context %}
                &self.context,
                {%- endif %}
+               {%- if (system.lookup | count) > 0 %}
+               Box::new(&self.archetypes),
+               {%- endif -%}
                {%- for state in system.states %}
                {%- if state.write %}
                &mut self.states.{{ state.use.field }},
@@ -781,6 +784,9 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                     {%- if system.needs_context %}
                     &self.context,
                     {%- endif %}
+                    {%- if (system.lookup | count) > 0 %}
+                    Box::new(&self.archetypes),
+                    {%- endif -%}
                     {%- for state in system.states %}
                     {%- if state.write %}
                     &mut self.states.{{ state.use.field }},
@@ -798,6 +804,9 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                 {%- if system.needs_context %}
                 &self.context,
                 {%- endif %}
+                {%- if (system.lookup | count) > 0 %}
+                Box::new(&self.archetypes),
+                {%- endif -%}
                 {%- for state in system.states %}
                 {%- if state.write %}
                 &mut self.states.{{ state.use.field }},
@@ -824,6 +833,9 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                 {%- if system.needs_context %}
                 &self.context,
                 {%- endif %}
+                {%- if (system.lookup | count) > 0 %}
+                Box::new(self),
+                {%- endif -%}
                 {%- for state in system.states %}
                 {%- if state.write %}
                 &mut self.states.{{ state.use.field }},
@@ -1242,7 +1254,7 @@ pub trait ComponentAccessMut: ComponentAccess {
 {%- for world in ecs.worlds %}
 
 //noinspection RsSortImplTraitMembers
-impl<E, Q> ComponentAccess for {{ world.name.type }}<E, Q> {
+impl ComponentAccess for {{ world.name.type }}Archetypes {
     {%- for component in world.components %}
 
     /// Gets the [`{{component.raw}}`]({{component.type}}) component of the specified entity.
@@ -1257,7 +1269,7 @@ impl<E, Q> ComponentAccess for {{ world.name.type }}<E, Q> {
 {%- for world in ecs.worlds %}
 
 //noinspection RsSortImplTraitMembers
-impl<E, Q> ComponentAccessMut for {{ world.name.type }}<E, Q> {
+impl ComponentAccessMut for {{ world.name.type }} {
     {%- for component in world.components %}
 
     /// Mutably gets the [`{{component.raw}}`]({{component.type}}) component of the specified entity.
