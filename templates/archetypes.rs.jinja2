@@ -365,6 +365,25 @@ impl {{ archetype.name.type }} {
         {%- endif %}
     }
 
+    /// Mutably gets the entity at the specified index.
+    #[allow(dead_code)]
+    pub fn get_at_mut(&mut self, index: usize) -> Option<{{ archetype.name.raw }}EntityMut> {
+        if index > self.len() {
+            return None;
+        }
+
+        {%- if ecs.allow_unsafe %}
+        Some(unsafe { self.get_at_unchecked_mut(index) })
+        {%- else %}
+        Some({{ archetype.name.raw }}EntityMut {
+            entity_id: self.entities[index],
+            {%- for component_name in archetype.components %}
+            {{ component_name.field }}: &mut self.{{ component_name.fields }}[index],
+            {%- endfor %}
+        })
+        {%- endif %}
+    }
+
     /// Gets the entity at the specified index.
     #[allow(dead_code)]
     pub unsafe fn get_at_unchecked(&self, index: usize) -> {{ archetype.name.raw }}EntityRef {

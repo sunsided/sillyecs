@@ -417,6 +417,36 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
     {%- endfor %}
     {%- for archetype in world.archetypes %}
 
+    /// Accesses the `{{ archetype.name.raw }}` entity with the given ID if it exists in this archetype.
+    pub fn get_{{ archetype.name.field }}<'world>(
+        &'world self,
+        entity_id: EntityId
+    ) -> Option<{{ archetype.name.raw }}EntityRef<'world>> {
+        let ear = self.entity_locations.get(&entity_id)?;
+        if ear.archetype != {{ archetype.name.type }}::ID {
+            return None;
+        }
+        self
+            .archetypes
+            .{{ archetype.name.field }}
+            .get_at(ear.index)
+    }
+
+    /// Mutably accesses the `{{ archetype.name.raw }}` entity with the given ID if it exists in this archetype.
+    pub fn get_{{ archetype.name.field }}_mut<'world>(
+        &'world mut self,
+        entity_id: EntityId
+    ) -> Option<{{ archetype.name.raw }}EntityMut<'world>> {
+        let ear = self.entity_locations.get(&entity_id)?;
+        if ear.archetype != {{ archetype.name.type }}::ID {
+            return None;
+        }
+        self
+            .archetypes
+            .{{ archetype.name.field }}
+            .get_at_mut(ear.index)
+    }
+
     /// Spawn a new `{{ archetype.name.raw }}` entity into the world given its [`{{ archetype.name.raw }}EntityData`].
     #[inline]
     pub fn spawn_{{ archetype.name.field }}(
