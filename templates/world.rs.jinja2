@@ -423,36 +423,6 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
     {%- endfor %}
     {%- for archetype in world.archetypes %}
 
-    /// Accesses the `{{ archetype.name.raw }}` entity with the given ID if it exists in this archetype.
-    pub fn get_{{ archetype.name.field }}_entity(
-        &self,
-        entity_id: EntityId
-    ) -> Option<{{ archetype.name.raw }}EntityRef> {
-        let ear = self.archetypes.entity_locations.get(&entity_id)?.clone();
-        if ear.archetype != {{ archetype.name.type }}::ID {
-            return None;
-        }
-        self.archetypes
-            .collection
-            .{{ archetype.name.field }}
-            .get_entity_at(ear.index)
-    }
-
-    /// Mutably accesses the `{{ archetype.name.raw }}` entity with the given ID if it exists in this archetype.
-    pub fn get_{{ archetype.name.field }}_entity_mut(
-        &mut self,
-        entity_id: EntityId
-    ) -> Option<{{ archetype.name.raw }}EntityMut> {
-        let ear = self.archetypes.entity_locations.get(&entity_id)?.clone();
-        if ear.archetype != {{ archetype.name.type }}::ID {
-            return None;
-        }
-        self.archetypes
-            .collection
-            .{{ archetype.name.field }}
-            .get_entity_at_mut(ear.index)
-    }
-
     /// Spawn a new `{{ archetype.name.raw }}` entity into the world given its [`{{ archetype.name.raw }}EntityData`].
     #[inline]
     pub fn spawn_{{ archetype.name.field }}(
@@ -1233,6 +1203,76 @@ pub trait ComponentAccessMut: ComponentAccess {
     }
     {%- endfor %}
 }
+
+pub trait EntityAccess {
+    {%- for archetype in ecs.archetypes %}
+
+    /// Accesses the `{{ archetype.name.raw }}` entity with the given ID if it exists in this archetype.
+    #[allow(dead_code, unused)]
+    #[inline]
+    fn get_{{ archetype.name.field }}_entity(
+        &self,
+        entity_id: EntityId
+    ) -> Option<{{ archetype.name.raw }}EntityRef>
+    {
+        None
+    }
+    {%- endfor %}
+}
+
+pub trait EntityAccessMut: EntityAccess {
+    {%- for archetype in ecs.archetypes %}
+
+    /// Mutably accesses the `{{ archetype.name.raw }}` entity with the given ID if it exists in this archetype.
+    #[allow(dead_code, unused)]
+    #[inline]
+    fn get_{{ archetype.name.field }}_entity_mut(
+        &mut self,
+        entity_id: EntityId
+    ) -> Option<{{ archetype.name.raw }}EntityMut>
+    {
+        None
+    }
+    {%- endfor %}
+}
+{%- for world in ecs.worlds %}
+
+//noinspection RsSortImplTraitMembers
+impl<E, Q> EntityAccess for {{ world.name.type }}<E, Q> {
+    {%- for archetype in world.archetypes %}
+
+    /// Accesses the `{{ archetype.name.raw }}` entity with the given ID if it exists in this archetype.
+    #[allow(dead_code, unused)]
+    #[inline]
+    fn get_{{ archetype.name.field }}_entity(
+        &self,
+        entity_id: EntityId
+    ) -> Option<{{ archetype.name.raw }}EntityRef>
+    {
+        self.archetypes.get_{{ archetype.name.field }}_entity(entity_id)
+    }
+    {%- endfor %}
+}
+{%- endfor %}
+{%- for world in ecs.worlds %}
+
+//noinspection RsSortImplTraitMembers
+impl<E, Q> EntityAccessMut for {{ world.name.type }}<E, Q> {
+    {%- for archetype in world.archetypes %}
+
+    /// Mutably accesses the `{{ archetype.name.raw }}` entity with the given ID if it exists in this archetype.
+    #[allow(dead_code, unused)]
+    #[inline]
+    fn get_{{ archetype.name.field }}_entity_mut(
+        &mut self,
+        entity_id: EntityId
+    ) -> Option<{{ archetype.name.raw }}EntityMut>
+    {
+        self.archetypes.get_{{ archetype.name.field }}_entity_mut(entity_id)
+    }
+    {%- endfor %}
+}
+{%- endfor %}
 {%- for world in ecs.worlds %}
 
 //noinspection RsSortImplTraitMembers
@@ -1259,6 +1299,54 @@ impl<E, Q> ComponentAccessMut for {{ world.name.type }}<E, Q> {
     #[inline]
     fn get_{{component.field}}_component_mut(&mut self, entity_id: EntityId) -> Option<&mut {{component.type}}> {
         self.archetypes.get_{{component.field}}_component_mut(entity_id)
+    }
+    {%- endfor %}
+}
+{%- endfor %}
+{%- for world in ecs.worlds %}
+
+//noinspection RsSortImplTraitMembers
+impl EntityAccess for {{ world.name.type }}Archetypes {
+    {%- for archetype in world.archetypes %}
+
+    /// Accesses the `{{ archetype.name.raw }}` entity with the given ID if it exists in this archetype.
+    #[allow(dead_code, unused)]
+    fn get_{{ archetype.name.field }}_entity(
+        &self,
+        entity_id: EntityId
+    ) -> Option<{{ archetype.name.raw }}EntityRef>
+    {
+        let ear = self.entity_locations.get(&entity_id)?.clone();
+        if ear.archetype != {{ archetype.name.type }}::ID {
+            return None;
+        }
+        self.collection
+            .{{ archetype.name.field }}
+            .get_entity_at(ear.index)
+    }
+    {%- endfor %}
+}
+{%- endfor %}
+{%- for world in ecs.worlds %}
+
+//noinspection RsSortImplTraitMembers
+impl EntityAccessMut for {{ world.name.type }}Archetypes {
+    {%- for archetype in world.archetypes %}
+
+    /// Mutably accesses the `{{ archetype.name.raw }}` entity with the given ID if it exists in this archetype.
+    #[allow(dead_code, unused)]
+    fn get_{{ archetype.name.field }}_entity_mut(
+        &mut self,
+        entity_id: EntityId
+    ) -> Option<{{ archetype.name.raw }}EntityMut>
+    {
+        let ear = self.entity_locations.get(&entity_id)?.clone();
+        if ear.archetype != {{ archetype.name.type }}::ID {
+            return None;
+        }
+        self.collection
+            .{{ archetype.name.field }}
+            .get_entity_at_mut(ear.index)
     }
     {%- endfor %}
 }
