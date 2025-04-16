@@ -668,5 +668,30 @@ impl core::ops::DerefMut for {{ system.name.type }} {
         &mut self.0
     }
 }
+{%- endfor %}
+{%- for system in ecs.systems %}
+{%- if (system.lookup | count) > 0 %}
 
+pub trait {{ system.name.raw }}ComponentLookup {
+    {%- for component in system.lookup %}
+    /// Gets the [`{{component.raw}}`]({{component.type}}) component of the specified entity.
+    #[allow(dead_code, unused)]
+    fn get_{{component.field}}_component(&self, entity_id: EntityId) -> Option<&{{component.type}}>;
+    {%- endfor %}
+}
+
+impl<T> {{ system.name.raw }}ComponentLookup for T
+where
+    T: ComponentAccess
+{
+{%- for component in system.lookup %}
+    /// Gets the [`{{component.raw}}`]({{component.type}}) component of the specified entity.
+    #[allow(dead_code, unused)]
+    #[inline]
+    fn get_{{component.field}}_component(&self, entity_id: EntityId) -> Option<&{{component.type}}> {
+        T::get_{{component.field}}_component(self, entity_id)
+    }
+    {%- endfor %}
+}
+{%- endif %}
 {%- endfor %}
