@@ -133,11 +133,6 @@ impl {{ component.name.type }} {
     pub const fn new(data: {{ component.name.raw }}Data) -> Self {
         Self(data)
     }
-
-    /// Consumes self and returns the inner [`{{ component.name.raw }}Data`].
-    pub const fn into_inner(self) -> {{ component.name.raw }}Data {
-        self.0
-    }
 }
 
 #[automatically_derived]
