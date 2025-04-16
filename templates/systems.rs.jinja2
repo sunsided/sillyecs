@@ -323,9 +323,6 @@ pub trait Apply{{ system.name.type }}: System {
         {%- if system.needs_context %}
         context: &FrameContext,
         {%- endif %}
-        {%- if (system.lookup | count) > 0 %}
-        lookup: Box<&dyn {{system.name.raw}}ComponentLookup>,
-        {%- endif -%}
         {%- for state in system.states %}
         {%- if state.write %}
         {{ state.use.field }}: &mut {{ state.use.type }},
@@ -348,9 +345,6 @@ pub trait Apply{{ system.name.type }}: System {
         {%- if system.needs_context %}
         context: &FrameContext,
         {%- endif %}
-        {%- if (system.lookup | count) > 0 %}
-        lookup: Box<&dyn {{system.name.raw}}ComponentLookup>,
-        {%- endif -%}
         {%- for state in system.states %}
         {%- if state.write %}
         {{ state.use.field }}: &mut {{ state.use.type }},
@@ -373,9 +367,6 @@ pub trait Apply{{ system.name.type }}: System {
         {%- if system.needs_context %}
         context: &FrameContext,
         {%- endif %}
-        {%- if (system.lookup | count) > 0 %}
-        lookup: Box<&dyn {{system.name.raw}}ComponentLookup>,
-        {%- endif -%}
         {%- for state in system.states %}
         {%- if state.write %}
         {{ state.use.field }}: &mut {{ state.use.type }},
@@ -491,9 +482,6 @@ pub trait Apply{{ system.name.type }}: System {
         {%- if system.needs_context %}
         context: &FrameContext,
         {%- endif %}
-        {%- if (system.lookup | count) > 0 %}
-        lookup: Box<&dyn {{system.name.raw}}ComponentLookup>,
-        {%- endif -%}
         {%- for state in system.states %}
         {%- if state.write %}
         {{ state.use.field }}: &mut {{ state.use.type }},
@@ -531,9 +519,6 @@ pub trait Apply{{ system.name.type }}: System {
         {%- if system.needs_context %}
         context: &FrameContext,
         {%- endif %}
-        {%- if (system.lookup | count) > 0 %}
-        lookup: Box<&dyn {{system.name.raw}}ComponentLookup>,
-        {%- endif -%}
         {%- for state in system.states %}
         {%- if state.write %}
         {{ state.use.field }}: &mut {{ state.use.type }},
@@ -560,9 +545,6 @@ pub trait Apply{{ system.name.type }}: System {
                 {%- if system.needs_context %}
                 &context,
                 {%- endif %}
-                {%- if (system.lookup | count) > 0 %}
-                lookup,
-                {%- endif -%}
                 {%- for state in system.states %}
                 {{ state.use.field }},
                 {%- endfor %}
@@ -592,9 +574,6 @@ impl {{ system.name.type }} {
         {%- if system.needs_context %}
         context: &FrameContext,
         {%- endif %}
-        {%- if (system.lookup | count) > 0 %}
-        lookup: Box<&dyn {{system.name.raw}}ComponentLookup>,
-        {%- endif -%}
         {%- for state in system.states %}
         {%- if state.write %}
         {{ state.use.field }}: &mut {{ state.use.type }},
@@ -621,9 +600,6 @@ impl {{ system.name.type }} {
             {%- if system.needs_context %}
             context,
             {%- endif %}
-            {%- if (system.lookup | count) > 0 %}
-            lookup,
-            {%- endif -%}
             {%- for state in system.states %}
             {{ state.use.field }},
             {%- endfor %}
@@ -657,9 +633,6 @@ impl {{ system.name.type }} {
         {%- if system.needs_context %}
         context: &FrameContext,
         {%- endif %}
-        {%- if (system.lookup | count) > 0 %}
-        lookup: Box<&dyn {{system.name.raw}}ComponentLookup>,
-        {%- endif -%}
         {%- for state in system.states %}
         {%- if state.write %}
         {{ state.use.field }}: &mut {{ state.use.type }},
@@ -686,9 +659,6 @@ impl {{ system.name.type }} {
             {%- if system.needs_context %}
             context,
             {%- endif %}
-            {%- if (system.lookup | count) > 0 %}
-            lookup,
-            {%- endif -%}
             {%- for state in system.states %}
             {{ state.use.field }},
             {%- endfor %}
@@ -725,9 +695,6 @@ impl {{ system.name.type }} {
         {{ state.use.field }}: &{{ state.use.type }},
         {%- endif %}
         {%- endfor %}
-        {%- if (system.lookup | count) > 0 %}
-        lookup: Box<&dyn {{system.name.raw}}ComponentLookup>,
-        {%- endif -%}
         {%- if system.emits_commands %}
         commands: &impl WorldCommandSender
         {%- endif %}
@@ -736,9 +703,6 @@ impl {{ system.name.type }} {
             {%- if system.needs_context %}
             &context,
             {%- endif %}
-            {%- if (system.lookup | count) > 0 %}
-            lookup,
-            {%- endif -%}
             {%- for state in system.states %}
             {{ state.use.field }},
             {%- endfor %}

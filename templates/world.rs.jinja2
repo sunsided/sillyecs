@@ -717,9 +717,6 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                {%- if system.needs_context %}
                &self.context,
                {%- endif %}
-               {%- if (system.lookup | count) > 0 %}
-               Box::new(&self.archetypes),
-               {%- endif -%}
                {%- for state in system.states %}
                {%- if state.write %}
                &mut self.states.{{ state.use.field }},
@@ -729,22 +726,19 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                {%- endfor %}
            );
         if is_ready && self.systems.{{ system.name.field }}.on_begin_phase(
-                    {%- if system.needs_context %}
-                    &self.context,
-                    {%- endif %}
-                    {%- if (system.lookup | count) > 0 %}
-                    Box::new(&self.archetypes),
-                    {%- endif -%}
-                    {%- for state in system.states %}
-                    {%- if state.write %}
-                    &mut self.states.{{ state.use.field }},
-                    {%- else %}
-                    &self.states.{{ state.use.field }},
-                    {%- endif %}
-                    {%- endfor %}
-                )
-                .inspect_err(|error| tracing::error!(?error, "{{ system.name.type }}::on_begin_phase returned an error"))
-                .is_ok()
+                {%- if system.needs_context %}
+                &self.context,
+                {%- endif %}
+                {%- for state in system.states %}
+                {%- if state.write %}
+                &mut self.states.{{ state.use.field }},
+                {%- else %}
+                &self.states.{{ state.use.field }},
+                {%- endif %}
+                {%- endfor %}
+            )
+            .inspect_err(|error| tracing::error!(?error, "{{ system.name.type }}::on_begin_phase returned an error"))
+            .is_ok()
         {
         {%- for archetype in system.affected_archetypes %}
             // Apply {{ system.name.type }} to {{ archetype.type }}
@@ -752,9 +746,6 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                 {%- if system.needs_context %}
                 &self.context,
                 {%- endif %}
-                {%- if (system.lookup | count) > 0 %}
-                Box::new(&self.archetypes),
-                {%- endif -%}
                 {%- for state in system.states %}
                 {%- if state.write %}
                 &mut self.states.{{ state.use.field }},
@@ -781,9 +772,6 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                 {%- if system.needs_context %}
                 &self.context,
                 {%- endif %}
-                {%- if (system.lookup | count) > 0 %}
-                Box::new(self),
-                {%- endif -%}
                 {%- for state in system.states %}
                 {%- if state.write %}
                 &mut self.states.{{ state.use.field }},
@@ -1249,7 +1237,7 @@ impl<E, Q> EntityAccess for {{ world.name.type }}<E, Q> {
         entity_id: EntityId
     ) -> Option<{{ archetype.name.raw }}EntityRef>
     {
-        self.archetypes.get_{{ archetype.name.field }}_entity(entity_id)
+        EntityAccess::get_{{ archetype.name.field }}_entity(&self.archetypes, entity_id)
     }
     {%- endfor %}
 }
@@ -1268,7 +1256,7 @@ impl<E, Q> EntityAccessMut for {{ world.name.type }}<E, Q> {
         entity_id: EntityId
     ) -> Option<{{ archetype.name.raw }}EntityMut>
     {
-        self.archetypes.get_{{ archetype.name.field }}_entity_mut(entity_id)
+        EntityAccessMut::get_{{ archetype.name.field }}_entity_mut(&mut self.archetypes, entity_id)
     }
     {%- endfor %}
 }
@@ -1283,7 +1271,7 @@ impl<E, Q> ComponentAccess for {{ world.name.type }}<E, Q> {
     #[allow(dead_code, unused)]
     #[inline]
     fn get_{{component.field}}_component(&self, entity_id: EntityId) -> Option<&{{component.type}}> {
-        self.archetypes.get_{{component.field}}_component(entity_id)
+        ComponentAccess::get_{{component.field}}_component(&self.archetypes, entity_id)
     }
     {%- endfor %}
 }
@@ -1298,7 +1286,7 @@ impl<E, Q> ComponentAccessMut for {{ world.name.type }}<E, Q> {
     #[allow(dead_code, unused)]
     #[inline]
     fn get_{{component.field}}_component_mut(&mut self, entity_id: EntityId) -> Option<&mut {{component.type}}> {
-        self.archetypes.get_{{component.field}}_component_mut(entity_id)
+        ComponentAccessMut::get_{{component.field}}_component_mut(&mut self.archetypes, entity_id)
     }
     {%- endfor %}
 }
