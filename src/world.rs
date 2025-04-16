@@ -1,5 +1,6 @@
 use crate::Name;
 use crate::archetype::{Archetype, ArchetypeRef};
+use crate::component::ComponentRef;
 use crate::ecs::EcsError;
 use crate::state::State;
 use crate::system::{System, SystemPhase, SystemPhaseRef};
@@ -31,6 +32,9 @@ pub struct World {
     /// The systems in scheduling order (based on this world's systems).
     #[serde(default, skip_deserializing)]
     pub scheduled_systems: HashMap<SystemPhaseRef, Vec<Vec<System>>>,
+    /// The components used in this world (based on this world's archetypes).
+    #[serde(default, skip_deserializing)]
+    pub components: HashMap<ComponentRef, HashSet<ArchetypeRef>>,
 }
 
 impl World {
@@ -43,9 +47,19 @@ impl World {
     ) -> Result<(), EcsError> {
         let mut used_systems = HashSet::new();
         let mut used_states = HashSet::new();
+
         for archetype in archetypes {
             if !self.archetypes_refs.iter().any(|a| a.eq(&archetype.name)) {
                 continue;
+            }
+
+            for component in &archetype.components {
+                self.components
+                    .entry(component.clone())
+                    .and_modify(|set| {
+                        set.insert(archetype.name.clone());
+                    })
+                    .or_insert(HashSet::from([archetype.name.clone()]));
             }
 
             self.archetypes.push(archetype.clone());

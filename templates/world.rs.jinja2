@@ -415,6 +415,37 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
     }
     {%- endif %}
     {%- endfor %}
+    {%- for component, archetypes in world.components|items %}
+
+    /// Gets the `{{component.raw}}` component of the specified entity.
+    #[allow(dead_code)]
+    #[inline]
+    pub fn get_{{component.field}}_component(&self, entity_id: EntityId) -> Option<&{{component.type}}> {
+        let ear = self.entity_locations.get(&entity_id)?;
+        match ear.archetype {
+            {%- for archetype in archetypes %}
+            {{ archetype.type }}::ID => self.archetypes.{{ archetype.field }}.get_{{component.field}}_component_at(ear.index),
+            {%- endfor %}
+            #[allow(dead_code)]
+            _ => None
+        }
+    }
+
+    /// Mutably gets the `{{component.raw}}` component of the specified entity.
+    #[allow(dead_code)]
+    #[inline]
+    pub fn get_{{component.field}}_component_mut(&mut self, entity_id: EntityId) -> Option<&mut {{component.type}}> {
+        let ear = self.entity_locations.get(&entity_id)?;
+        match ear.archetype {
+            {%- for archetype in archetypes %}
+            {{ archetype.type }}::ID => self.archetypes.{{ archetype.field }}.get_{{component.field}}_component_at_mut(ear.index),
+            {%- endfor %}
+            #[allow(dead_code)]
+            _ => None
+        }
+    }
+
+    {%- endfor %}
     {%- for archetype in world.archetypes %}
 
     /// Accesses the `{{ archetype.name.raw }}` entity with the given ID if it exists in this archetype.
