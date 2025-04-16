@@ -345,16 +345,63 @@ impl {{ archetype.name.type }} {
     pub fn iter(&self) -> {{ archetype.name.raw }}EntityIterator {
         {{ archetype.name.raw }}EntityIterator::new(self)
     }
+    {%- for component in archetype.components %}
 
-    /// Gets the entity at the specified index.
+    /// Gets the `{{component.raw}}` component at the specified index.
     #[allow(dead_code)]
-    pub fn get_at(&self, index: usize) -> Option<{{ archetype.name.raw }}EntityRef> {
+    #[inline]
+    pub fn get_{{component.field}}_component_at(&self, index: usize) -> Option<&{{component.type}}> {
         if index > self.len() {
             return None;
         }
 
         {%- if ecs.allow_unsafe %}
-        Some(unsafe { self.get_at_unchecked(index) })
+        Some(unsafe { self.get_{{component.field}}_component_at_unchecked(index) })
+        {%- else %}
+        Some(&self.{{ component_name.fields }}[index])
+        {%- endif %}
+    }
+
+    /// Mutably gets the `{{component.raw}}` component at the specified index.
+    #[allow(dead_code)]
+    #[inline]
+    pub fn get_{{component.field}}_component_at_mut(&mut self, index: usize) -> Option<&mut {{component.type}}> {
+        if index > self.len() {
+            return None;
+        }
+
+        {%- if ecs.allow_unsafe %}
+        Some(unsafe { self.get_{{component.field}}_component_at_unchecked_mut(index) })
+        {%- else %}
+        Some(&mut self.{{ component_name.fields }}[index])
+        {%- endif %}
+    }
+
+    /// Gets the `{{component.raw}}` component at the specified index.
+    #[allow(dead_code)]
+    #[inline]
+    pub unsafe fn get_{{component.field}}_component_at_unchecked(&self, index: usize) -> &{{component.type}} {
+        self.{{ component.fields }}.get_unchecked(index)
+    }
+
+    /// Gets the `{{component.raw}}` component at the specified index.
+    #[allow(dead_code)]
+    #[inline]
+    pub unsafe fn get_{{component.field}}_component_at_unchecked_mut(&mut self, index: usize) -> &mut {{component.type}} {
+        self.{{ component.fields }}.get_unchecked_mut(index)
+    }
+
+    {%- endfor %}
+
+    /// Gets the entity at the specified index.
+    #[allow(dead_code)]
+    pub fn get_entity_at(&self, index: usize) -> Option<{{ archetype.name.raw }}EntityRef> {
+        if index > self.len() {
+            return None;
+        }
+
+        {%- if ecs.allow_unsafe %}
+        Some(unsafe { self.get_entity_at_unchecked(index) })
         {%- else %}
         Some({{ archetype.name.raw }}EntityRef {
             entity_id: self.entities[index],
@@ -367,13 +414,13 @@ impl {{ archetype.name.type }} {
 
     /// Mutably gets the entity at the specified index.
     #[allow(dead_code)]
-    pub fn get_at_mut(&mut self, index: usize) -> Option<{{ archetype.name.raw }}EntityMut> {
+    pub fn get_entity_at_mut(&mut self, index: usize) -> Option<{{ archetype.name.raw }}EntityMut> {
         if index > self.len() {
             return None;
         }
 
         {%- if ecs.allow_unsafe %}
-        Some(unsafe { self.get_at_unchecked_mut(index) })
+        Some(unsafe { self.get_entity_at_unchecked_mut(index) })
         {%- else %}
         Some({{ archetype.name.raw }}EntityMut {
             entity_id: self.entities[index],
@@ -386,7 +433,7 @@ impl {{ archetype.name.type }} {
 
     /// Gets the entity at the specified index.
     #[allow(dead_code)]
-    pub unsafe fn get_at_unchecked(&self, index: usize) -> {{ archetype.name.raw }}EntityRef {
+    pub unsafe fn get_entity_at_unchecked(&self, index: usize) -> {{ archetype.name.raw }}EntityRef {
         {{ archetype.name.raw }}EntityRef {
             entity_id: *self.entities.get_unchecked(index),
             {%- for component_name in archetype.components %}
@@ -397,7 +444,7 @@ impl {{ archetype.name.type }} {
 
     /// Gets the entity at the specified index.
     #[allow(dead_code)]
-    pub unsafe fn get_at_unchecked_mut(&mut self, index: usize) -> {{ archetype.name.raw }}EntityMut {
+    pub unsafe fn get_entity_at_unchecked_mut(&mut self, index: usize) -> {{ archetype.name.raw }}EntityMut {
         {{ archetype.name.raw }}EntityMut {
             entity_id: *self.entities.get_unchecked(index),
             {%- for component_name in archetype.components %}
@@ -816,14 +863,14 @@ impl GetEntityRef for {{ archetype.name.type }} {
     #[inline(always)]
     #[allow(clippy::needless_lifetimes, dead_code)]
     fn get_at<'archetype>(&'archetype self, index: usize) -> Option<Self::EntityRef<'archetype>> {
-        self.get_at(index)
+        self.get_entity_at(index)
     }
 
     /// See [`{{ archetype.name.type }}::get_at_unchecked`]({{ archetype.name.type }}::get_at_unchecked).
     #[inline(always)]
     #[allow(clippy::needless_lifetimes, dead_code)]
     unsafe fn get_at_unchecked<'archetype>(&'archetype self, index: usize) -> Self::EntityRef<'archetype> {
-        unsafe { self.get_at_unchecked(index) }
+        unsafe { self.get_entity_at_unchecked(index) }
     }
 }
 {%- endfor %}

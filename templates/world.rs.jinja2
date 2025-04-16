@@ -429,7 +429,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
         self
             .archetypes
             .{{ archetype.name.field }}
-            .get_at(ear.index)
+            .get_entity_at(ear.index)
     }
 
     /// Mutably accesses the `{{ archetype.name.raw }}` entity with the given ID if it exists in this archetype.
@@ -444,7 +444,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
         self
             .archetypes
             .{{ archetype.name.field }}
-            .get_at_mut(ear.index)
+            .get_entity_at_mut(ear.index)
     }
 
     /// Spawn a new `{{ archetype.name.raw }}` entity into the world given its [`{{ archetype.name.raw }}EntityData`].
