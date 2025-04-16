@@ -1,6 +1,6 @@
 use crate::Name;
 use crate::archetype::{Archetype, ArchetypeId, ArchetypeRef};
-use crate::component::ComponentName;
+use crate::component::{ComponentName, ComponentRef};
 use crate::state::StateName;
 use crate::system_scheduler::{Access, Dependency, Resource};
 use serde::{Deserialize, Deserializer, Serialize};
@@ -43,6 +43,15 @@ pub struct System {
     /// Whether the system requires access to the user state (and which ones).
     #[serde(default, rename(serialize = "states", deserialize = "states"))]
     pub states: Vec<StateUse>,
+    /// Whether the system requires access to components of other entities, and which ones.
+    #[serde(default)]
+    pub lookup: Vec<ComponentRef>,
+    /// Whether the system uses a preflight phase.
+    #[serde(default)]
+    pub preflight: bool,
+    /// Whether the system uses a postflight phase.
+    #[serde(default)]
+    pub postflight: bool,
     /// The phase in which to run the system.
     pub phase: SystemPhaseRef,
     /// The optional input components to the system.
