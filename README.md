@@ -24,7 +24,7 @@ A silly little compile-time generated archetype ECS in Rust.
 
 ```toml
 [build-dependencies]
-sillyecs = "0.0.2"
+sillyecs = "0.0.6"
 ```
 
 ## Usage
