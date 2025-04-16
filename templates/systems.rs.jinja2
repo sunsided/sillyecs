@@ -678,51 +678,6 @@ impl {{ system.name.type }} {
             {%- endif %}
         );
     }
-
-    {%- for archetype in system.affected_archetypes %}
-
-    /// Applies this system to the [`{{ archetype.type }}`].
-    #[inline]
-    #[deprecated]
-    fn apply_to_{{ archetype.field }}(
-        &mut self,
-        archetype: &mut {{ archetype.type }},
-        {%- if system.needs_context %}
-        context: &FrameContext,
-        {%- endif %}
-        {%- for state in system.states %}
-        {%- if state.write %}
-        {{ state.use.field }}: &mut {{ state.use.type }},
-        {%- else %}
-        {{ state.use.field }}: &{{ state.use.type }},
-        {%- endif %}
-        {%- endfor %}
-        {%- if system.emits_commands %}
-        commands: &impl WorldCommandSender
-        {%- endif %}
-    ) {
-        self.apply_many(
-            {%- if system.needs_context %}
-            &context,
-            {%- endif %}
-            {%- for state in system.states %}
-            {{ state.use.field }},
-            {%- endfor %}
-            {%- if system.needs_entities %}
-            &archetype.entities,
-            {%- endif %}
-            {%- for input in system.inputs %}
-            &archetype.{{ input.fields }},
-            {%- endfor %}
-            {%- for output in system.outputs %}
-            &mut archetype.{{ output.fields }},
-            {%- endfor %}
-            {%- if system.emits_commands %}
-            commands
-            {%- endif %}
-        );
-    }
-    {%- endfor %}
 }
 
 #[automatically_derived]
