@@ -1215,3 +1215,57 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
 {%- endfor %}
 }
 {%- endfor %}
+
+pub trait ComponentAccess {
+    {%- for component in ecs.components %}
+
+    /// Gets the [`{{component.name.raw}}`]({{component.name.type}}) component of the specified entity.
+    #[allow(dead_code, unused)]
+    #[inline]
+    fn get_{{component.name.field}}_component(&self, entity_id: EntityId) -> Option<&{{component.name.type}}> {
+        None
+    }
+    {%- endfor %}
+}
+
+pub trait ComponentAccessMut: ComponentAccess {
+    {%- for component in ecs.components %}
+
+    /// Mutably gets the [`{{component.name.raw}}`]({{component.name.type}}) component of the specified entity.
+    #[allow(dead_code, unused)]
+    #[inline]
+    fn get_{{component.name.field}}_component_mut(&mut self, entity_id: EntityId) -> Option<&mut {{component.name.type}}> {
+        None
+    }
+    {%- endfor %}
+}
+{%- for world in ecs.worlds %}
+
+//noinspection RsSortImplTraitMembers
+impl<E, Q> ComponentAccess for {{ world.name.type }}<E, Q> {
+    {%- for component in world.components %}
+
+    /// Gets the [`{{component.raw}}`]({{component.type}}) component of the specified entity.
+    #[allow(dead_code, unused)]
+    #[inline]
+    fn get_{{component.field}}_component(&self, entity_id: EntityId) -> Option<&{{component.type}}> {
+        self.get_{{component.field}}_component(entity_id)
+    }
+    {%- endfor %}
+}
+{%- endfor %}
+{%- for world in ecs.worlds %}
+
+//noinspection RsSortImplTraitMembers
+impl<E, Q> ComponentAccessMut for {{ world.name.type }}<E, Q> {
+    {%- for component in world.components %}
+
+    /// Mutably gets the [`{{component.raw}}`]({{component.type}}) component of the specified entity.
+    #[allow(dead_code, unused)]
+    #[inline]
+    fn get_{{component.field}}_component_mut(&mut self, entity_id: EntityId) -> Option<&mut {{component.type}}> {
+        self.get_{{component.field}}_component_mut(entity_id)
+    }
+    {%- endfor %}
+}
+{%- endfor %}
