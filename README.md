@@ -215,7 +215,6 @@ phases:
 systems:
   - name: WgpuInitShader
     phase: WgpuReinit
-    entities: true
     states:
       - use: WgpuRender
         write: true
@@ -246,7 +245,7 @@ Implement the `WgpuInitShaderSystem` to compile and upload the shader:
 ```rust
 use std::convert::Infallible;
 use wgpu_resource_manager::{DeviceAndQueue, DeviceId};
-use crate::engine::{ApplyWgpuInitShaderSystem, CreateSystem, EntityId, PhaseEvents, SystemFactory, SystemWgpuReinitPhaseEvents, WgpuInitShaderSystem, WgpuShaderComponent};
+use crate::engine::{ApplyWgpuInitShaderSystem, CreateSystem, PhaseEvents, SystemFactory, SystemWgpuReinitPhaseEvents, WgpuInitShaderSystem, WgpuShaderComponent};
 use crate::engine::phases::render::WgpuRenderState;
 
 #[derive(Debug, Default)]
@@ -267,7 +266,7 @@ impl ApplyWgpuInitShaderSystem for WgpuInitShaderSystem {
         gpu.is_ready()
     }
 
-    fn apply_many(&mut self, gpu: &mut WgpuRenderState, entities: &[EntityId], shaders: &mut [WgpuShaderComponent]) {
+    fn apply_many(&mut self, gpu: &mut WgpuRenderState, shaders: &mut [WgpuShaderComponent]) {
         let Ok(device) = gpu.device() else {
             return;
         };
@@ -275,7 +274,7 @@ impl ApplyWgpuInitShaderSystem for WgpuInitShaderSystem {
         let device_changed = device.id() != self.device_id;
         self.device_id = device.id();
 
-        for (entity_id, shader) in entities.iter().zip(shaders) {
+        for shader in shaders {
             // Skip over all already initialized shaders.
             if shader.module.is_some() && !device_changed {
                 continue;
