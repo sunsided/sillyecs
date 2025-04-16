@@ -1116,6 +1116,10 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
     {%- endfor %}
 
     /// Sends a command.
+    ///
+    /// Note that commands are picked up before and after simulation phases (not between system runs).
+    /// As a result, issuing commands from the outside world will not have any effect until the next
+    /// ECS phase run is executed.
     #[inline]
     pub fn command(&mut self, command: WorldCommand<Q::UserCommand>) -> Result<(), Q::Error>
     where
