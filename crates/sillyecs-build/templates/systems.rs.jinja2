@@ -625,6 +625,77 @@ pub trait Apply{{ system.name.type }}: System {
             );
         }
     }
+
+    /// Applies the system's business logic to the given entity components.
+    ///
+    /// ### Reads
+    /// {% for input in system.inputs %}
+    /// - `{{ input.field }}`: A slice of the input components of type [`{{ input.type }}`].{% endfor %}
+    ///
+    /// ### Mutates
+    /// {% for output in system.outputs %}
+    /// - `{{ output.field }}`: A mutable slice of the components of type [`{{ output.type }}`].{% endfor %}
+    #[allow(unused_mut)]
+    fn apply_all(
+        &mut self,
+        {%- if system.needs_context %}
+        context: &::sillyecs::FrameContext,
+        {%- endif %}
+        {%- for state in system.states %}
+            {%- set access = state.system | default(value="none") %}
+            {%- if access == "none" %}
+                {# skip #}
+            {%- elif access == "read" %}
+                {{ state.use.field }}: &{{ state.use.type }},
+            {%- elif access == "write" %}
+                {{ state.use.field }}: &mut {{ state.use.type }},
+            {%- else %}
+                todo!("Invalid state use in ECS construction"),
+            {%- endif %}
+        {%- endfor %}
+        {%- if system.needs_entities %}
+        entities: [&[::sillyecs::EntityId]; {{ system.affected_archetype_count }}],
+        {%- endif %}
+        {%- for input in system.inputs %}
+        {{ input.fields }}: [&[{{ input.type }}]; {{ system.affected_archetype_count }}],
+        {%- endfor %}
+        {%- for output in system.outputs %}
+        mut {{ output.fields }}: [&mut [{{ output.type }}]; {{ system.affected_archetype_count }}],
+        {%- endfor %}
+        {%- if system.emits_commands %}
+        commands: &impl WorldCommandSender
+        {%- endif %}
+    ) {
+        let zipped_iter = {{ system.component_iter_code }};
+        for {{ system.component_untuple_code }} in zipped_iter {
+            Apply{{ system.name.type }}::apply_many(
+                self,
+                {%- if system.needs_context %}
+                context,
+                {%- endif %}
+                {%- for state in system.states %}
+                    {%- set access = state.system | default(value="none") %}
+                    {%- if access == "none" %}
+                        {# skip #}
+                    {%- else %}
+                        {{ state.use.field }},
+                    {%- endif %}
+                {%- endfor %}
+                {%- if system.needs_entities %}
+                entity,
+                {%- endif %}
+                {%- for input in system.inputs %}
+                {{ input.field }},
+                {%- endfor %}
+                {%- for output in system.outputs %}
+                {{ output.field }},
+                {%- endfor %}
+                {%- if system.emits_commands %}
+                commands
+                {%- endif %}
+            );
+        }
+    }
 }
 
 #[allow(dead_code)]
