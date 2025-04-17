@@ -278,6 +278,8 @@ mod tests {
             run_after: prefer_after.into_iter().map(sysname).collect(),
             context: false,
             states: vec![],
+            lookup: vec![],
+            preflight: false,
             entities: false,
             commands: false,
             inputs: inputs.into_iter().map(compname).collect(),
@@ -290,6 +292,7 @@ mod tests {
             component_untuple_code: String::new(),
             description: None,
             dependencies: Default::default(),
+            postflight: false,
         };
         system.finish_dependencies();
         system

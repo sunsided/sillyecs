@@ -12,9 +12,9 @@ A silly little compile-time generated archetype ECS in Rust.
 
 - [Installation](#installation)
 - [Usage](#usage)
-  - [Command Queue and Application-Specific Commands](#command-queue-and-application-specific-commands)
+    - [Command Queue and Application-Specific Commands](#command-queue-and-application-specific-commands)
 - [Examples](#examples)
-  - [WGPU Shader Compilation](#wgpu-shader-compilation)
+    - [WGPU Shader Compilation](#wgpu-shader-compilation)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -100,10 +100,10 @@ systems:
   - name: Physics
     phase: FixedUpdate
     context: true
-    run_after: []    # optional
+    run_after: [ ]    # optional
     preflight: true  # optional, extra scan before system run
     postflight: true # optional, extra scan after system run
-    lookup:          # optional
+    lookup: # optional
       - Particle     # request random access to particles in pre- or postflight
     inputs:
       - Velocity
@@ -116,7 +116,11 @@ systems:
     # on_request: true  # call world.request_render_phase() to allow execution (resets atomically)
     states:
       - use: WgpuRender
-        write: false  # optional
+        write: false       # optional, defaults for the below 
+        check: read        # optional: none|read|write
+        begin_phase: none  # optional: none|read|write
+        system: write      # optional: none|read|write
+        end_phase: none    # optional: none|read|write
     inputs:
       - Position
 
@@ -166,14 +170,14 @@ impl<UserCommand> CommandQueue<UserCommand> {
 
 impl<UserCommand> WorldUserCommand for CommandQueue<UserCommand>
 where
-        UserCommand: Send + Debug
+    UserCommand: Send + Debug
 {
-  type UserCommand = UserCommand;
+    type UserCommand = UserCommand;
 }
 
 impl<UserCommand> WorldCommandReceiver for CommandQueue<UserCommand>
 where
-        UserCommand: Send + Debug
+    UserCommand: Send + Debug
 {
     type Error = TryRecvError;
 

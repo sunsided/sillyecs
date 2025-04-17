@@ -11,6 +11,14 @@ use std::sync::atomic::AtomicU64;
 
 static SYSTEM_IDS: AtomicU64 = AtomicU64::new(1);
 
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum AccessType {
+    None,
+    Read,
+    Write,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct System {
     /// The ID of the system. Automatically generatedd.
@@ -88,6 +96,24 @@ pub struct StateUse {
     /// Whether write access is required.
     #[serde(default)]
     pub write: bool,
+    /// How the phase begin hook accesses the state.
+    #[serde(default)]
+    pub begin_phase: Option<AccessType>,
+    /// How the readiness check accesses the state.
+    #[serde(default)]
+    pub check: Option<AccessType>,
+    /// How the preflight accesses the state.
+    #[serde(default)]
+    pub preflight: Option<AccessType>,
+    /// How the system accesses the state.
+    #[serde(default)]
+    pub system: Option<AccessType>,
+    /// How the postflight accesses the state.
+    #[serde(default)]
+    pub postflight: Option<AccessType>,
+    /// How the phase end hook accesses the state.
+    #[serde(default)]
+    pub end_phase: Option<AccessType>,
 }
 
 impl System {
@@ -129,6 +155,51 @@ impl System {
 
     pub(crate) fn finish(&mut self, archetypes: &[Archetype]) {
         self.finish_dependencies();
+
+        for state in &mut self.states {
+            if state.begin_phase.is_none() {
+                state.begin_phase = Some(if state.write {
+                    AccessType::Write
+                } else {
+                    AccessType::Read
+                });
+            }
+            if state.check.is_none() {
+                state.check = Some(if state.write {
+                    AccessType::Write
+                } else {
+                    AccessType::Read
+                });
+            }
+            if state.preflight.is_none() {
+                state.preflight = Some(if state.write {
+                    AccessType::Write
+                } else {
+                    AccessType::Read
+                });
+            }
+            if state.system.is_none() {
+                state.system = Some(if state.write {
+                    AccessType::Write
+                } else {
+                    AccessType::Read
+                });
+            }
+            if state.postflight.is_none() {
+                state.postflight = Some(if state.write {
+                    AccessType::Write
+                } else {
+                    AccessType::Read
+                });
+            }
+            if state.end_phase.is_none() {
+                state.end_phase = Some(if state.write {
+                    AccessType::Write
+                } else {
+                    AccessType::Read
+                });
+            }
+        }
 
         let mut ids_and_names = Vec::new();
         'archetype: for archetype in archetypes {
