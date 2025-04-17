@@ -340,10 +340,19 @@ impl AsMut<{{ system.name.type }}Data> for {{ world.name.type }}Systems {
 {%- for archetype in world.archetypes %}
 
 /// Spawns an entity into the world.
-impl<E, Q> Spawn<{{ archetype.name.raw}}EntityData> for {{ world.name.type }}<E, Q> {
+impl<E, Q> Spawn<{{ archetype.name.raw }}EntityData> for {{ world.name.type }}<E, Q> {
     /// Spawn a new entity into the world.
     #[inline]
-    fn spawn(&mut self, data: {{ archetype.name.raw}}EntityData) -> EntityId {
+    fn spawn(&mut self, data: {{ archetype.name.raw }}EntityData) -> EntityId {
+        self.spawn_{{ archetype.name.field}}(data)
+    }
+}
+
+/// Spawns an entity into the world.
+impl<E, Q> Spawn<{{ archetype.name.raw }}EntityComponents> for {{ world.name.type }}<E, Q> {
+    /// Spawn a new entity into the world.
+    #[inline]
+    fn spawn(&mut self, data: {{ archetype.name.raw }}EntityComponents) -> EntityId {
         self.spawn_{{ archetype.name.field}}(data)
     }
 }
@@ -453,10 +462,14 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
 
     /// Spawn a new `{{ archetype.name.raw }}` entity into the world given its [`{{ archetype.name.raw }}EntityData`].
     #[inline]
-    pub fn spawn_{{ archetype.name.field }}(
+    pub fn spawn_{{ archetype.name.field }}<Entity>(
         &mut self,
-        {{ archetype.name.field }}: {{ archetype.name.raw }}EntityData
-    ) -> EntityId {
+        {{ archetype.name.field }}: Entity
+    ) -> EntityId
+    where
+        Entity: Into<{{ archetype.name.raw }}EntityComponents>
+    {
+        let {{ archetype.name.field }} = {{ archetype.name.field }}.into();
         self.spawn_{{ archetype.name.field }}_with(
             {%- for component_name in archetype.components %}
             {{ archetype.name.field }}.{{component_name.field}},

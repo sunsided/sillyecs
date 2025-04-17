@@ -331,7 +331,7 @@ In your world, you can now instantiate shaders and get them back:
 ```rust
 fn register_example_shader<E, Q>(world: &MainWorld<E, Q>) -> WgpuShaderEntityRef {
     let entity_id = world.spawn_wgpu_shader(WgpuShaderEntityData {
-        wgpu_shader: WgpuShaderData::new(include_wgsl!("shader.wgsl")).into(),
+        wgpu_shader: WgpuShaderData::new(include_wgsl!("shader.wgsl")),
     });
 
     // Get it back
