@@ -256,6 +256,7 @@ pub struct {{ world.name.type }}States {
     {%- endfor %}
 }
 
+#[allow(dead_code)]
 impl {{ world.name.type }}States {
     pub const fn new(
         {%- for state in world.states %}
@@ -1692,4 +1693,82 @@ where
 {
     type UserCommand = U;
 }
+{%- endfor %}
+{%- for component in ecs.components %}
+
+/// An iterator over all [`{{ component.name.raw }}`]({{ component.name.type }}) components, regardless of archetype.
+#[allow(dead_code)]
+// TODO: Simplify to ::core::slice::Iter<> if only one archetype has this component.
+pub type {{ component.name.raw }}ComponentIter<'a> = ::sillyecs::FlattenSlices<'a, {{ component.name.type }}>;
+
+/// A mutable iterator over all [`{{ component.name.raw }}`]({{ component.name.type }}) components, regardless of archetype.
+#[allow(dead_code)]
+// TODO: Simplify to ::core::slice::IterMut<> if only one archetype has this component.
+pub type {{ component.name.raw }}ComponentIterMut<'a> = ::sillyecs::FlattenSlicesMut<'a, {{ component.name.type }}>;
+
+/// A trait for types allowing to iterate all [`{{ component.name.raw }}`]({{ component.name.type }}) components, regardless of archetype.
+#[allow(dead_code)]
+pub trait Iter{{ component.name.raw }}Components<'a> {
+    type Iterator: core::iter::Iterator<Item = &'a {{ component.name.type }}>;
+
+    /// Iterates all [`{{ component.name.raw }}`]({{ component.name.type }}) components, regardless of archetype.
+    fn iter_{{ component.name.fields }}(&'a self) -> Self::Iterator;
+}
+
+/// A trait for types allowing to iterate all [`{{ component.name.raw }}`]({{ component.name.type }}) components, regardless of archetype.
+#[allow(dead_code)]
+pub trait IterMut{{ component.name.raw }}Components<'a> {
+    type IteratorMut: core::iter::Iterator<Item = &'a mut {{ component.name.type }}>;
+
+    /// Iterates all [`{{ component.name.raw }}`]({{ component.name.type }}) components, regardless of archetype.
+    fn iter_{{ component.name.fields }}(&'a mut self) -> Self::IteratorMut;
+}
+{%- endfor %}
+{%- for world in ecs.worlds %}
+{%- for component in world.components %}
+
+#[allow(dead_code)]
+impl<'a, E, Q> Iter{{ component.raw }}Components<'a> for {{ world.name.type }}<E, Q>
+{
+    type Iterator = {{ component.raw }}ComponentIter<'a>;
+
+    /// Iterates over the [`{{ component.raw }}`]({{ component.type}}) component of the following archetypes, in that order:
+    /// {%- for archetype in world.archetypes %}{% for arch_comp in archetype.components %}{% if arch_comp.type == component.type %}
+    /// - [`{{archetype.name.raw}}`]({{archetype.name.type}}){% endif %}{% endfor %}{% endfor %}
+    fn iter_{{ component.fields }}(&'a self) -> Self::Iterator {
+        // TODO: Simplify to ::core::slice::Iter<> if only one archetype has this component.
+        {{ component.raw }}ComponentIter::new([
+            {%- for archetype in world.archetypes %}
+            {%- for arch_comp in archetype.components %}
+            {%- if arch_comp.type == component.type %}
+            &self.archetypes.collection.{{archetype.name.field}}.{{ arch_comp.fields }},
+            {%- endif %}
+            {%- endfor %}
+            {%- endfor %}
+        ])
+    }
+}
+
+#[allow(dead_code)]
+impl<'a, E, Q> IterMut{{ component.raw }}Components<'a> for {{ world.name.type }}<E, Q>
+{
+    type IteratorMut = {{ component.raw }}ComponentIterMut<'a>;
+
+    /// Mutably iterates over the [`{{ component.raw }}`]({{ component.type}}) component of the following archetypes, in that order:
+    /// {%- for archetype in world.archetypes %}{% for arch_comp in archetype.components %}{% if arch_comp.type == component.type %}
+    /// - [`{{archetype.name.raw}}`]({{archetype.name.type}}){% endif %}{% endfor %}{% endfor %}
+    fn iter_{{ component.fields }}(&'a mut self) -> Self::IteratorMut {
+        // TODO: Simplify to ::core::slice::Iter<> if only one archetype has this component.
+        {{ component.raw }}ComponentIterMut::new([
+            {%- for archetype in world.archetypes %}
+            {%- for arch_comp in archetype.components %}
+            {%- if arch_comp.type == component.type %}
+            &mut self.archetypes.collection.{{archetype.name.field}}.{{ arch_comp.fields }},
+            {%- endif %}
+            {%- endfor %}
+            {%- endfor %}
+        ])
+    }
+}
+{%- endfor %}
 {%- endfor %}

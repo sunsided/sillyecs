@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::iter::FusedIterator;
 
 /// An iterator over a slice of slices.
 ///
@@ -43,12 +44,17 @@ impl<'a, T> FlattenSlices<'a, T> {
     }
 }
 
-impl<'a, T> core::iter::Iterator for FlattenSlices<'a, T> {
+impl<'a, T> Iterator for FlattenSlices<'a, T> {
     type Item = &'a T;
 
     fn next(&mut self) -> Option<Self::Item> {
-        while self.front < self.back {
+        while self.front <= self.back {
             let (slice_idx, elem_idx) = self.front;
+
+            if slice_idx > self.back.0 || (slice_idx == self.back.0 && elem_idx >= self.back.1) {
+                return None;
+            }
+
             let slice = &self.slices[slice_idx];
             if elem_idx < slice.len() {
                 let item = &slice[elem_idx];
@@ -84,30 +90,8 @@ impl<'a, T> core::iter::Iterator for FlattenSlices<'a, T> {
     }
 }
 
-impl<'a, T> core::iter::DoubleEndedIterator for FlattenSlices<'a, T> {
-    fn next_back(&mut self) -> Option<Self::Item> {
-        while self.front < self.back {
-            if self.back.1 > 0 {
-                self.back.1 -= 1;
-            } else {
-                if self.back.0 == 0 {
-                    return None;
-                }
-                self.back.0 -= 1;
-                self.back.1 = self.slices[self.back.0].len();
-                if self.back.1 == 0 {
-                    continue;
-                }
-                self.back.1 -= 1;
-            }
-            return Some(&self.slices[self.back.0][self.back.1]);
-        }
-        None
-    }
-}
-
-impl<'a, T> core::iter::ExactSizeIterator for FlattenSlices<'a, T> {}
-impl<'a, T> core::iter::FusedIterator for FlattenSlices<'a, T> {}
+impl<'a, T> ExactSizeIterator for FlattenSlices<'a, T> {}
+impl<'a, T> FusedIterator for FlattenSlices<'a, T> {}
 
 #[cfg(test)]
 mod tests {
@@ -127,19 +111,5 @@ mod tests {
         assert_eq!(iter.size_hint(), (6, Some(6)));
 
         assert_eq!(iter.copied().collect::<Vec<i32>>(), &[1, 2, 3, 4, 5, 6]);
-    }
-
-    #[test]
-    fn test_reverse() {
-        let s1 = &[1, 2][..];
-        let s2 = &[3][..];
-        let s3 = &[][..];
-        let s4 = &[4, 5, 6][..];
-
-        let iter = FlattenSlices::new([s1, s2, s3, s4]);
-        assert_eq!(
-            iter.rev().copied().collect::<Vec<i32>>(),
-            &[6, 5, 4, 3, 2, 1]
-        );
     }
 }
