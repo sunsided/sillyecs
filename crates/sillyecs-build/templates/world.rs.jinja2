@@ -1,52 +1,3 @@
-/// The ID of a world.
-#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
-pub struct WorldId(core::num::NonZeroU64);
-
-#[allow(dead_code)]
-impl WorldId {
-    /// Returns a new, unique world ID.
-    ///
-    /// Uniqueness is guaranteed by using a monotonically increasing `AtomicU64` counter
-    /// for generating IDs, starting from 1.
-    ///
-    /// # Implementation
-    /// This function uses a thread-safe counter with sequential consistency ordering
-    /// to ensure unique IDs even under concurrent access.
-    pub fn new() -> Self {
-        static WORLD_IDS: core::sync::atomic::AtomicU64 = core::sync::atomic::AtomicU64::new(1);
-        let id = WORLD_IDS.fetch_add(1, core::sync::atomic::Ordering::SeqCst);
-        WorldId(core::num::NonZeroU64::new(id).expect("ID was zero"))
-    }
-
-    /// Returns this ID as a [`NonZeroU64`](core::num::NonZeroU64) value.
-    pub const fn as_nonzero_u64(&self) -> core::num::NonZeroU64 {
-        self.0
-    }
-
-    /// Returns this ID as a `u64` value.
-    pub const fn as_u64(&self) -> u64 {
-        self.0.get()
-    }
-}
-
-impl core::hash::Hash for WorldId {
-    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
-        self.0.hash(state);
-    }
-}
-
-impl From<WorldId> for core::num::NonZeroU64 {
-    fn from(value: WorldId) -> core::num::NonZeroU64 {
-        value.as_nonzero_u64()
-    }
-}
-
-impl From<WorldId> for u64 {
-    fn from(value: WorldId) -> u64 {
-        value.as_u64()
-    }
-}
-
 /// A command in the [`World`].
 #[allow(dead_code)]
 pub enum WorldCommand<UserCommand> {
@@ -105,7 +56,7 @@ where
 #[allow(dead_code)]
 pub struct FrameContext {
     /// The world ID.
-    pub world_id: WorldId,
+    pub world_id: ::sillyecs::WorldId,
     /// The frame number.
     pub frame_number: u64,
     /// The delta time since the last frame.
@@ -121,7 +72,7 @@ pub struct FrameContext {
 #[allow(dead_code)]
 impl FrameContext {
     /// Constructs a new frame context.
-    fn new(world_id: WorldId) -> Self {
+    fn new(world_id: ::sillyecs::WorldId) -> Self {
         Self {
             world_id,
             frame_number: 0,
@@ -143,12 +94,12 @@ impl FrameContext {
 #[allow(dead_code)]
 pub trait World {
     /// The ID of this world.
-    const ID: WorldId;
+    const ID: ::sillyecs::WorldId;
 
     /// The ID of this world.
     #[inline]
     #[allow(dead_code)]
-    fn id(&self) -> WorldId {
+    fn id(&self) -> ::sillyecs::WorldId {
         Self::ID
     }
 }
@@ -230,7 +181,7 @@ pub struct {{ world.name.type }}<E, Q> {
 }
 
 impl<E, Q> World for {{ world.name.type }}<E, Q> {
-    const ID: WorldId = WorldId(core::num::NonZeroU64::new({{ world.id }}).expect("Invalid ID on ECS construction time"));
+    const ID: ::sillyecs::WorldId = ::sillyecs::WorldId::new_from(core::num::NonZeroU64::new({{ world.id }}).expect("Invalid ID on ECS construction time"));
 }
 {%- if (world.states | length) > 0 %}
 
