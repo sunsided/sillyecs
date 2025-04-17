@@ -695,11 +695,16 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
             &mut self.events,
             &self.context,
             {%- for state in phase.states %}
-            {%- if state.write %}
-            &mut self.states.{{ state.use.field }},
-            {%- else %}
-            &self.states.{{ state.use.field }},
-            {%- endif %}
+                {%- set access = state.begin_phase | default(value="none") %}
+                {%- if access == "none" %}
+                    {# skip #}
+                {%- elif access == "read" %}
+                    &self.states.{{ state.use.field }},
+                {%- elif access == "write" %}
+                    &mut self.states.{{ state.use.field }},
+                {%- else %}
+                    todo!("Invalid state use in ECS construction")
+                {%- endif %}
             {%- endfor %}
         )
         .inspect_err(|error| tracing::error!(%error, "Failed to handle phase begin events"))
@@ -712,11 +717,16 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
             result,
             &self.context,
             {%- for state in phase.states %}
-            {%- if state.write %}
-            &mut self.states.{{ state.use.field }},
-            {%- else %}
-            &self.states.{{ state.use.field }},
-            {%- endif %}
+                {%- set access = state.end_phase | default(value="none") %}
+                {%- if access == "none" %}
+                    {# skip #}
+                {%- elif access == "read" %}
+                    &self.states.{{ state.use.field }},
+                {%- elif access == "write" %}
+                    &mut self.states.{{ state.use.field }},
+                {%- else %}
+                    todo!("Invalid state use in ECS construction")
+                {%- endif %}
             {%- endfor %}
         )
         .inspect_err(|error| tracing::error!(%error, "Failed to handle phase end events"))
@@ -952,11 +962,16 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
             &mut self.events,
             &self.context,
             {%- for state in phase.states %}
-            {%- if state.write %}
-            &mut self.states.{{ state.use.field }},
-            {%- else %}
-            &self.states.{{ state.use.field }},
-            {%- endif %}
+                {%- set access = state.begin_phase | default(value="none") %}
+                {%- if access == "none" %}
+                    {# skip #}
+                {%- elif access == "read" %}
+                    &self.states.{{ state.use.field }},
+                {%- elif access == "write" %}
+                    &mut self.states.{{ state.use.field }},
+                {%- else %}
+                    todo!("Invalid state use in ECS construction")
+                {%- endif %}
             {%- endfor %}
         )
         .inspect_err(|error| tracing::error!(%error, "Failed to handle phase begin events"))
@@ -1175,11 +1190,16 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
             result,
             &self.context,
             {%- for state in phase.states %}
-            {%- if state.write %}
-            &mut self.states.{{ state.use.field }},
-            {%- else %}
-            &self.states.{{ state.use.field }},
-            {%- endif %}
+                {%- set access = state.end_phase | default(value="none") %}
+                {%- if access == "none" %}
+                    {# skip #}
+                {%- elif access == "read" %}
+                    &self.states.{{ state.use.field }},
+                {%- elif access == "write" %}
+                    &mut self.states.{{ state.use.field }},
+                {%- else %}
+                    todo!("Invalid state use in ECS construction")
+                {%- endif %}
             {%- endfor %}
         )
         .inspect_err(|error| tracing::error!(%error, "Failed to handle phase end events"))

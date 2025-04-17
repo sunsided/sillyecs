@@ -11,10 +11,11 @@ use std::sync::atomic::AtomicU64;
 
 static SYSTEM_IDS: AtomicU64 = AtomicU64::new(1);
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum AccessType {
     None,
+    #[default]
     Read,
     Write,
 }
@@ -93,27 +94,24 @@ pub struct StateUse {
     /// The name of the state.
     #[serde(rename = "use")]
     pub name: StateName,
-    /// Whether write access is required.
-    #[serde(default)]
-    pub write: bool,
     /// How the readiness check accesses the state.
     #[serde(default)]
-    pub check: Option<AccessType>,
+    pub check: AccessType,
     /// How the phase begin hook accesses the state.
     #[serde(default)]
-    pub begin_phase: Option<AccessType>,
+    pub begin_phase: AccessType,
     /// How the preflight accesses the state.
     #[serde(default)]
-    pub preflight: Option<AccessType>,
+    pub preflight: AccessType,
     /// How the system accesses the state.
     #[serde(default)]
-    pub system: Option<AccessType>,
+    pub system: AccessType,
     /// How the postflight accesses the state.
     #[serde(default)]
-    pub postflight: Option<AccessType>,
+    pub postflight: AccessType,
     /// How the phase end hook accesses the state.
     #[serde(default)]
-    pub end_phase: Option<AccessType>,
+    pub end_phase: AccessType,
 }
 
 impl AccessType {
@@ -124,17 +122,12 @@ impl AccessType {
 
 impl StateUse {
     pub fn any_write(&self) -> bool {
-        let default = if self.write {
-            AccessType::Write
-        } else {
-            AccessType::Read
-        };
-        self.check.unwrap_or(default).is_write()
-            || self.begin_phase.unwrap_or(default).is_write()
-            || self.preflight.unwrap_or(default).is_write()
-            || self.system.unwrap_or(default).is_write()
-            || self.postflight.unwrap_or(default).is_write()
-            || self.end_phase.unwrap_or(default).is_write()
+        self.check.is_write()
+            || self.begin_phase.is_write()
+            || self.preflight.is_write()
+            || self.system.is_write()
+            || self.postflight.is_write()
+            || self.end_phase.is_write()
     }
 }
 
@@ -175,28 +168,7 @@ impl System {
         }
     }
 
-    fn default_state_access(state: &mut Option<AccessType>, write: bool) {
-        if state.is_none() {
-            *state = Some(if write {
-                AccessType::Write
-            } else {
-                AccessType::Read
-            });
-        }
-    }
-
     pub(crate) fn finish(&mut self, archetypes: &[Archetype]) {
-        // Set state defaults before dependency resolution.
-        for state in &mut self.states {
-            Self::default_state_access(&mut state.check, state.write);
-            Self::default_state_access(&mut state.begin_phase, state.write);
-            Self::default_state_access(&mut state.preflight, state.write);
-            Self::default_state_access(&mut state.system, state.write);
-            Self::default_state_access(&mut state.postflight, state.write);
-            Self::default_state_access(&mut state.end_phase, state.write);
-        }
-
-        // Update dependencies after state defaults.
         self.finish_dependencies();
 
         let mut ids_and_names = Vec::new();

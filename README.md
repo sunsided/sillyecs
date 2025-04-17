@@ -93,8 +93,9 @@ phases:
   - name: Update
   - name: Render
     states:
-      - use: WgpuRender  # Use state in phase begin/end hooks
-        write: true
+      - use: WgpuRender    # Use state in phase begin/end hooks
+        begin_phase: write # optional: none|read|write, defaults to read
+        end_phase: write   # optional: none|read|write
 
 systems:
   - name: Physics
@@ -116,8 +117,7 @@ systems:
     # on_request: true  # call world.request_render_phase() to allow execution (resets atomically)
     states:
       - use: WgpuRender
-        write: false       # optional, defaults for the below 
-        check: read        # optional: none|read|write
+        check: read        # optional: none|read|write, defaults to read
         begin_phase: none  # optional: none|read|write
         system: write      # optional: none|read|write
         end_phase: none    # optional: none|read|write
