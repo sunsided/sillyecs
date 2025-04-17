@@ -51,58 +51,6 @@ where
     T: WorldCommandSender<UserCommand = U> + WorldCommandReceiver<UserCommand = U>
 { }
 
-/// A frame context.
-#[derive(Debug, Clone)]
-#[allow(dead_code)]
-pub struct FrameContext {
-    /// The world ID.
-    pub world_id: ::sillyecs::WorldId,
-    /// The frame number.
-    pub frame_number: u64,
-    /// The delta time since the last frame.
-    pub delta_time_secs: f32,
-    /// The fixed time for fixed-time systems. Defaults to 60 Hz (~16.66 ms).
-    pub fixed_time_secs: f32,
-    /// The start time of the current frame.
-    pub current_frame_start: std::time::Instant,
-    /// The start time of the last frame.
-    pub last_frame_start: std::time::Instant,
-}
-
-#[allow(dead_code)]
-impl FrameContext {
-    /// Constructs a new frame context.
-    fn new(world_id: ::sillyecs::WorldId) -> Self {
-        Self {
-            world_id,
-            frame_number: 0,
-            delta_time_secs: 0.0,
-            fixed_time_secs: 1.0 / 60.0,
-            current_frame_start: std::time::Instant::now(),
-            last_frame_start: std::time::Instant::now(),
-        }
-    }
-
-    /// Resets the frame context, e.g. after the application came back to foreground.
-    fn reset(&mut self) {
-        self.current_frame_start = std::time::Instant::now();
-        self.last_frame_start = std::time::Instant::now();
-    }
-}
-
-/// Marker trait for worlds.
-#[allow(dead_code)]
-pub trait World {
-    /// The ID of this world.
-    const ID: ::sillyecs::WorldId;
-
-    /// The ID of this world.
-    #[inline]
-    #[allow(dead_code)]
-    fn id(&self) -> ::sillyecs::WorldId {
-        Self::ID
-    }
-}
 {%- if ecs.any_phase_on_request %}
 
 /// Spawns an entity into the world.
@@ -164,7 +112,7 @@ pub struct {{ world.name.type }}<E, Q> {
     phase_flags: ConditionalPhaseFlags,
     {%- endif %}
     /// The frame context.
-    context: FrameContext,
+    context: ::sillyecs::FrameContext,
     {%- if ecs.any_phase_fixed %}
     /// The fixed-time accumulators.
     fixed_accumulators: FixedAccumulators,
@@ -180,7 +128,7 @@ pub struct {{ world.name.type }}<E, Q> {
     command_queue: Q
 }
 
-impl<E, Q> World for {{ world.name.type }}<E, Q> {
+impl<E, Q> ::sillyecs::World for {{ world.name.type }}<E, Q> {
     const ID: ::sillyecs::WorldId = ::sillyecs::WorldId::new_from(core::num::NonZeroU64::new({{ world.id }}).expect("Invalid ID on ECS construction time"));
 }
 {%- if (world.states | length) > 0 %}
@@ -357,7 +305,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
         E: SystemPhaseEvents,
         Q: WorldCommandQueue
     {
-        let context = FrameContext::new(Self::ID);
+        let context = ::sillyecs::FrameContext::new(<Self as ::sillyecs::World>::ID);
         Self {
             archetypes: Default::default(),
             systems: {{ world.name.type }}Systems {

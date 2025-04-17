@@ -208,7 +208,7 @@ impl System{{ phase.name.type }}Events for NoOpPhaseEvents {
     #[inline]
     fn on_begin_phase(
         &mut self,
-        _context: &FrameContext,
+        _context: &::sillyecs::FrameContext,
         {%- for state in phase.states %}
             {%- set access = state.begin_phase | default(value="none") %}
             {%- if access == "none" %}
@@ -229,7 +229,7 @@ impl System{{ phase.name.type }}Events for NoOpPhaseEvents {
     fn on_end_phase(
         &mut self,
         _result: Option<Self::Result>,
-        _context: &FrameContext,
+        _context: &::sillyecs::FrameContext,
         {%- for state in phase.states %}
             {%- set access = state.end_phase | default(value="none") %}
             {%- if access == "none" %}
@@ -257,7 +257,7 @@ pub trait System{{ phase.name.type }}Events {
     /// Executed at the beginning of the phase (before all systems).
     fn on_begin_phase(
         &mut self,
-        context: &FrameContext,
+        context: &::sillyecs::FrameContext,
         {%- for state in phase.states %}
             {%- set access = state.begin_phase | default(value="none") %}
             {%- if access == "none" %}
@@ -279,7 +279,7 @@ pub trait System{{ phase.name.type }}Events {
     fn on_end_phase(
         &mut self,
         result: Option<Self::Result>,
-        context: &FrameContext,
+        context: &::sillyecs::FrameContext,
         {%- for state in phase.states %}
             {%- set access = state.end_phase | default(value="none") %}
             {%- if access == "none" %}
@@ -341,7 +341,7 @@ pub trait Apply{{ system.name.type }}: System {
     fn is_ready(
         &self,
         {%- if system.needs_context %}
-        context: &FrameContext,
+        context: &::sillyecs::FrameContext,
         {%- endif %}
         {%- for state in system.states %}
             {%- set access = state.check | default(value="none") %}
@@ -368,7 +368,7 @@ pub trait Apply{{ system.name.type }}: System {
     fn on_begin_phase(
         &mut self,
         {%- if system.needs_context %}
-        context: &FrameContext,
+        context: &::sillyecs::FrameContext,
         {%- endif %}
         {%- for state in system.states %}
             {%- set access = state.begin_phase | default(value="none") %}
@@ -395,7 +395,7 @@ pub trait Apply{{ system.name.type }}: System {
     fn on_end_phase(
         &mut self,
         {%- if system.needs_context %}
-        context: &FrameContext,
+        context: &::sillyecs::FrameContext,
         {%- endif %}
         {%- for state in system.states %}
             {%- set access = state.end_phase | default(value="none") %}
@@ -430,7 +430,7 @@ pub trait Apply{{ system.name.type }}: System {
     fn preflight(
         &mut self,
         {%- if system.needs_context %}
-        context: &FrameContext,
+        context: &::sillyecs::FrameContext,
         {%- endif %}
         {%- if (system.lookup | count) > 0 %}
         lookup: Box<&dyn {{system.name.raw}}ComponentLookup>,
@@ -479,7 +479,7 @@ pub trait Apply{{ system.name.type }}: System {
     fn postflight(
         &mut self,
         {%- if system.needs_context %}
-        context: &FrameContext,
+        context: &::sillyecs::FrameContext,
         {%- endif %}
         {%- if (system.lookup | count) > 0 %}
         lookup: Box<&dyn {{system.name.raw}}ComponentLookup>,
@@ -527,7 +527,7 @@ pub trait Apply{{ system.name.type }}: System {
     fn apply_single(
         &mut self,
         {%- if system.needs_context %}
-        context: &FrameContext,
+        context: &::sillyecs::FrameContext,
         {%- endif %}
         {%- for state in system.states %}
             {%- set access = state.system | default(value="none") %}
@@ -569,7 +569,7 @@ pub trait Apply{{ system.name.type }}: System {
     fn apply_many(
         &mut self,
         {%- if system.needs_context %}
-        context: &FrameContext,
+        context: &::sillyecs::FrameContext,
         {%- endif %}
         {%- for state in system.states %}
             {%- set access = state.system | default(value="none") %}
@@ -634,7 +634,7 @@ impl {{ system.name.type }} {
     pub fn apply_single(
         &mut self,
         {%- if system.needs_context %}
-        context: &FrameContext,
+        context: &::sillyecs::FrameContext,
         {%- endif %}
         {%- for state in system.states %}
             {%- set access = state.system | default(value="none") %}
@@ -703,7 +703,7 @@ impl {{ system.name.type }} {
     fn apply_many(
         &mut self,
         {%- if system.needs_context %}
-        context: &FrameContext,
+        context: &::sillyecs::FrameContext,
         {%- endif %}
         {%- for state in system.states %}
             {%- set access = state.system | default(value="none") %}
