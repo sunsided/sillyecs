@@ -1697,6 +1697,7 @@ where
 
 /// An iterator over all [`{{ component.name.raw }}`]({{ component.name.type }}) components, regardless of archetype.
 #[allow(dead_code)]
+// TODO: Simplify to ::core::slice::Iter<> if only one archetype has this component.
 pub type {{ component.name.raw }}ComponentIterator<'a> = ::sillyecs::FlattenSlices<'a, {{ component.name.type }}>;
 
 /// A trait for types allowing to iterate all [`{{ component.name.raw }}`]({{ component.name.type }}) components, regardless of archetype.
@@ -1720,6 +1721,7 @@ impl<'a, E, Q> Iter{{ component.raw }}Components<'a> for {{ world.name.type }}<E
     /// {%- for archetype in world.archetypes %}{% for arch_comp in archetype.components %}{% if arch_comp.type == component.type %}
     /// - [`{{archetype.name.raw}}`]({{archetype.name.type}}){% endif %}{% endfor %}{% endfor %}
     fn iter_{{ component.fields }}(&'a self) -> Self::Iterator {
+        // TODO: Simplify to ::core::slice::Iter<> if only one archetype has this component.
         {{ component.raw }}ComponentIterator::new([
             {%- for archetype in world.archetypes %}
             {%- for arch_comp in archetype.components %}
