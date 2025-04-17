@@ -20,11 +20,11 @@ A silly little compile-time generated archetype ECS in Rust.
 
 ## Installation
 
-`sillyecs` is a build-time dependency. To use it, add this to your `Cargo.toml`:
+`sillyecs` is a maily build-time dependency. To use it, add this to your `Cargo.toml`:
 
 ```toml
 [build-dependencies]
-sillyecs = "0.0.6"
+sillyecs-build = "0.0.6"
 ```
 
 ## Usage
