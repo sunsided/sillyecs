@@ -9,3 +9,7 @@ authors = ["Markus Mayer <widemeadows@gmail.com>"]
 license = "EUPL-1.2"
 version = "0.0.6"
 edition = "2024"
+
+[features]
+default = ["prefetch"] # TODO: remove prefetch from defaults
+prefetch = []

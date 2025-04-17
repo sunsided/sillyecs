@@ -5,40 +5,19 @@ use std::iter::FusedIterator;
 /// Presents the inner slices as one contiguous set of mutable references.
 pub struct FlattenSlicesMut<'a, T> {
     slices: Box<[&'a mut [T]]>,
-    front: (usize, usize),
-    back: (usize, usize),
+    front: (usize, usize), // (slice index, element index)
 }
 
 impl<'a, T> FlattenSlicesMut<'a, T> {
     pub fn new<const N: usize>(slices: [&'a mut [T]; N]) -> Self {
-        let slices = Box::new(slices);
-        let mut back = (0, 0);
-        for (i, s) in slices.iter().enumerate().rev() {
-            if !s.is_empty() {
-                back = (i, s.len());
-                break;
-            }
-        }
-
         Self {
-            slices,
+            slices: Box::new(slices),
             front: (0, 0),
-            back,
         }
     }
 
     pub fn reset(&mut self) {
         self.front = (0, 0);
-        self.back = Self::compute_back(&self.slices);
-    }
-
-    fn compute_back(slices: &[&'a mut [T]]) -> (usize, usize) {
-        for (i, s) in slices.iter().enumerate().rev() {
-            if !s.is_empty() {
-                return (i, s.len());
-            }
-        }
-        (0, 0)
     }
 }
 
@@ -46,46 +25,62 @@ impl<'a, T> Iterator for FlattenSlicesMut<'a, T> {
     type Item = &'a mut T;
 
     fn next(&mut self) -> Option<Self::Item> {
-        while self.front < self.back {
-            let (slice_idx, elem_idx) = self.front;
+        const PREFETCH_THRESHOLD: usize = 4;
 
-            if let Some(slice) = self.slices.get_mut(slice_idx) {
-                if elem_idx < slice.len() {
-                    let item = unsafe {
-                        // Safety: we ensure unique access by advancing the front position immediately
-                        let item = &mut *(&mut slice[elem_idx] as *mut T);
-                        self.front.1 += 1;
-                        if self.front.1 >= slice.len() {
-                            self.front.0 += 1;
-                            self.front.1 = 0;
+        while self.front.0 < self.slices.len() {
+            let (slice_idx, elem_idx) = self.front;
+            let slice = &mut self.slices[slice_idx];
+
+            if elem_idx < slice.len() {
+                // SAFETY: We return exactly one &mut reference per item,
+                // and update `front` immediately after.
+                let item = unsafe {
+                    let ptr = slice.as_mut_ptr().add(elem_idx);
+                    self.front.1 += 1;
+
+                    if self.front.1 >= slice.len() {
+                        self.front.0 += 1;
+                        self.front.1 = 0;
+                    }
+
+                    // Prefetch next slice's start address if close to switching
+                    #[cfg(all(target_arch = "x86_64", target_feature = "sse"))]
+                    if slice.len() - elem_idx <= PREFETCH_THRESHOLD {
+                        let next_idx = slice_idx + 1;
+                        if next_idx < self.slices.len() {
+                            let next = &self.slices[next_idx];
+                            if !next.is_empty() {
+                                #[allow(unused_unsafe)]
+                                unsafe {
+                                    const STRATEGY: i32 = core::arch::x86_64::_MM_HINT_T0;
+                                    core::arch::x86_64::_mm_prefetch::<STRATEGY>(
+                                        next.as_ptr() as *const i8
+                                    );
+                                }
+                            }
                         }
-                        item
-                    };
-                    return Some(item);
-                } else {
-                    self.front.0 += 1;
-                    self.front.1 = 0;
-                }
+                    }
+
+                    &mut *ptr
+                };
+
+                return Some(item);
             } else {
-                break;
+                // Skip empty or exhausted slice
+                self.front.0 += 1;
+                self.front.1 = 0;
             }
         }
+
         None
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
         let mut count = 0;
-        for i in self.front.0..=self.back.0 {
+        for i in self.front.0..self.slices.len() {
             let slice = &self.slices[i];
             let start = if i == self.front.0 { self.front.1 } else { 0 };
-            let end = if i == self.back.0 {
-                self.back.1
-            } else {
-                slice.len()
-            };
-            if end > start {
-                count += end - start;
-            }
+            count += slice.len().saturating_sub(start);
         }
         (count, Some(count))
     }

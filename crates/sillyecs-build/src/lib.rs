@@ -58,23 +58,27 @@ where
     let field_name = field_name.as_ref();
 
     if field_name.ends_with('y') {
-        let bytes = field_name.as_bytes();
-        if bytes.len() >= 2 {
-            let penultimate = bytes[bytes.len() - 2] as char;
-            if !"aeiou".contains(penultimate) {
-                // Consonant + y => ies
+        if field_name.len() >= 2 {
+            let before_y = field_name.chars().nth_back(1).unwrap();
+            if !"aeiou".contains(before_y) {
                 return format!("{}ies", &field_name[..field_name.len() - 1]);
             }
         }
-        // Vowel + y => just add 's'
         return format!("{field_name}s");
-    } else if field_name.ends_with('s')
-        || field_name.ends_with("sh")
-        || field_name.ends_with("ch")
-        || field_name.ends_with('x')
-        || field_name.ends_with('z')
-    {
+    }
+
+    let suffixes = ["ch", "sh", "x", "z"];
+    if suffixes.iter().any(|s| field_name.ends_with(s)) {
         return format!("{field_name}es");
+    }
+
+    // Handle singular words ending in "s" carefully.
+    // If it's "ss" (e.g., "boss"), treat as needing "es".
+    // But if it ends in "s" and is not "ss", assume it's already plural.
+    if field_name.ends_with("ss") {
+        return format!("{field_name}es");
+    } else if field_name.ends_with('s') {
+        return field_name.to_string(); // likely already plural
     }
 
     format!("{field_name}s")
@@ -130,5 +134,6 @@ mod tests {
         assert_eq!(pluralize_name("boss"), "bosses");
         assert_eq!(pluralize_name("fox"), "foxes");
         assert_eq!(pluralize_name("door"), "doors");
+        assert_eq!(pluralize_name("stars"), "stars");
     }
 }
