@@ -235,6 +235,10 @@ impl<E, Q> World for {{ world.name.type }}<E, Q> {
 {%- if (world.states | length) > 0 %}
 
 /// The user states used in the world.
+///
+/// It encapsulates ownership of and access to the following state types:
+/// {% for state in world.states %}
+/// - [{{ state.name.type }}]({{ state.name.type }}){%- endfor %}
 #[derive(Debug, Default)]
 pub struct {{ world.name.type }}States {
     {%- for state in world.states %}
