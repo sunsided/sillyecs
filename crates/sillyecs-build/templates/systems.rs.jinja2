@@ -448,7 +448,7 @@ pub trait Apply{{ system.name.type }}: System {
             {%- endif %}
         {%- endfor %}
         {%- if system.needs_entities %}
-        entities: &[EntityId],
+        entities: &[::sillyecs::EntityId],
         {%- endif %}
         {%- for input in system.inputs %}
         {{ input.fields }}: &[{{ input.type }}],
@@ -497,7 +497,7 @@ pub trait Apply{{ system.name.type }}: System {
             {%- endif %}
         {%- endfor %}
         {%- if system.needs_entities %}
-        entities: &[EntityId],
+        entities: &[::sillyecs::EntityId],
         {%- endif %}
         {%- for input in system.inputs %}
         {{ input.fields }}: &[{{ input.type }}],
@@ -542,7 +542,7 @@ pub trait Apply{{ system.name.type }}: System {
             {%- endif %}
         {%- endfor %}
         {%- if system.needs_entities %}
-        entity: EntityId,
+        entity: ::sillyecs::EntityId,
         {%- endif %}
         {%- for input in system.inputs %}
         {{ input.field }}: &{{ input.type }},
@@ -584,7 +584,7 @@ pub trait Apply{{ system.name.type }}: System {
             {%- endif %}
         {%- endfor %}
         {%- if system.needs_entities %}
-        entities: &[EntityId],
+        entities: &[::sillyecs::EntityId],
         {%- endif %}
         {%- for input in system.inputs %}
         {{ input.fields }}: &[{{ input.type }}],
@@ -649,7 +649,7 @@ impl {{ system.name.type }} {
             {%- endif %}
         {%- endfor %}
         {%- if system.needs_entities %}
-        entity: EntityId,
+        entity: ::sillyecs::EntityId,
         {%- endif %}
         {%- for input in system.inputs %}
         {{ input.field }}: &{{ input.type }},
@@ -718,7 +718,7 @@ impl {{ system.name.type }} {
             {%- endif %}
         {%- endfor %}
         {%- if system.needs_entities %}
-        entities: &[EntityId],
+        entities: &[::sillyecs::EntityId],
         {%- endif %}
         {%- for input in system.inputs %}
         {{ input.fields }}: &[{{ input.type }}],
@@ -801,7 +801,7 @@ pub trait {{ system.name.raw }}ComponentLookup {
     {%- for component in system.lookup %}
     /// Gets the [`{{component.raw}}`]({{component.type}}) component of the specified entity.
     #[allow(dead_code, unused)]
-    fn get_{{component.field}}_component(&self, entity_id: EntityId) -> Option<&{{component.type}}>;
+    fn get_{{component.field}}_component(&self, entity_id: ::sillyecs::EntityId) -> Option<&{{component.type}}>;
     {%- endfor %}
 }
 
@@ -813,7 +813,7 @@ where
     /// Gets the [`{{component.raw}}`]({{component.type}}) component of the specified entity.
     #[allow(dead_code, unused)]
     #[inline]
-    fn get_{{component.field}}_component(&self, entity_id: EntityId) -> Option<&{{component.type}}> {
+    fn get_{{component.field}}_component(&self, entity_id: ::sillyecs::EntityId) -> Option<&{{component.type}}> {
         T::get_{{component.field}}_component(self, entity_id)
     }
     {%- endfor %}

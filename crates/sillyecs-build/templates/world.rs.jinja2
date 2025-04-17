@@ -56,7 +56,7 @@ pub enum WorldCommand<UserCommand> {
     /// Due to the reusability of systems, not all commands are valid in all worlds.
     SpawnEntity(ArchetypeEntityData),
     /// Despawn an entity.
-    DespawnEntity(EntityId),
+    DespawnEntity(::sillyecs::EntityId),
     /// A user-specific command.
     User(UserCommand)
 }
@@ -283,7 +283,7 @@ struct {{ world.name.type }}Archetypes {
     // Example:
     //      type EntityLocationMap<K, V> = fxhash::FxHashMap<K, V>;
     //
-    entity_locations: EntityLocationMap<EntityId, EntityArchetypeRef>,
+    entity_locations: EntityLocationMap<::sillyecs::EntityId, EntityArchetypeRef>,
 
     pub collection: {{ world.name.type }}ArchetypeCollection
 }
@@ -344,7 +344,7 @@ impl AsMut<{{ system.name.type }}Data> for {{ world.name.type }}Systems {
 impl<E, Q> Spawn<{{ archetype.name.raw }}EntityData> for {{ world.name.type }}<E, Q> {
     /// Spawn a new entity into the world.
     #[inline]
-    fn spawn(&mut self, data: {{ archetype.name.raw }}EntityData) -> EntityId {
+    fn spawn(&mut self, data: {{ archetype.name.raw }}EntityData) -> ::sillyecs::EntityId {
         self.spawn_{{ archetype.name.field}}(data)
     }
 }
@@ -353,7 +353,7 @@ impl<E, Q> Spawn<{{ archetype.name.raw }}EntityData> for {{ world.name.type }}<E
 impl<E, Q> Spawn<{{ archetype.name.raw }}EntityComponents> for {{ world.name.type }}<E, Q> {
     /// Spawn a new entity into the world.
     #[inline]
-    fn spawn(&mut self, data: {{ archetype.name.raw }}EntityComponents) -> EntityId {
+    fn spawn(&mut self, data: {{ archetype.name.raw }}EntityComponents) -> ::sillyecs::EntityId {
         self.spawn_{{ archetype.name.field}}(data)
     }
 }
@@ -362,7 +362,7 @@ impl<E, Q> Spawn<{{ archetype.name.raw }}EntityComponents> for {{ world.name.typ
 /// Helper trait to prevent accidental abuse of the Archetype's spawning function.
 pub trait WorldEntityRegistry {
     /// Registers an entity with the world.
-    fn register(&mut self, id: EntityId, archetype: EntityArchetypeRef) -> EntityId;
+    fn register(&mut self, id: ::sillyecs::EntityId, archetype: EntityArchetypeRef) -> ::sillyecs::EntityId;
 }
 
 #[allow(dead_code)]
@@ -445,8 +445,8 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
         self.archetypes.entity_locations.is_empty()
     }
 
-    /// De-spawns an entity given by its [`EntityId`]. Returns an error if the entity was unknown in this world.
-    pub fn despawn_by_id(&mut self, id: EntityId) -> Result<(), DespawnError> {
+    /// De-spawns an entity given by its [`::sillyecs::EntityId`]. Returns an error if the entity was unknown in this world.
+    pub fn despawn_by_id(&mut self, id: ::sillyecs::EntityId) -> Result<(), DespawnError> {
         self.handle_despawn_command(id)
     }
     {%- for phase in ecs.phases %}
@@ -466,7 +466,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
     pub fn spawn_{{ archetype.name.field }}<Entity>(
         &mut self,
         {{ archetype.name.field }}: Entity
-    ) -> EntityId
+    ) -> ::sillyecs::EntityId
     where
         Entity: Into<{{ archetype.name.raw }}EntityComponents>
     {
@@ -484,12 +484,12 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
         {%- for component_name in archetype.components %}
         {{component_name.field}}: {{ component_name.type }},
         {%- endfor %}
-    ) -> EntityId {
-        struct Registry<'a>(&'a mut EntityLocationMap<EntityId, EntityArchetypeRef>);
+    ) -> ::sillyecs::EntityId {
+        struct Registry<'a>(&'a mut EntityLocationMap<::sillyecs::EntityId, EntityArchetypeRef>);
 
         impl WorldEntityRegistry for Registry<'_> {
             #[inline(always)]
-            fn register(&mut self, id: EntityId, archetype: EntityArchetypeRef) -> EntityId {
+            fn register(&mut self, id: ::sillyecs::EntityId, archetype: EntityArchetypeRef) -> ::sillyecs::EntityId {
                 self.0.insert(id, archetype);
                 id
             }
@@ -1286,7 +1286,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
         }
     }
 
-    fn handle_despawn_command(&mut self, id: EntityId) -> Result<(), DespawnError> {
+    fn handle_despawn_command(&mut self, id: ::sillyecs::EntityId) -> Result<(), DespawnError> {
          if let Some(loc) = self.archetypes.entity_locations.remove(&id) {
             let result = match loc.archetype {
                 {%- for archetype in world.archetypes %}
@@ -1354,7 +1354,7 @@ impl Default for DeltaTimers {
 
 #[derive(Debug)]
 pub enum DespawnError {
-    EntityNotFound(EntityId),
+    EntityNotFound(::sillyecs::EntityId),
     InvalidIndexInArchetype(usize, ArchetypeId)
 }
 
@@ -1409,7 +1409,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
     #[allow(dead_code)]
     pub fn frontload_{{ archetype.name.fields }}(
         &mut self,
-        entities_to_frontload: &[EntityId],
+        entities_to_frontload: &[::sillyecs::EntityId],
         previous_frontload_pivot: Option<usize>
     ) -> usize {
         self.archetypes
@@ -1477,7 +1477,7 @@ pub trait ComponentAccess {
     /// Gets the [`{{component.name.raw}}`]({{component.name.type}}) component of the specified entity.
     #[allow(dead_code, unused)]
     #[inline]
-    fn get_{{component.name.field}}_component(&self, entity_id: EntityId) -> Option<&{{component.name.type}}> {
+    fn get_{{component.name.field}}_component(&self, entity_id: ::sillyecs::EntityId) -> Option<&{{component.name.type}}> {
         None
     }
     {%- endfor %}
@@ -1489,7 +1489,7 @@ pub trait ComponentAccessMut: ComponentAccess {
     /// Mutably gets the [`{{component.name.raw}}`]({{component.name.type}}) component of the specified entity.
     #[allow(dead_code, unused)]
     #[inline]
-    fn get_{{component.name.field}}_component_mut(&mut self, entity_id: EntityId) -> Option<&mut {{component.name.type}}> {
+    fn get_{{component.name.field}}_component_mut(&mut self, entity_id: ::sillyecs::EntityId) -> Option<&mut {{component.name.type}}> {
         None
     }
     {%- endfor %}
@@ -1503,7 +1503,7 @@ pub trait EntityAccess {
     #[inline]
     fn get_{{ archetype.name.field }}_entity(
         &self,
-        entity_id: EntityId
+        entity_id: ::sillyecs::EntityId
     ) -> Option<{{ archetype.name.raw }}EntityRef>
     {
         None
@@ -1519,7 +1519,7 @@ pub trait EntityAccessMut: EntityAccess {
     #[inline]
     fn get_{{ archetype.name.field }}_entity_mut(
         &mut self,
-        entity_id: EntityId
+        entity_id: ::sillyecs::EntityId
     ) -> Option<{{ archetype.name.raw }}EntityMut>
     {
         None
@@ -1537,7 +1537,7 @@ impl<E, Q> EntityAccess for {{ world.name.type }}<E, Q> {
     #[inline]
     fn get_{{ archetype.name.field }}_entity(
         &self,
-        entity_id: EntityId
+        entity_id: ::sillyecs::EntityId
     ) -> Option<{{ archetype.name.raw }}EntityRef>
     {
         EntityAccess::get_{{ archetype.name.field }}_entity(&self.archetypes, entity_id)
@@ -1556,7 +1556,7 @@ impl<E, Q> EntityAccessMut for {{ world.name.type }}<E, Q> {
     #[inline]
     fn get_{{ archetype.name.field }}_entity_mut(
         &mut self,
-        entity_id: EntityId
+        entity_id: ::sillyecs::EntityId
     ) -> Option<{{ archetype.name.raw }}EntityMut>
     {
         EntityAccessMut::get_{{ archetype.name.field }}_entity_mut(&mut self.archetypes, entity_id)
@@ -1573,7 +1573,7 @@ impl<E, Q> ComponentAccess for {{ world.name.type }}<E, Q> {
     /// Gets the [`{{component.raw}}`]({{component.type}}) component of the specified entity.
     #[allow(dead_code, unused)]
     #[inline]
-    fn get_{{component.field}}_component(&self, entity_id: EntityId) -> Option<&{{component.type}}> {
+    fn get_{{component.field}}_component(&self, entity_id: ::sillyecs::EntityId) -> Option<&{{component.type}}> {
         ComponentAccess::get_{{component.field}}_component(&self.archetypes, entity_id)
     }
     {%- endfor %}
@@ -1588,7 +1588,7 @@ impl<E, Q> ComponentAccessMut for {{ world.name.type }}<E, Q> {
     /// Mutably gets the [`{{component.raw}}`]({{component.type}}) component of the specified entity.
     #[allow(dead_code, unused)]
     #[inline]
-    fn get_{{component.field}}_component_mut(&mut self, entity_id: EntityId) -> Option<&mut {{component.type}}> {
+    fn get_{{component.field}}_component_mut(&mut self, entity_id: ::sillyecs::EntityId) -> Option<&mut {{component.type}}> {
         ComponentAccessMut::get_{{component.field}}_component_mut(&mut self.archetypes, entity_id)
     }
     {%- endfor %}
@@ -1604,7 +1604,7 @@ impl EntityAccess for {{ world.name.type }}Archetypes {
     #[allow(dead_code, unused)]
     fn get_{{ archetype.name.field }}_entity(
         &self,
-        entity_id: EntityId
+        entity_id: ::sillyecs::EntityId
     ) -> Option<{{ archetype.name.raw }}EntityRef>
     {
         let ear = self.entity_locations.get(&entity_id)?.clone();
@@ -1628,7 +1628,7 @@ impl EntityAccessMut for {{ world.name.type }}Archetypes {
     #[allow(dead_code, unused)]
     fn get_{{ archetype.name.field }}_entity_mut(
         &mut self,
-        entity_id: EntityId
+        entity_id: ::sillyecs::EntityId
     ) -> Option<{{ archetype.name.raw }}EntityMut>
     {
         let ear = self.entity_locations.get(&entity_id)?.clone();
@@ -1650,7 +1650,7 @@ impl ComponentAccess for {{ world.name.type }}Archetypes {
 
     /// Gets the `{{component.raw}}` component of the specified entity.
     #[allow(dead_code)]
-    fn get_{{component.field}}_component(&self, entity_id: EntityId) -> Option<&{{component.type}}> {
+    fn get_{{component.field}}_component(&self, entity_id: ::sillyecs::EntityId) -> Option<&{{component.type}}> {
         let ear = self.entity_locations.get(&entity_id)?.clone();
         match ear.archetype {
             {%- for archetype in archetypes %}
@@ -1671,7 +1671,7 @@ impl ComponentAccessMut for {{ world.name.type }}Archetypes {
 
     /// Mutably gets the `{{component.raw}}` component of the specified entity.
     #[allow(dead_code)]
-    fn get_{{component.field}}_component_mut(&mut self, entity_id: EntityId) -> Option<&mut {{component.type}}> {
+    fn get_{{component.field}}_component_mut(&mut self, entity_id: ::sillyecs::EntityId) -> Option<&mut {{component.type}}> {
         let ear = self.entity_locations.get(&entity_id)?.clone();
         match ear.archetype {
             {%- for archetype in archetypes %}

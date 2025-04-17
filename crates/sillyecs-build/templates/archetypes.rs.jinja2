@@ -1,58 +1,3 @@
-/// The ID of an entity.
-#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
-pub struct EntityId(core::num::NonZeroU64);
-
-#[allow(dead_code)]
-impl EntityId {
-    /// Returns a new, unique entity ID.
-    ///
-    /// Uniqueness is guaranteed by using a monotonically increasing `AtomicU64` counter
-    /// for generating IDs, starting from 1.
-    ///
-    /// # Implementation
-    /// This function uses a thread-safe counter with sequential consistency ordering
-    /// to ensure unique IDs even under concurrent access.
-    pub fn new() -> Self {
-        static ENTITY_IDS: core::sync::atomic::AtomicU64 = core::sync::atomic::AtomicU64::new(1);
-        let id = ENTITY_IDS.fetch_add(1, core::sync::atomic::Ordering::SeqCst);
-        EntityId(core::num::NonZeroU64::new(id).expect("ID was zero"))
-    }
-
-    /// Returns this ID as a [`NonZeroU64`](core::num::NonZeroU64) value.
-    pub const fn as_nonzero_u64(&self) -> core::num::NonZeroU64 {
-        self.0
-    }
-
-    /// Returns this ID as a `u64` value.
-    pub const fn as_u64(&self) -> u64 {
-        self.0.get()
-    }
-}
-
-impl core::hash::Hash for EntityId {
-    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
-        self.0.hash(state);
-    }
-}
-
-impl From<EntityId> for core::num::NonZeroU64 {
-    fn from(value: EntityId) -> core::num::NonZeroU64 {
-        value.as_nonzero_u64()
-    }
-}
-
-impl From<EntityId> for u64 {
-    fn from(value: EntityId) -> u64 {
-        value.as_u64()
-    }
-}
-
-impl core::fmt::Display for EntityId {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> Result<(), core::fmt::Error> {
-        core::fmt::Display::fmt(&self.0.get(), f)
-    }
-}
-
 /// The ID of an [`Archetype`].
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 #[repr(u32)]
@@ -135,7 +80,7 @@ pub struct EntityArchetypeRef {
 #[allow(dead_code)]
 pub trait Spawn<E> {
     /// Spawn a new entity into the world.
-    fn spawn(&mut self, data: E) -> EntityId;
+    fn spawn(&mut self, data: E) -> ::sillyecs::EntityId;
 }
 
 /// Marker trait for archetypes.
@@ -237,7 +182,7 @@ impl ArchetypeEntityData {
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub struct EntityWithIdAndData<Data: EntityData> {
-    pub id: EntityId,
+    pub id: ::sillyecs::EntityId,
     pub data: Data,
 }
 
@@ -254,7 +199,7 @@ pub trait EntityData {
 {%- endif %}
 #[derive(Debug, Default, Clone)]
 pub struct {{ archetype.name.type }} {
-    pub entities: Vec<EntityId>,
+    pub entities: Vec<::sillyecs::EntityId>,
     {%- for component_name in archetype.components %}
     pub {{ component_name.fields }}: Vec<{{ component_name.type }}>,
     {%- endfor %}
@@ -303,7 +248,7 @@ impl EntityData for {{ archetype.name.raw }}EntityComponents {
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub struct {{ archetype.name.raw }}EntityRef<'archetype> {
-    pub entity_id: EntityId,
+    pub entity_id: ::sillyecs::EntityId,
     {%- for component_name in archetype.components %}
     pub {{ component_name.field }}: &'archetype {{ component_name.type }},
     {%- endfor %}
@@ -313,7 +258,7 @@ pub struct {{ archetype.name.raw }}EntityRef<'archetype> {
 #[derive(Debug)]
 #[allow(dead_code)]
 pub struct {{ archetype.name.raw }}EntityMut<'archetype> {
-    pub entity_id: EntityId,
+    pub entity_id: ::sillyecs::EntityId,
     {%- for component_name in archetype.components %}
     pub {{ component_name.field }}: &'archetype mut {{ component_name.type }},
     {%- endfor %}
@@ -508,7 +453,7 @@ impl {{ archetype.name.raw }}EntityData {
     /// Spawn this entity into the given world.
     #[inline]
     #[allow(dead_code)]
-    pub fn spawn_into<W>(self, world: &mut W) -> EntityId
+    pub fn spawn_into<W>(self, world: &mut W) -> ::sillyecs::EntityId
     where
         W: Spawn<{{ archetype.name.raw }}EntityData>
     {
@@ -520,7 +465,7 @@ impl {{ archetype.name.raw }}EntityComponents {
     /// Spawn this entity into the given world.
     #[inline]
     #[allow(dead_code)]
-    pub fn spawn_into<W>(self, world: &mut W) -> EntityId
+    pub fn spawn_into<W>(self, world: &mut W) -> ::sillyecs::EntityId
     where
         W: Spawn<{{ archetype.name.raw }}EntityComponents>
     {
@@ -584,7 +529,7 @@ impl {{ archetype.name.type }} {
         {{component_name.field}}: {{ component_name.type }},
         {%- endfor %}
         mut world_registry: R
-    ) -> EntityId
+    ) -> ::sillyecs::EntityId
     where
         R: WorldEntityRegistry
     {
@@ -592,7 +537,7 @@ impl {{ archetype.name.type }} {
         self.{{ component_name.fields }}.push({{component_name.field}});
         {%- endfor %}
 
-        let entity_id = EntityId::new();
+        let entity_id = ::sillyecs::EntityId::new();
 
         let entity_index = self.entities.len();
         self.entities.push(entity_id);
@@ -609,7 +554,7 @@ impl {{ archetype.name.type }} {
     ///
     /// Returns the ID of the entity that was moved into the hole, or [`None`] if the archetype is now empty.
     #[doc(hidden)]
-    pub fn drop_at_index(&mut self, index: usize) -> Result<Option<EntityId>, usize> {
+    pub fn drop_at_index(&mut self, index: usize) -> Result<Option<::sillyecs::EntityId>, usize> {
         if index > self.entities.len() {
             return Err(index);
         }
@@ -701,7 +646,7 @@ pub trait GetEntityRef {
 {%- for archetype in ecs.archetypes %}
 
 impl core::ops::Index<usize> for {{ archetype.name.type }} {
-    type Output = EntityId;
+    type Output = ::sillyecs::EntityId;
 
     fn index(&self, index: usize) -> &Self::Output {
         &self.entities[index]
@@ -712,14 +657,14 @@ impl core::ops::Index<usize> for {{ archetype.name.type }} {
 #[allow(dead_code)]
 pub trait FrontloadEntities:
     Archetype
-    + core::ops::Index<usize, Output = EntityId>
+    + core::ops::Index<usize, Output = ::sillyecs::EntityId>
 {
     /// Frontloads entities provided by their IDs (e.g., from quadtree results).
     /// Returns the count of frontloaded entities.
     fn frontload(
         &mut self,
-        entity_lookup: &mut EntityLocationMap<EntityId, EntityArchetypeRef>,
-        entities_to_frontload: &[EntityId],
+        entity_lookup: &mut EntityLocationMap<::sillyecs::EntityId, EntityArchetypeRef>,
+        entities_to_frontload: &[::sillyecs::EntityId],
         previous_frontload_pivot: Option<usize>
     ) -> usize {
         // Collect and filter valid indices
@@ -745,7 +690,7 @@ pub trait FrontloadEntities:
     /// Returns the count of frontloaded entities.
     fn frontload_by_indices_sorted<I>(
         &mut self,
-        entity_lookup: &mut EntityLocationMap<EntityId, EntityArchetypeRef>,
+        entity_lookup: &mut EntityLocationMap<::sillyecs::EntityId, EntityArchetypeRef>,
         indices_to_frontload: I,
         previous_frontload_pivot: Option<usize>
     ) -> usize
@@ -805,13 +750,13 @@ pub trait FrontloadEntitiesScan:
     Archetype
     + FrontloadEntities
     + GetEntityRef
-    + core::ops::Index<usize, Output = EntityId>
+    + core::ops::Index<usize, Output = ::sillyecs::EntityId>
 {
     /// Frontloads entities satisfying `should_frontload`.
     /// Returns the number of entities frontloaded.
     fn frontload_scan<F>(
         &mut self,
-        entity_lookup: &mut EntityLocationMap<EntityId, EntityArchetypeRef>,
+        entity_lookup: &mut EntityLocationMap<::sillyecs::EntityId, EntityArchetypeRef>,
         mut should_frontload: F,
     ) -> usize
     where
