@@ -1634,6 +1634,10 @@ where
     type UserCommand = U;
 }
 {%- endfor %}
+
+/// An iterator over [`EntityId`](::sillyecs::EntityId) values.
+#[allow(dead_code)]
+pub type EntityIdIter<'a> = ::sillyecs::FlattenCopySlices<'a, ::sillyecs::EntityId>;
 {%- for component in ecs.components %}
 
 /// An iterator over all [`{{ component.name.raw }}`]({{ component.name.type }}) components, regardless of archetype.
@@ -1653,6 +1657,16 @@ pub trait Iter{{ component.name.raw }}Components<'a> {
 
     /// Iterates all [`{{ component.name.raw }}`]({{ component.name.type }}) components, regardless of archetype.
     fn iter_{{ component.name.fields }}(&'a self) -> Self::Iterator;
+}
+
+/// A trait for types allowing to iterate the [`EntityId`](::sillyecs::EntityId) values
+/// of all [`{{ component.name.raw }}`]({{ component.name.type }}) components, regardless of archetype.
+#[allow(dead_code)]
+pub trait Iter{{ component.name.raw }}Entities<'a> {
+    type Iterator: core::iter::Iterator<Item = ::sillyecs::EntityId>;
+
+    /// Iterates all entity IDs of [`{{ component.name.raw }}`]({{ component.name.type }}) components, regardless of archetype.
+    fn iter_{{ component.name.field }}_entities(&'a self) -> Self::Iterator;
 }
 
 /// A trait for types allowing to iterate all [`{{ component.name.raw }}`]({{ component.name.type }}) components, regardless of archetype.
@@ -1682,6 +1696,26 @@ impl<'a, E, Q> Iter{{ component.raw }}Components<'a> for {{ world.name.type }}<E
             {%- for arch_comp in archetype.components %}
             {%- if arch_comp.type == component.type %}
             &self.archetypes.collection.{{archetype.name.field}}.{{ arch_comp.fields }},
+            {%- endif %}
+            {%- endfor %}
+            {%- endfor %}
+        ])
+    }
+}
+
+#[allow(dead_code)]
+impl<'a, E, Q> Iter{{ component.raw }}Entities<'a> for {{ world.name.type }}<E, Q>
+{
+    type Iterator = EntityIdIter<'a>;
+
+    /// Iterates all entity IDs of [`{{ component.raw }}`]({{ component.type }}) components, regardless of archetype.
+    fn iter_{{ component.field }}_entities(&'a self) -> Self::Iterator {
+        // TODO: Simplify to ::core::slice::Iter<> if only one archetype has this component.
+        EntityIdIter::new([
+            {%- for archetype in world.archetypes %}
+            {%- for arch_comp in archetype.components %}
+            {%- if arch_comp.type == component.type %}
+            &self.archetypes.collection.{{archetype.name.field}}.entities,
             {%- endif %}
             {%- endfor %}
             {%- endfor %}
