@@ -1661,7 +1661,7 @@ pub trait IterMut{{ component.name.raw }}Components<'a> {
     type IteratorMut: core::iter::Iterator<Item = &'a mut {{ component.name.type }}>;
 
     /// Iterates all [`{{ component.name.raw }}`]({{ component.name.type }}) components, regardless of archetype.
-    fn iter_{{ component.name.fields }}(&'a mut self) -> Self::IteratorMut;
+    fn iter_{{ component.name.fields }}_mut(&'a mut self) -> Self::IteratorMut;
 }
 {%- endfor %}
 {%- for world in ecs.worlds %}
@@ -1697,7 +1697,7 @@ impl<'a, E, Q> IterMut{{ component.raw }}Components<'a> for {{ world.name.type }
     /// Mutably iterates over the [`{{ component.raw }}`]({{ component.type}}) component of the following archetypes, in that order:
     /// {%- for archetype in world.archetypes %}{% for arch_comp in archetype.components %}{% if arch_comp.type == component.type %}
     /// - [`{{archetype.name.raw}}`]({{archetype.name.type}}){% endif %}{% endfor %}{% endfor %}
-    fn iter_{{ component.fields }}(&'a mut self) -> Self::IteratorMut {
+    fn iter_{{ component.fields }}_mut(&'a mut self) -> Self::IteratorMut {
         // TODO: Simplify to ::core::slice::Iter<> if only one archetype has this component.
         {{ component.raw }}ComponentIterMut::new([
             {%- for archetype in world.archetypes %}
