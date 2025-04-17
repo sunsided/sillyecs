@@ -1,5 +1,5 @@
-use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
-use rand::{Rng, RngCore};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use rand::Rng;
 
 const NUM_ARCHETYPES: usize = 7;
 const COMPONENTS_PER_ARCHETYPE: usize = 1024;
@@ -7,7 +7,7 @@ const COMPONENTS_PER_ARCHETYPE: usize = 1024;
 #[derive(Debug, Clone, Copy)]
 struct Component(f32);
 
-// === Flat Iterator (baseline) ===
+// Flat Iterator (baseline)
 
 fn flat_slice_iter(data: &[Component]) -> f32 {
     let mut sum = 0.0;
@@ -17,7 +17,7 @@ fn flat_slice_iter(data: &[Component]) -> f32 {
     sum
 }
 
-// === FlattenSlices without prefetch ===
+// FlattenSlices without prefetch
 
 pub struct FlattenSlices<'a, T> {
     slices: [&'a [T]; NUM_ARCHETYPES],
@@ -57,7 +57,7 @@ impl<'a, T> Iterator for FlattenSlices<'a, T> {
     }
 }
 
-// === With prefetch ===
+// With prefetch
 
 pub struct FlattenSlicesPrefetch<'a, T> {
     slices: [&'a [T]; NUM_ARCHETYPES],
@@ -123,7 +123,7 @@ fn benchmark_flatten_slices(c: &mut Criterion) {
 
     // Generate data
     let mut rng = rand::rng();
-    let mut archetypes: [[Component; COMPONENTS_PER_ARCHETYPE]; NUM_ARCHETYPES] =
+    let archetypes: [[Component; COMPONENTS_PER_ARCHETYPE]; NUM_ARCHETYPES] =
         std::array::from_fn(|_| std::array::from_fn(|_| Component(rng.random())));
 
     let slice_refs: [&[Component]; NUM_ARCHETYPES] =

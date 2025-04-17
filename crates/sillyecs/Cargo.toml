@@ -10,10 +10,6 @@ license = "EUPL-1.2"
 version = "0.0.6"
 edition = "2024"
 
-[features]
-default = ["prefetch"] # TODO: remove prefetch from defaults
-prefetch = []
-
 [dev-dependencies]
 criterion = "0.5.1"
 rand = "0.9.1"

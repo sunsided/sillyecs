@@ -25,8 +25,6 @@ impl<'a, T> Iterator for FlattenSlicesMut<'a, T> {
     type Item = &'a mut T;
 
     fn next(&mut self) -> Option<Self::Item> {
-        const PREFETCH_THRESHOLD: usize = 4;
-
         while self.front.0 < self.slices.len() {
             let (slice_idx, elem_idx) = self.front;
             let slice = &mut self.slices[slice_idx];
@@ -35,7 +33,6 @@ impl<'a, T> Iterator for FlattenSlicesMut<'a, T> {
                 // SAFETY: We return exactly one &mut reference per item,
                 // and update `front` immediately after.
                 let item = unsafe {
-                    let ptr = slice.as_mut_ptr().add(elem_idx);
                     self.front.1 += 1;
 
                     if self.front.1 >= slice.len() {
@@ -43,24 +40,7 @@ impl<'a, T> Iterator for FlattenSlicesMut<'a, T> {
                         self.front.1 = 0;
                     }
 
-                    // Prefetch next slice's start address if close to switching
-                    #[cfg(all(target_arch = "x86_64", target_feature = "sse"))]
-                    if slice.len() - elem_idx <= PREFETCH_THRESHOLD {
-                        let next_idx = slice_idx + 1;
-                        if next_idx < self.slices.len() {
-                            let next = &self.slices[next_idx];
-                            if !next.is_empty() {
-                                #[allow(unused_unsafe)]
-                                unsafe {
-                                    const STRATEGY: i32 = core::arch::x86_64::_MM_HINT_T0;
-                                    core::arch::x86_64::_mm_prefetch::<STRATEGY>(
-                                        next.as_ptr() as *const i8
-                                    );
-                                }
-                            }
-                        }
-                    }
-
+                    let ptr = slice.as_mut_ptr().add(elem_idx);
                     &mut *ptr
                 };
 
