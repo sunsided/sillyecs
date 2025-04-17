@@ -1,3 +1,5 @@
+//! Build-time dependency of `sillyecs`, a silly little Archetype ECS system.
+
 mod archetype;
 mod code;
 mod component;
