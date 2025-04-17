@@ -49,15 +49,33 @@ impl Display for Name {
     }
 }
 
-fn pluralize_name(field_name: String) -> String {
-    let field_name = if let Some(prefix) = field_name.strip_suffix('y') {
-        format!("{prefix}ies")
-    } else if !field_name.ends_with('s') {
-        format!("{field_name}s")
-    } else {
-        field_name
-    };
-    field_name
+fn pluralize_name<S>(field_name: S) -> String
+where
+    S: AsRef<str>,
+{
+    let field_name = field_name.as_ref();
+
+    if field_name.ends_with('y') {
+        let bytes = field_name.as_bytes();
+        if bytes.len() >= 2 {
+            let penultimate = bytes[bytes.len() - 2] as char;
+            if !"aeiou".contains(penultimate) {
+                // Consonant + y => ies
+                return format!("{}ies", &field_name[..field_name.len() - 1]);
+            }
+        }
+        // Vowel + y => just add 's'
+        return format!("{field_name}s");
+    } else if field_name.ends_with('s')
+        || field_name.ends_with("sh")
+        || field_name.ends_with("ch")
+        || field_name.ends_with('x')
+        || field_name.ends_with('z')
+    {
+        return format!("{field_name}es");
+    }
+
+    format!("{field_name}s")
 }
 
 fn snake_case_filter(value: String) -> String {
@@ -98,5 +116,17 @@ mod tests {
         for (input, expected) in cases {
             assert_eq!(pascal_to_snake(&input.to_string()), expected);
         }
+    }
+
+    #[test]
+    fn test_pluralize_name() {
+        assert_eq!(pluralize_name("velocity"), "velocities");
+        assert_eq!(pluralize_name("component"), "components");
+        assert_eq!(pluralize_name("TimeOfDay"), "TimeOfDays");
+        assert_eq!(pluralize_name("box"), "boxes");
+        assert_eq!(pluralize_name("brush"), "brushes");
+        assert_eq!(pluralize_name("boss"), "bosses");
+        assert_eq!(pluralize_name("fox"), "foxes");
+        assert_eq!(pluralize_name("door"), "doors");
     }
 }
