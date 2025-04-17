@@ -261,18 +261,41 @@ pub struct {{ archetype.name.type }} {
 }
 
 /// An entity of the [`{{ archetype.name.type }}`].
-pub type {{ archetype.name.raw }}Entity = EntityWithIdAndData<{{ archetype.name.raw }}EntityData>;
+pub type {{ archetype.name.raw }}Entity = EntityWithIdAndData<{{ archetype.name.raw }}EntityComponents>;
+
+/// The data of an entity of the [`{{ archetype.name.type }}`].
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
+pub struct {{ archetype.name.raw }}EntityData {
+    {%- for component_name in archetype.components %}
+    pub {{ component_name.field }}: {{ component_name.raw }}Data,
+    {%- endfor %}
+}
 
 /// An entity of the [`{{ archetype.name.type }}`].
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
-pub struct {{ archetype.name.raw }}EntityData {
+pub struct {{ archetype.name.raw }}EntityComponents {
     {%- for component_name in archetype.components %}
     pub {{ component_name.field }}: {{ component_name.type }},
     {%- endfor %}
 }
 
+impl From<{{ archetype.name.raw }}EntityData> for {{ archetype.name.raw }}EntityComponents {
+    fn from(value: {{ archetype.name.raw }}EntityData) -> Self {
+        Self {
+            {%- for component_name in archetype.components %}
+            {{ component_name.field }}: value.{{ component_name.field }}.into(),
+            {%- endfor %}
+        }
+    }
+}
+
 impl EntityData for {{ archetype.name.raw }}EntityData {
+    const ARCHETYPE_ID: ArchetypeId = {{archetype.name.type}}::ID;
+}
+
+impl EntityData for {{ archetype.name.raw }}EntityComponents {
     const ARCHETYPE_ID: ArchetypeId = {{archetype.name.type}}::ID;
 }
 
@@ -469,7 +492,7 @@ impl HasComponent<{{ component_name.type }}> for {{ archetype.name.raw }}Entity 
 }
 
 #[allow(dead_code)]
-impl HasComponent<{{ component_name.type }}> for {{ archetype.name.raw }}EntityData {
+impl HasComponent<{{ component_name.type }}> for {{ archetype.name.raw }}EntityComponents {
     #[inline]
     fn get(&self) -> &{{ component_name.type }} {
         &self.{{ component_name.field }}
@@ -487,14 +510,26 @@ impl {{ archetype.name.raw }}EntityData {
     #[allow(dead_code)]
     pub fn spawn_into<W>(self, world: &mut W) -> EntityId
     where
-        W: Spawn<{{ archetype.name.raw}}EntityData>
+        W: Spawn<{{ archetype.name.raw }}EntityData>
+    {
+        world.spawn(self)
+    }
+}
+
+impl {{ archetype.name.raw }}EntityComponents {
+    /// Spawn this entity into the given world.
+    #[inline]
+    #[allow(dead_code)]
+    pub fn spawn_into<W>(self, world: &mut W) -> EntityId
+    where
+        W: Spawn<{{ archetype.name.raw }}EntityComponents>
     {
         world.spawn(self)
     }
 }
 
 impl core::ops::Deref for {{ archetype.name.raw }}Entity {
-    type Target = {{ archetype.name.raw }}EntityData;
+    type Target = {{ archetype.name.raw }}EntityComponents;
 
     fn deref(&self) -> &Self::Target {
         &self.data
