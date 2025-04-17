@@ -218,7 +218,7 @@ impl System{{ phase.name.type }}Events for NoOpPhaseEvents {
             {%- elif access == "write" %}
                 _{{ state.use.field }}: &mut {{ state.use.type }},
             {%- else %}
-                todo!("Invalid state use in ECS construction")
+                todo!("Invalid state use in ECS construction"),
             {%- endif %}
         {%- endfor %}
     ) -> Result<(), Self::Error> {
@@ -239,7 +239,7 @@ impl System{{ phase.name.type }}Events for NoOpPhaseEvents {
             {%- elif access == "write" %}
                 _{{ state.use.field }}: &mut {{ state.use.type }},
             {%- else %}
-                todo!("Invalid state use in ECS construction")
+                todo!("Invalid state use in ECS construction"),
             {%- endif %}
         {%- endfor %}
     ) -> Result<(), Self::Error> {
@@ -267,7 +267,7 @@ pub trait System{{ phase.name.type }}Events {
             {%- elif access == "write" %}
                 {{ state.use.field }}: &mut {{ state.use.type }},
             {%- else %}
-                todo!("Invalid state use in ECS construction")
+                todo!("Invalid state use in ECS construction"),
             {%- endif %}
         {%- endfor %}
     ) -> Result<Self::Result, Self::Error>;
@@ -289,7 +289,7 @@ pub trait System{{ phase.name.type }}Events {
             {%- elif access == "write" %}
                 {{ state.use.field }}: &mut {{ state.use.type }},
             {%- else %}
-                todo!("Invalid state use in ECS construction")
+                todo!("Invalid state use in ECS construction"),
             {%- endif %}
         {%- endfor %}
     ) -> Result<(), Self::Error>;
@@ -352,7 +352,7 @@ pub trait Apply{{ system.name.type }}: System {
             {%- elif access == "write" %}
                 {{ state.use.field }}: &mut {{ state.use.type }},
             {%- else %}
-                todo!("Invalid state use in ECS construction")
+                todo!("Invalid state use in ECS construction"),
             {%- endif %}
         {%- endfor %}
     ) -> bool {
@@ -379,7 +379,7 @@ pub trait Apply{{ system.name.type }}: System {
             {%- elif access == "write" %}
                 {{ state.use.field }}: &mut {{ state.use.type }},
             {%- else %}
-                todo!("Invalid state use in ECS construction")
+                todo!("Invalid state use in ECS construction"),
             {%- endif %}
         {%- endfor %}
     ) -> Result<(), Self::Error> {
@@ -406,7 +406,7 @@ pub trait Apply{{ system.name.type }}: System {
             {%- elif access == "write" %}
                 {{ state.use.field }}: &mut {{ state.use.type }},
             {%- else %}
-                todo!("Invalid state use in ECS construction")
+                todo!("Invalid state use in ECS construction"),
             {%- endif %}
         {%- endfor %}
     ) -> Result<(), Self::Error> {
@@ -444,7 +444,7 @@ pub trait Apply{{ system.name.type }}: System {
             {%- elif access == "write" %}
                 {{ state.use.field }}: &mut {{ state.use.type }},
             {%- else %}
-                todo!("Invalid state use in ECS construction")
+                todo!("Invalid state use in ECS construction"),
             {%- endif %}
         {%- endfor %}
         {%- if system.needs_entities %}
@@ -492,7 +492,7 @@ pub trait Apply{{ system.name.type }}: System {
         {%- elif access == "write" %}
             {{ state.use.field }}: &mut {{ state.use.type }},
         {%- else %}
-            todo!("Invalid state use in ECS construction")
+            todo!("Invalid state use in ECS construction"),
         {%- endif %}
         {%- if system.needs_entities %}
         entities: &[EntityId],
@@ -536,7 +536,7 @@ pub trait Apply{{ system.name.type }}: System {
             {%- elif access == "write" %}
                 {{ state.use.field }}: &mut {{ state.use.type }},
             {%- else %}
-                todo!("Invalid state use in ECS construction")
+                todo!("Invalid state use in ECS construction"),
             {%- endif %}
         {%- endfor %}
         {%- if system.needs_entities %}
@@ -578,7 +578,7 @@ pub trait Apply{{ system.name.type }}: System {
             {%- elif access == "write" %}
                 {{ state.use.field }}: &mut {{ state.use.type }},
             {%- else %}
-                todo!("Invalid state use in ECS construction")
+                todo!("Invalid state use in ECS construction"),
             {%- endif %}
         {%- endfor %}
         {%- if system.needs_entities %}
@@ -601,7 +601,12 @@ pub trait Apply{{ system.name.type }}: System {
                 &context,
                 {%- endif %}
                 {%- for state in system.states %}
-                {{ state.use.field }},
+                    {%- set access = state.system | default(value="none") %}
+                    {%- if access == "none" %}
+                        {# skip #}
+                    {%- else %}
+                        {{ state.use.field }},
+                    {%- endif %}
                 {%- endfor %}
                 {%- if system.needs_entities %}
                 *entity,
@@ -638,7 +643,7 @@ impl {{ system.name.type }} {
             {%- elif access == "write" %}
                 {{ state.use.field }}: &mut {{ state.use.type }},
             {%- else %}
-                todo!("Invalid state use in ECS construction")
+                todo!("Invalid state use in ECS construction"),
             {%- endif %}
         {%- endfor %}
         {%- if system.needs_entities %}
@@ -661,7 +666,12 @@ impl {{ system.name.type }} {
             context,
             {%- endif %}
             {%- for state in system.states %}
-            {{ state.use.field }},
+                {%- set access = state.system | default(value="none") %}
+                {%- if access == "none" %}
+                    {# skip #}
+                {%- else %}
+                    {{ state.use.field }},
+                {%- endif %}
             {%- endfor %}
             {%- if system.needs_entities %}
             entity,
@@ -702,7 +712,7 @@ impl {{ system.name.type }} {
             {%- elif access == "write" %}
                 {{ state.use.field }}: &mut {{ state.use.type }},
             {%- else %}
-                todo!("Invalid state use in ECS construction")
+                todo!("Invalid state use in ECS construction"),
             {%- endif %}
         {%- endfor %}
         {%- if system.needs_entities %}
@@ -725,7 +735,12 @@ impl {{ system.name.type }} {
             context,
             {%- endif %}
             {%- for state in system.states %}
-            {{ state.use.field }},
+                {%- set access = state.system | default(value="none") %}
+                {%- if access == "none" %}
+                    {# skip #}
+                {%- else %}
+                    {{ state.use.field }},
+                {%- endif %}
             {%- endfor %}
             {%- if system.needs_entities %}
             entities,

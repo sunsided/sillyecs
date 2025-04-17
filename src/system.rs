@@ -94,24 +94,27 @@ pub struct StateUse {
     /// The name of the state.
     #[serde(rename = "use")]
     pub name: StateName,
+    /// How the default access level.
+    #[serde(default)]
+    pub default: AccessType,
     /// How the readiness check accesses the state.
     #[serde(default)]
-    pub check: AccessType,
+    pub check: Option<AccessType>,
     /// How the phase begin hook accesses the state.
     #[serde(default)]
-    pub begin_phase: AccessType,
+    pub begin_phase: Option<AccessType>,
     /// How the preflight accesses the state.
     #[serde(default)]
-    pub preflight: AccessType,
+    pub preflight: Option<AccessType>,
     /// How the system accesses the state.
     #[serde(default)]
-    pub system: AccessType,
+    pub system: Option<AccessType>,
     /// How the postflight accesses the state.
     #[serde(default)]
-    pub postflight: AccessType,
+    pub postflight: Option<AccessType>,
     /// How the phase end hook accesses the state.
     #[serde(default)]
-    pub end_phase: AccessType,
+    pub end_phase: Option<AccessType>,
 }
 
 impl AccessType {
@@ -122,12 +125,18 @@ impl AccessType {
 
 impl StateUse {
     pub fn any_write(&self) -> bool {
-        self.check.is_write()
-            || self.begin_phase.is_write()
-            || self.preflight.is_write()
-            || self.system.is_write()
-            || self.postflight.is_write()
-            || self.end_phase.is_write()
+        self.check.unwrap_or(self.default).is_write()
+            || self.begin_phase.unwrap_or(self.default).is_write()
+            || self.preflight.unwrap_or(self.default).is_write()
+            || self.system.unwrap_or(self.default).is_write()
+            || self.postflight.unwrap_or(self.default).is_write()
+            || self.end_phase.unwrap_or(self.default).is_write()
+    }
+}
+
+fn set_default_state(state: &mut Option<AccessType>, default: AccessType) {
+    if state.is_none() {
+        *state = Some(default);
     }
 }
 
@@ -168,7 +177,20 @@ impl System {
         }
     }
 
+    fn apply_state_defaults(&mut self) {
+        for state in &mut self.states {
+            set_default_state(&mut state.check, state.default);
+            set_default_state(&mut state.begin_phase, state.default);
+            set_default_state(&mut state.preflight, state.default);
+            set_default_state(&mut state.system, state.default);
+            set_default_state(&mut state.postflight, state.default);
+            set_default_state(&mut state.end_phase, state.default);
+        }
+    }
+
     pub(crate) fn finish(&mut self, archetypes: &[Archetype]) {
+        // Set dependencies after default states
+        self.apply_state_defaults();
         self.finish_dependencies();
 
         let mut ids_and_names = Vec::new();
