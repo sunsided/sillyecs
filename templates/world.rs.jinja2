@@ -1134,7 +1134,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                                 {%- if system.needs_context %}
                                 &self.context,
                                 {%- endif %}
-                                {%- if (system.lookup | preflightcount) > 0 %}
+                                {%- if (system.lookup | count) > 0 %}
                                 Box::new(&self.archetypes),
                                 {%- endif -%}
                                 {%- for state in system.states %}

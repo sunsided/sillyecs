@@ -484,16 +484,18 @@ pub trait Apply{{ system.name.type }}: System {
         {%- if (system.lookup | count) > 0 %}
         lookup: Box<&dyn {{system.name.raw}}ComponentLookup>,
         {%- endif -%}
-        {%- set access = state.postflight | default(value="none") %}
-        {%- if access == "none" %}
-            {# skip #}
-        {%- elif access == "read" %}
-            {{ state.use.field }}: &{{ state.use.type }},
-        {%- elif access == "write" %}
-            {{ state.use.field }}: &mut {{ state.use.type }},
-        {%- else %}
-            todo!("Invalid state use in ECS construction"),
-        {%- endif %}
+        {%- for state in system.states %}
+            {%- set access = state.postflight | default(value="none") %}
+            {%- if access == "none" %}
+                {# skip #}
+            {%- elif access == "read" %}
+                {{ state.use.field }}: &{{ state.use.type }},
+            {%- elif access == "write" %}
+                {{ state.use.field }}: &mut {{ state.use.type }},
+            {%- else %}
+                todo!("Invalid state use in ECS construction"),
+            {%- endif %}
+        {%- endfor %}
         {%- if system.needs_entities %}
         entities: &[EntityId],
         {%- endif %}
