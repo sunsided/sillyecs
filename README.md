@@ -117,7 +117,8 @@ systems:
     # on_request: true  # call world.request_render_phase() to allow execution (resets atomically)
     states:
       - use: WgpuRender
-        check: read        # optional: none|read|write, defaults to read
+        default: none      # The default for the below values; optional: none|read|write, defaults to read
+        check: read        # optional: none|read|write
         begin_phase: none  # optional: none|read|write
         system: write      # optional: none|read|write
         end_phase: none    # optional: none|read|write
@@ -253,7 +254,9 @@ systems:
     phase: WgpuReinit
     states:
       - use: WgpuRender
-        write: true
+        default: none
+        check: read
+        system: write
     outputs:
       - WgpuShader
 ```
@@ -298,7 +301,7 @@ impl CreateSystem<WgpuInitShaderSystem> for SystemFactory {
 impl ApplyWgpuInitShaderSystem for WgpuInitShaderSystem {
     type Error = Infallible;
 
-    fn is_ready(&self, gpu: &mut WgpuRenderState) -> bool {
+    fn is_ready(&self, gpu: &WgpuRenderState) -> bool {
         gpu.is_ready()
     }
 
