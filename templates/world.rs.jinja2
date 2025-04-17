@@ -235,6 +235,10 @@ impl<E, Q> World for {{ world.name.type }}<E, Q> {
 {%- if (world.states | length) > 0 %}
 
 /// The user states used in the world.
+///
+/// It encapsulates ownership of and access to the following state types:
+/// {% for state in world.states %}
+/// - [{{ state.name.type }}]({{ state.name.type }}){%- endfor %}
 #[derive(Debug, Default)]
 pub struct {{ world.name.type }}States {
     {%- for state in world.states %}
@@ -251,6 +255,22 @@ pub struct {{ world.name.type }}States {
     pub {{ state.name.field }}: {{ state.name.type }},
     {%- endfor %}
 }
+
+impl {{ world.name.type }}States {
+    pub const fn new(
+        {%- for state in world.states %}
+        {{ state.name.field }}: {{ state.name.type }},
+        {%- endfor %}
+    ) -> Self {
+        Self {
+            {%- for state in world.states %}
+            {{ state.name.field }},
+            {%- endfor %}
+        }
+    }
+}
+
+
 {%- endif %}
 
 /// The archetypes used in the world.
@@ -340,9 +360,9 @@ impl<Q> {{ world.name.type }}<NoOpPhaseEvents, Q> {
     /// Creates a new [`{{ world.name.type }}`].
     pub fn new<S>(
         create_systems: &S,
-        {%- for state in world.states %}
-        {{ state.name.field }}: {{ state.name.type }},
-        {%- endfor %}
+        {%- if (world.states | length) > 0 %}
+        states: {{ world.name.type }}States,
+        {%- endif %}
         command_queue: Q) -> Self
     where
         S: CreateSystems,
@@ -350,9 +370,9 @@ impl<Q> {{ world.name.type }}<NoOpPhaseEvents, Q> {
     {
         Self::new_with_events(
             create_systems,
-            {%- for state in world.states %}
-            {{ state.name.field }},
-            {%- endfor %}
+            {%- if (world.states | length) > 0 %}
+            states,
+            {%- endif %}
             command_queue,
             NoOpPhaseEvents
         )
@@ -364,9 +384,9 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
     /// Creates a new [`{{ world.name.type }}`].
     pub fn new_with_events<S>(
         create_systems: &S,
-        {%- for state in world.states %}
-        {{ state.name.field }}: {{ state.name.type }},
-        {%- endfor %}
+        {%- if (world.states | length) > 0 %}
+        states: {{ world.name.type }}States,
+        {%- endif %}
         command_queue: Q,
         phase_events: E) -> Self
     where
@@ -389,11 +409,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
             {%- endif %}
             context,
             {%- if (world.states | length) > 0 %}
-            states: {{ world.name.type }}States {
-                {%- for state in world.states %}
-                {{ state.name.field }},
-                {%- endfor %}
-            },
+            states,
             {%- endif %}
             {%- if ecs.any_phase_fixed %}
             fixed_accumulators: Default::default(),
