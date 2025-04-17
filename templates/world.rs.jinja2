@@ -746,11 +746,16 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                &self.context,
                {%- endif %}
                {%- for state in system.states %}
-               {%- if state.write %}
-               &mut self.states.{{ state.use.field }},
-               {%- else %}
-               &self.states.{{ state.use.field }},
-               {%- endif %}
+                   {%- set access = state.check | default(value="none") %}
+                   {%- if access == "none" %}
+                       {# skip #}
+                   {%- elif access == "read" %}
+                       &self.states.{{ state.use.field }},
+                   {%- elif access == "write" %}
+                       &mut self.states.{{ state.use.field }},
+                   {%- else %}
+                       todo!("Invalid state use in ECS construction")
+                   {%- endif %}
                {%- endfor %}
            );
         if is_ready && self.systems.{{ system.name.field }}.on_begin_phase(
@@ -758,11 +763,16 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                 &self.context,
                 {%- endif %}
                 {%- for state in system.states %}
-                {%- if state.write %}
-                &mut self.states.{{ state.use.field }},
-                {%- else %}
-                &self.states.{{ state.use.field }},
-                {%- endif %}
+                    {%- set access = state.begin_phase | default(value="none") %}
+                    {%- if access == "none" %}
+                        {# skip #}
+                    {%- elif access == "read" %}
+                        &self.states.{{ state.use.field }},
+                    {%- elif access == "write" %}
+                        &mut self.states.{{ state.use.field }},
+                    {%- else %}
+                        todo!("Invalid state use in ECS construction")
+                    {%- endif %}
                 {%- endfor %}
             )
             .inspect_err(|error| tracing::error!(?error, "{{ system.name.type }}::on_begin_phase returned an error"))
@@ -781,11 +791,16 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                     Box::new(&self.archetypes),
                     {%- endif -%}
                     {%- for state in system.states %}
-                    {%- if state.write %}
-                    &mut self.states.{{ state.use.field }},
-                    {%- else %}
-                    &self.states.{{ state.use.field }},
-                    {%- endif %}
+                        {%- set access = state.preflight | default(value="none") %}
+                        {%- if access == "none" %}
+                            {# skip #}
+                        {%- elif access == "read" %}
+                            &self.states.{{ state.use.field }},
+                        {%- elif access == "write" %}
+                            &mut self.states.{{ state.use.field }},
+                        {%- else %}
+                            todo!("Invalid state use in ECS construction")
+                        {%- endif %}
                     {%- endfor %}
                     {%- if system.needs_entities %}
                     &self.archetypes.collection.{{ archetype.field }}.entities,
@@ -815,11 +830,16 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                     &self.context,
                     {%- endif %}
                     {%- for state in system.states %}
-                    {%- if state.write %}
-                    &mut self.states.{{ state.use.field }},
-                    {%- else %}
-                    &self.states.{{ state.use.field }},
-                    {%- endif %}
+                        {%- set access = state.system | default(value="none") %}
+                        {%- if access == "none" %}
+                            {# skip #}
+                        {%- elif access == "read" %}
+                            &self.states.{{ state.use.field }},
+                        {%- elif access == "write" %}
+                            &mut self.states.{{ state.use.field }},
+                        {%- else %}
+                            todo!("Invalid state use in ECS construction")
+                        {%- endif %}
                     {%- endfor %}
                     {%- if system.needs_entities %}
                     &self.archetypes.collection.{{ archetype.field }}.entities,
@@ -850,11 +870,16 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                     Box::new(&self.archetypes),
                     {%- endif -%}
                     {%- for state in system.states %}
-                    {%- if state.write %}
-                    &mut self.states.{{ state.use.field }},
-                    {%- else %}
-                    &self.states.{{ state.use.field }},
-                    {%- endif %}
+                        {%- set access = state.postflight | default(value="none") %}
+                        {%- if access == "none" %}
+                            {# skip #}
+                        {%- elif access == "read" %}
+                            &self.states.{{ state.use.field }},
+                        {%- elif access == "write" %}
+                            &mut self.states.{{ state.use.field }},
+                        {%- else %}
+                            todo!("Invalid state use in ECS construction")
+                        {%- endif %}
                     {%- endfor %}
                     {%- if system.needs_entities %}
                     &self.archetypes.collection.{{ archetype.field }}.entities,
@@ -880,11 +905,16 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                 &self.context,
                 {%- endif %}
                 {%- for state in system.states %}
-                {%- if state.write %}
-                &mut self.states.{{ state.use.field }},
-                {%- else %}
-                &self.states.{{ state.use.field }},
-                {%- endif %}
+                    {%- set access = state.end_phase | default(value="none") %}
+                    {%- if access == "none" %}
+                        {# skip #}
+                    {%- elif access == "read" %}
+                        &self.states.{{ state.use.field }},
+                    {%- elif access == "write" %}
+                        &mut self.states.{{ state.use.field }},
+                    {%- else %}
+                        todo!("Invalid state use in ECS construction")
+                    {%- endif %}
                 {%- endfor %}
             )
             .inspect_err(|error| tracing::error!(?error, "{{ system.name.type }}::on_end_phase returned an error"))
@@ -948,11 +978,16 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                &self.context,
                {%- endif %}
                {%- for state in system.states %}
-               {%- if state.write %}
-               &mut self.states.{{ state.use.field }},
-               {%- else %}
-               &self.states.{{ state.use.field }},
-               {%- endif %}
+                   {%- set access = state.check | default(value="none") %}
+                   {%- if access == "none" %}
+                       {# skip #}
+                   {%- elif access == "read" %}
+                       &self.states.{{ state.use.field }},
+                   {%- elif access == "write" %}
+                       &mut self.states.{{ state.use.field }},
+                   {%- else %}
+                       todo!("Invalid state use in ECS construction")
+                   {%- endif %}
                {%- endfor %}
            );
         let is_{{ system.name.field }}_ready = is_{{ system.name.field }}_ready &
@@ -961,11 +996,16 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                 &self.context,
                 {%- endif %}
                 {%- for state in system.states %}
-                {%- if state.write %}
-                &mut self.states.{{ state.use.field }},
-                {%- else %}
-                &self.states.{{ state.use.field }},
-                {%- endif %}
+                    {%- set access = state.begin_phase | default(value="none") %}
+                    {%- if access == "none" %}
+                        {# skip #}
+                    {%- elif access == "read" %}
+                        &self.states.{{ state.use.field }},
+                    {%- elif access == "write" %}
+                        &mut self.states.{{ state.use.field }},
+                    {%- else %}
+                        todo!("Invalid state use in ECS construction")
+                    {%- endif %}
                 {%- endfor %}
             )
             .inspect_err(|error| tracing::error!(%error, "{{ system.name.type }}::on_begin_phase returned an error"))
@@ -991,11 +1031,16 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                                 Box::new(&self.archetypes),
                                 {%- endif -%}
                                 {%- for state in system.states %}
-                                {%- if state.write %}
-                                &mut self.states.{{ state.use.field }},
-                                {%- else %}
-                                &self.states.{{ state.use.field }},
-                                {%- endif %}
+                                    {%- set access = state.preflight | default(value="none") %}
+                                    {%- if access == "none" %}
+                                        {# skip #}
+                                    {%- elif access == "read" %}
+                                        &self.states.{{ state.use.field }},
+                                    {%- elif access == "write" %}
+                                        &mut self.states.{{ state.use.field }},
+                                    {%- else %}
+                                        todo!("Invalid state use in ECS construction")
+                                    {%- endif %}
                                 {%- endfor %}
                                 {%- if system.needs_entities %}
                                 &self.archetypes.collection.{{ archetype.field }}.entities,
@@ -1025,11 +1070,16 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                                 &self.context,
                                 {%- endif %}
                                 {%- for state in system.states %}
-                                {%- if state.write %}
-                                &mut self.states.{{ state.use.field }},
-                                {%- else %}
-                                &self.states.{{ state.use.field }},
-                                {%- endif %}
+                                    {%- set access = state.system | default(value="none") %}
+                                    {%- if access == "none" %}
+                                        {# skip #}
+                                    {%- elif access == "read" %}
+                                        &self.states.{{ state.use.field }},
+                                    {%- elif access == "write" %}
+                                        &mut self.states.{{ state.use.field }},
+                                    {%- else %}
+                                        todo!("Invalid state use in ECS construction")
+                                    {%- endif %}
                                 {%- endfor %}
                                 {%- if system.needs_entities %}
                                 &self.archetypes.collection.{{ archetype.field }}.entities,
@@ -1056,15 +1106,20 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                                 {%- if system.needs_context %}
                                 &self.context,
                                 {%- endif %}
-                                {%- if (system.lookup | count) > 0 %}
+                                {%- if (system.lookup | preflightcount) > 0 %}
                                 Box::new(&self.archetypes),
                                 {%- endif -%}
                                 {%- for state in system.states %}
-                                {%- if state.write %}
-                                &mut self.states.{{ state.use.field }},
-                                {%- else %}
-                                &self.states.{{ state.use.field }},
-                                {%- endif %}
+                                    {%- set access = state.postflight | default(value="none") %}
+                                    {%- if access == "none" %}
+                                        {# skip #}
+                                    {%- elif access == "read" %}
+                                        &self.states.{{ state.use.field }},
+                                    {%- elif access == "write" %}
+                                        &mut self.states.{{ state.use.field }},
+                                    {%- else %}
+                                        todo!("Invalid state use in ECS construction")
+                                    {%- endif %}
                                 {%- endfor %}
                                 {%- if system.needs_entities %}
                                 &self.archetypes.collection.{{ archetype.field }}.entities,
@@ -1096,11 +1151,16 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
             &self.context,
             {%- endif %}
             {%- for state in system.states %}
-            {%- if state.write %}
-            &mut self.states.{{ state.use.field }},
-            {%- else %}
-            &self.states.{{ state.use.field }},
-            {%- endif %}
+                {%- set access = state.end_phase | default(value="none") %}
+                {%- if access == "none" %}
+                    {# skip #}
+                {%- elif access == "read" %}
+                    &self.states.{{ state.use.field }},
+                {%- elif access == "write" %}
+                    &mut self.states.{{ state.use.field }},
+                {%- else %}
+                    todo!("Invalid state use in ECS construction")
+                {%- endif %}
             {%- endfor %}
         )
         .inspect_err(|error| tracing::error!(%error, "{{ system.name.type }}::on_end_phase returned an error"))
