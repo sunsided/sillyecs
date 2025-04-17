@@ -20,9 +20,13 @@ A silly little compile-time generated archetype ECS in Rust.
 
 ## Installation
 
-`sillyecs` is a maily build-time dependency. To use it, add this to your `Cargo.toml`:
+`sillyecs` is a maily build-time dependency (`sillyecs-build`) that comes with a utility crate (`sillyecs`).
+To use them, add this to your `Cargo.toml`:
 
 ```toml
+[dependencies]
+sillyecs = "0.0.6"
+
 [build-dependencies]
 sillyecs-build = "0.0.6"
 ```
@@ -32,7 +36,7 @@ sillyecs-build = "0.0.6"
 Use `sillyecs` in your `build.rs`:
 
 ```rust
-use sillyecs::EcsCode;
+use sillyecs_build::EcsCode;
 use std::fs::File;
 use std::io::BufReader;
 
