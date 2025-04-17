@@ -53,6 +53,8 @@ fn pluralize_name<S>(field_name: S) -> String
 where
     S: AsRef<str>,
 {
+    // TODO: Implement proper handling of irregulars (mouse -> mice)
+
     let field_name = field_name.as_ref();
 
     if field_name.ends_with('y') {
