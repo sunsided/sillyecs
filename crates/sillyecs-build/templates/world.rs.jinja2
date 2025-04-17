@@ -746,9 +746,30 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
 
             // Systems
             {
-                {%- for archetype in system.affected_archetypes %}
-                // Apply {{ system.name.type }} to {{ archetype.type }}
-                self.systems.{{ system.name.field }}.apply_many(
+                {%- if system.needs_entities %}
+                let entities: [&[::sillyecs::EntityId]; {{ system.affected_archetypes | length }}] = [
+                    {%- for archetype in system.affected_archetypes %}
+                    &self.archetypes.collection.{{ archetype.field }}.entities,
+                    {%- endfor %}
+                ];
+                {%- endif %}
+                {%- for input in system.inputs %}
+                let {{ input.field }}_inputs: [&[{{ input.type }}]; {{ system.affected_archetypes | length }}] = [
+                    {%- for archetype in system.affected_archetypes %}
+                    &self.archetypes.collection.{{ archetype.field }}.{{ input.fields }},
+                    {%- endfor %}
+                ];
+                {%- endfor %}
+                {%- for output in system.outputs %}
+                let {{ output.field }}_outputs: [&mut [{{ output.type }}]; {{ system.affected_archetypes | length }}] = [
+                    {%- for archetype in system.affected_archetypes %}
+                    &mut self.archetypes.collection.{{ archetype.field }}.{{ output.fields }},
+                    {%- endfor %}
+                ];
+                {%- endfor %}
+
+                // Apply {{ system.name.type }} to all archetypes
+                self.systems.{{ system.name.field }}.apply_all(
                     {%- if system.needs_context %}
                     &self.context,
                     {%- endif %}
@@ -765,19 +786,18 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                         {%- endif %}
                     {%- endfor %}
                     {%- if system.needs_entities %}
-                    &self.archetypes.collection.{{ archetype.field }}.entities,
+                    entities,
                     {%- endif %}
                     {%- for input in system.inputs %}
-                    &self.archetypes.collection.{{ archetype.field }}.{{ input.fields }},
+                    {{ input.field }}_inputs,
                     {%- endfor %}
                     {%- for output in system.outputs %}
-                    &mut self.archetypes.collection.{{ archetype.field }}.{{ output.fields }},
+                    {{ output.field }}_outputs,
                     {%- endfor %}
                     {%- if system.emits_commands %}
                     &self.command_queue
                     {%- endif %}
                 );
-                {%- endfor %}
             }
 
             // Postflight
