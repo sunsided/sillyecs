@@ -610,11 +610,16 @@ impl {{ system.name.type }} {
         context: &FrameContext,
         {%- endif %}
         {%- for state in system.states %}
-        {%- if state.write %}
-        {{ state.use.field }}: &mut {{ state.use.type }},
-        {%- else %}
-        {{ state.use.field }}: &{{ state.use.type }},
-        {%- endif %}
+            {%- set access = state.system | default(value="none") %}
+            {%- if access == "none" %}
+                {# skip #}
+            {%- elif access == "read" %}
+                {{ state.use.field }}: &{{ state.use.type }},
+            {%- elif access == "write" %}
+                {{ state.use.field }}: &mut {{ state.use.type }},
+            {%- else %}
+                todo!("Invalid state use in ECS construction")
+            {%- endif %}
         {%- endfor %}
         {%- if system.needs_entities %}
         entity: EntityId,
@@ -669,11 +674,16 @@ impl {{ system.name.type }} {
         context: &FrameContext,
         {%- endif %}
         {%- for state in system.states %}
-        {%- if state.write %}
-        {{ state.use.field }}: &mut {{ state.use.type }},
-        {%- else %}
-        {{ state.use.field }}: &{{ state.use.type }},
-        {%- endif %}
+            {%- set access = state.system | default(value="none") %}
+            {%- if access == "none" %}
+                {# skip #}
+            {%- elif access == "read" %}
+                {{ state.use.field }}: &{{ state.use.type }},
+            {%- elif access == "write" %}
+                {{ state.use.field }}: &mut {{ state.use.type }},
+            {%- else %}
+                todo!("Invalid state use in ECS construction")
+            {%- endif %}
         {%- endfor %}
         {%- if system.needs_entities %}
         entities: &[EntityId],

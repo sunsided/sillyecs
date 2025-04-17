@@ -11,7 +11,7 @@ use std::sync::atomic::AtomicU64;
 
 static SYSTEM_IDS: AtomicU64 = AtomicU64::new(1);
 
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum AccessType {
     None,
@@ -116,6 +116,28 @@ pub struct StateUse {
     pub end_phase: Option<AccessType>,
 }
 
+impl AccessType {
+    pub const fn is_write(&self) -> bool {
+        matches!(self, Self::Write)
+    }
+}
+
+impl StateUse {
+    pub fn any_write(&self) -> bool {
+        let default = if self.write {
+            AccessType::Write
+        } else {
+            AccessType::Read
+        };
+        self.check.unwrap_or(default).is_write()
+            || self.begin_phase.unwrap_or(default).is_write()
+            || self.preflight.unwrap_or(default).is_write()
+            || self.system.unwrap_or(default).is_write()
+            || self.postflight.unwrap_or(default).is_write()
+            || self.end_phase.unwrap_or(default).is_write()
+    }
+}
+
 impl System {
     pub(crate) fn finish_dependencies(&mut self) {
         self.dependencies.clear();
@@ -144,7 +166,7 @@ impl System {
         for state in &self.states {
             self.dependencies.push(Dependency {
                 resource: Resource::UserState(state.name.clone()),
-                access: if state.write {
+                access: if state.any_write() {
                     Access::Write
                 } else {
                     Access::Read
@@ -164,8 +186,7 @@ impl System {
     }
 
     pub(crate) fn finish(&mut self, archetypes: &[Archetype]) {
-        self.finish_dependencies();
-
+        // Set state defaults before dependency resolution.
         for state in &mut self.states {
             Self::default_state_access(&mut state.check, state.write);
             Self::default_state_access(&mut state.begin_phase, state.write);
@@ -174,6 +195,9 @@ impl System {
             Self::default_state_access(&mut state.postflight, state.write);
             Self::default_state_access(&mut state.end_phase, state.write);
         }
+
+        // Update dependencies after state defaults.
+        self.finish_dependencies();
 
         let mut ids_and_names = Vec::new();
         'archetype: for archetype in archetypes {
