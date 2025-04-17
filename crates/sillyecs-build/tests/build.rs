@@ -1,4 +1,4 @@
-use sillyecs::EcsCode;
+use sillyecs_build::EcsCode;
 use std::io::BufReader;
 
 #[test]
