@@ -96,12 +96,12 @@ pub struct StateUse {
     /// Whether write access is required.
     #[serde(default)]
     pub write: bool,
-    /// How the phase begin hook accesses the state.
-    #[serde(default)]
-    pub begin_phase: Option<AccessType>,
     /// How the readiness check accesses the state.
     #[serde(default)]
     pub check: Option<AccessType>,
+    /// How the phase begin hook accesses the state.
+    #[serde(default)]
+    pub begin_phase: Option<AccessType>,
     /// How the preflight accesses the state.
     #[serde(default)]
     pub preflight: Option<AccessType>,
@@ -153,52 +153,26 @@ impl System {
         }
     }
 
+    fn default_state_access(state: &mut Option<AccessType>, write: bool) {
+        if state.is_none() {
+            *state = Some(if write {
+                AccessType::Write
+            } else {
+                AccessType::Read
+            });
+        }
+    }
+
     pub(crate) fn finish(&mut self, archetypes: &[Archetype]) {
         self.finish_dependencies();
 
         for state in &mut self.states {
-            if state.begin_phase.is_none() {
-                state.begin_phase = Some(if state.write {
-                    AccessType::Write
-                } else {
-                    AccessType::Read
-                });
-            }
-            if state.check.is_none() {
-                state.check = Some(if state.write {
-                    AccessType::Write
-                } else {
-                    AccessType::Read
-                });
-            }
-            if state.preflight.is_none() {
-                state.preflight = Some(if state.write {
-                    AccessType::Write
-                } else {
-                    AccessType::Read
-                });
-            }
-            if state.system.is_none() {
-                state.system = Some(if state.write {
-                    AccessType::Write
-                } else {
-                    AccessType::Read
-                });
-            }
-            if state.postflight.is_none() {
-                state.postflight = Some(if state.write {
-                    AccessType::Write
-                } else {
-                    AccessType::Read
-                });
-            }
-            if state.end_phase.is_none() {
-                state.end_phase = Some(if state.write {
-                    AccessType::Write
-                } else {
-                    AccessType::Read
-                });
-            }
+            Self::default_state_access(&mut state.check, state.write);
+            Self::default_state_access(&mut state.begin_phase, state.write);
+            Self::default_state_access(&mut state.preflight, state.write);
+            Self::default_state_access(&mut state.system, state.write);
+            Self::default_state_access(&mut state.postflight, state.write);
+            Self::default_state_access(&mut state.end_phase, state.write);
         }
 
         let mut ids_and_names = Vec::new();
