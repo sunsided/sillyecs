@@ -1,35 +1,102 @@
 # TODO: Allow definition of custom commands to be emitted by systems
 
+allow_unsafe: true
+
 states:
   - name: WgpuRender
     description: The WGPU render state; will be initialized in the Render phase hooks
+  - name: ActiveCamera
+    description: The uniforms of the active camera.
+  - name: Input
+    description: The device input obtained from the window system.
+  - name: ResourceManager
+    description: The WGPU resource manager
 
-phases:
-  - name: Startup
-  - name: FixedUpdate
-    fixed: 60Hz
-  - name: Update
-  - name: Render
-    manual: true
-    states:
-      - use: WgpuRender
-        write: true
+components:
+  - name: TimeOfDay
+  - name: Sun
+  - name: Skydome
+  - name: Fog
+  - name: AmbientLight
+  - name: Stars
+  - name: Camera
+  - name: CameraFpsController
+  - name: Position
+  - name: Transform
+  - name: Velocity
+  - name: Tile
+  - name: Health
+  - name: Collider
+  - name: Model
+  - name: Color
+  - name: BackgroundColor
+    description: The background color used for clearing the render buffer
+  - name: DynamicLight
+    description: A marker component for light entities
+  - name: WgpuShader
+    description: A WGPU shader
+  - name: TextureSource
+    description: The source of a texture, e.g. a file, or in-memory buffers
+  - name: WgpuTexture
+    description: A WGPU texture with a default view
 
 worlds:
   - name: Main
     archetypes:
-      - Particle
+      - Environment
+      - Camera
+      - Cube
       - Player
+      - Tile
       - ForegroundObject
       - BackgroundObject
       - SceneBackground
+      - DynamicLight
+      - WgpuShader
+      - WgpuTexture
 
 archetypes:
-  - name: Particle
-    description: A particle system particle.
+  - name: WgpuShader
+    components:
+      - WgpuShader
+
+  - name: WgpuTexture
+    components:
+      - TextureSource
+      - WgpuTexture
+
+  - name: Environment
+    components:
+      - TimeOfDay
+      - Sun
+      - Skydome
+      - AmbientLight
+      - Stars
+      - Fog
+
+  - name: Camera
+    components:
+      - Camera
+      - CameraFpsController
+
+  - name: DynamicLight
+    components:
+      - DynamicLight
+      - Color
+      - Position
+
+  - name: Tile
+    components:
+      - Tile
+      - Position
+
+  - name: Cube
+    description: A marching cube :)
     components:
       - Position
       - Velocity
+      - Transform
+      - Model
 
   - name: Player
     components:
@@ -51,15 +118,94 @@ archetypes:
     components:
       - BackgroundColor
 
-components:
-  - name: Position
-  - name: Velocity
-  - name: Health
-  - name: Collider
-  - name: BackgroundColor
-    description: The background color used for clearing the render buffer
+phases:
+  - name: Startup  # TODO: put world entity creation here
+    manual: true
+  - name: WgpuReinit
+    manual: true
+  - name: FixedUpdate
+    fixed: 60Hz
+  - name: Update
+  - name: Render
+    manual: true
+    states:
+      - use: WgpuRender
+        begin_phase: write
+        end_phase: write
 
 systems:
+  - name: WgpuInitShader
+    phase: WgpuReinit
+    entities: true
+    postflight: true
+    states:
+      - use: WgpuRender
+        default: none
+        check: read
+        system: write
+      - use: ResourceManager
+        default: none
+        postflight: write
+        end_phase: write
+    outputs:
+      - WgpuShader
+
+  - name: WgpuInitTexture
+    phase: WgpuReinit
+    entities: true
+    postflight: true
+    states:
+      - use: WgpuRender
+        default: none
+        check: read
+        system: write
+      - use: ResourceManager
+        default: none
+        postflight: write
+        end_phase: write
+    inputs:
+      - TextureSource
+    outputs:
+      - WgpuTexture
+
+  - name: Camera
+    phase: Update
+    states:
+      - use: Input
+      - use: WgpuRender  # for the screen size
+    outputs:
+      - Camera
+      - CameraFpsController
+
+  - name: TimeOfDay
+    phase: FixedUpdate
+    context: true
+    outputs:
+      - TimeOfDay
+
+  - name: Sun
+    phase: FixedUpdate
+    inputs:
+      - TimeOfDay
+    outputs:
+      - Sun
+      - Skydome
+      - AmbientLight
+
+  - name: Fog
+    phase: FixedUpdate
+    inputs:
+      - TimeOfDay
+    outputs:
+      - Fog
+
+  - name: Stars
+    phase: FixedUpdate
+    inputs:
+      - TimeOfDay
+    outputs:
+      - Stars
+
   - name: Physics
     phase: FixedUpdate
     context: true
@@ -76,23 +222,92 @@ systems:
     outputs:
       - BackgroundColor
 
+  - name: CameraRender
+    phase: Render
+    states:
+      - use: WgpuRender
+      - use: ActiveCamera
+        system: write
+    inputs:
+      - Camera
+
+  - name: FrameGlobals
+    phase: Render
+    inputs:
+      - TimeOfDay
+      - Sun
+      - Fog
+      - AmbientLight
+      - Stars
+      - Skydome
+    states:
+      - use: WgpuRender
+        system: write
+
   - name: RenderBackground
     phase: Render
     inputs:
       - BackgroundColor
     states:
       - use: WgpuRender
-        write: true
+        system: write
 
-  - name: Render
+  - name: RenderSky
     phase: Render
     run_after:
       - RenderBackground
     inputs:
+      - Skydome
+    states:
+      - use: WgpuRender
+        system: write
+
+  - name: Render
+    phase: Render
+    run_after:
+      - RenderSky
+    inputs:
+      - Position
+      - Transform
+      - Model
+    states:
+      - use: WgpuRender
+        system: write
+
+  - name: TileRender
+    phase: Render
+    run_after:
+      - RenderSky
+    inputs:
+      - Tile
       - Position
     states:
       - use: WgpuRender
-        write: true
+        system: write
+
+  - name: DynamicLight
+    context: true
+    phase: Render
+    run_after:
+      - RenderSky
+    states:
+      - use: WgpuRender
+        system: write
+    inputs:
+      - Color
+    outputs:
+      - DynamicLight
+
+  - name: VgaBlit
+    description: If retro rendering is enabled, this system blits the VGA offscreen buffer to the screen
+    phase: Render
+    run_after:
+      - Render  # specifically, run last
+    inputs:
+      - BackgroundColor
+    states:
+      - use: WgpuRender
+        system: write
 
 # TODO: List systems and their inputs and mutation targets. Generate traits that implement the signature.
 # TODO: Generate a function that loops all archetypes matching the signature of a given system

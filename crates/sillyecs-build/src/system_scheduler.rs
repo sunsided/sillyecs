@@ -17,7 +17,7 @@ use crate::component::ComponentName;
 use crate::ecs::EcsError;
 use crate::state::StateNameRef;
 use crate::system::{System, SystemId};
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub enum Access {
@@ -44,206 +44,233 @@ pub enum Resource {
 /// Schedules systems into parallelizable batches using resource dependencies and forced `run_after` ordering.
 ///
 /// Forced `run_after` edges (from a system referenced in run_after to the current system) are added first.
-/// Then resource–based candidate edges (writer → reader) are collected.
+/// Then resource–based candidate edges (writer → reader or writer → writer) are collected.
 /// For each unordered pair of systems that share conflicting candidate edges (i.e. edges in both directions),
-/// the conflict is resolved by favoring one candidate if possible; otherwise, a cycle is detected and we panic.
+/// the conflict is resolved by honoring any forced ordering (direct or transitive); if neither applies, a tie-break by ID is used.
 pub fn schedule_systems(systems: &[System]) -> Result<Vec<Vec<SystemId>>, EcsError> {
-    // The final dependency graph.
-    let mut graph: HashMap<SystemId, Vec<SystemId>> = HashMap::new();
-    // in_degree tracks the number of incoming edges per system.
-    let mut in_degree: HashMap<SystemId, usize> = HashMap::new();
-    // Convenience lookup.
-    let mut systems_by_id: HashMap<SystemId, &System> = HashMap::new();
+    let n = systems.len();
 
-    // Listing order mapping.
-    let id_to_index: HashMap<SystemId, usize> = systems
+    // map names ↔ ids
+    let id_by_name = systems
         .iter()
-        .enumerate()
-        .map(|(i, sys)| (sys.id, i))
-        .collect();
+        .map(|sys| (sys.name.clone(), sys.id))
+        .collect::<HashMap<_, _>>();
+    let name_by_id = systems
+        .iter()
+        .map(|sys| (sys.id, sys.name.clone()))
+        .collect::<HashMap<_, _>>();
 
+    // Build initial adjacency for forced run_after edges
+    let mut graph: HashMap<SystemId, HashSet<SystemId>> = HashMap::new();
+    let mut forced_edges: HashSet<(SystemId, SystemId)> = HashSet::new();
     for sys in systems {
-        systems_by_id.insert(sys.id, sys);
-        in_degree.insert(sys.id, 0);
-    }
-
-    // --- Step 1: Add Forced run_after Edges ---
-    // For each system, add an edge from every system it must run after.
-    for sys in systems {
-        for run_after_name in &sys.run_after {
-            // Find the system by name.
-            let pred = systems
-                .iter()
-                .find(|s| s.name.eq(run_after_name))
-                .expect(&format!(
-                    "Failed to find system {name} specified in run_after",
-                    name = run_after_name.type_name_raw
-                ));
-            // Add forced edge: pred -> sys.
-            graph.entry(pred.id).or_default().push(sys.id);
-            *in_degree.entry(sys.id).or_default() += 1;
+        graph.entry(sys.id).or_default();
+        for pred in &sys.run_after {
+            let p = id_by_name[&pred];
+            graph.entry(p).or_default().insert(sys.id);
+            forced_edges.insert((p, sys.id));
         }
     }
 
-    // --- Step 2: Collect Resource–based Candidate Edges ---
-    // We'll collect candidates in a map keyed by an unordered pair (min(id), max(id)).
-    // The value is a tuple (set of candidate directions: true means first->second, false means second->first).
-    type EdgeDir = bool; // true means (a -> b) where a is min(id)
-    let mut candidate_edges: HashMap<(SystemId, SystemId), HashSet<EdgeDir>> = HashMap::new();
+    // Build forced adjacency for reachability
+    let mut forced_adj: HashMap<SystemId, Vec<SystemId>> = HashMap::new();
+    for &(u, v) in &forced_edges {
+        forced_adj.entry(u).or_default().push(v);
+    }
 
-    // Build readers and writers maps.
-    let mut readers: HashMap<Resource, HashSet<SystemId>> = HashMap::new();
-    let mut writers: HashMap<Resource, HashSet<SystemId>> = HashMap::new();
-    for sys in systems {
-        for dep in &sys.dependencies {
-            match dep.access {
-                Access::Read => {
-                    readers
-                        .entry(dep.resource.clone())
-                        .or_default()
-                        .insert(sys.id);
+    // Helper: check transitive forced reachability u →* v
+    fn forced_reachable(
+        adj: &HashMap<SystemId, Vec<SystemId>>,
+        start: SystemId,
+        target: SystemId,
+    ) -> bool {
+        let mut stack = vec![start];
+        let mut seen = HashSet::new();
+        while let Some(u) = stack.pop() {
+            if u == target {
+                return true;
+            }
+            if !seen.insert(u) {
+                continue;
+            }
+            if let Some(neis) = adj.get(&u) {
+                for &w in neis {
+                    stack.push(w);
                 }
-                Access::Write => {
-                    writers
-                        .entry(dep.resource.clone())
-                        .or_default()
-                        .insert(sys.id);
-                }
+            }
+        }
+        false
+    }
+
+    // Add resource-based edges: any writer → (reader or writer) of same resource
+    for a in systems {
+        for b in systems {
+            if a.id == b.id {
+                continue;
+            }
+            if a.dependencies.iter().any(|da| {
+                da.access == Access::Write
+                    && b.dependencies.iter().any(|db| db.resource == da.resource)
+            }) {
+                graph.entry(a.id).or_default().insert(b.id);
             }
         }
     }
 
-    // For each resource, for each writer, add candidate edges to each reader,
-    // except if a forced run_after edge exists between them (in either direction).
-    // For each resource, for each writer, add candidate edges to each reader,
-    // except if a forced run_after edge exists between them (in either direction).
-    for (resource, writer_ids) in &writers {
-        let mut affected = HashSet::new();
-        if let Some(r) = readers.get(resource) {
-            affected.extend(r);
-        }
-        if let Some(w) = writers.get(resource) {
-            affected.extend(w);
-        }
-        for &writer in writer_ids {
-            for &reader in &affected {
-                if writer == reader {
+    // Resolve bidirectional conflicts
+    for a in systems {
+        for b in systems {
+            if a.id >= b.id {
+                continue;
+            }
+            let has_ab = graph.get(&a.id).map_or(false, |s| s.contains(&b.id));
+            let has_ba = graph.get(&b.id).map_or(false, |s| s.contains(&a.id));
+            if has_ab && has_ba {
+                // honor any forced (direct or transitive)
+                let reach_ab = forced_reachable(&forced_adj, a.id, b.id);
+                let reach_ba = forced_reachable(&forced_adj, b.id, a.id);
+                if reach_ab && !reach_ba {
+                    // a should precede b: remove b→a
+                    graph.get_mut(&b.id).unwrap().remove(&a.id);
                     continue;
                 }
-                let writer_sys = systems_by_id.get(&writer).unwrap();
-                let reader_sys = systems_by_id.get(&reader).unwrap();
-                // If either system forces the other, skip the resource candidate edge.
-                let forced = writer_sys
-                    .run_after
-                    .iter()
-                    .any(|name| name.eq(&reader_sys.name))
-                    || reader_sys
-                        .run_after
-                        .iter()
-                        .any(|name| name.eq(&writer_sys.name));
-                if forced {
+                if reach_ba && !reach_ab {
+                    graph.get_mut(&a.id).unwrap().remove(&b.id);
                     continue;
                 }
-                // Determine an ordering key (min, max) and candidate direction.
-                let (a, b, direction) = if id_to_index[&writer] < id_to_index[&reader] {
-                    (writer, reader, true) // candidate edge: writer (a) -> reader (b)
+                // no clear forced preference: tie-break by ID
+                if a.id < b.id {
+                    graph.get_mut(&a.id).unwrap().remove(&b.id);
                 } else {
-                    (reader, writer, false) // candidate edge becomes b -> a
-                };
-                candidate_edges.entry((a, b)).or_default().insert(direction);
-            }
-        }
-    }
-
-    // --- Step 3: Resolve Candidate Edge Conflicts ---
-    // For each pair, if candidate_edges yields a single direction, add that edge.
-    // If both directions are present, resolve the conflict using a tie-breaker.
-    for ((a, b), dirs) in candidate_edges {
-        let chosen = if dirs.len() == 1 {
-            *dirs.iter().next().unwrap()
-        } else {
-            // Conflict: both directions were proposed.
-            // Tie-breaker: favor the edge that puts the system with a non-empty run_after list later.
-            let sys_a = systems_by_id.get(&a).unwrap();
-            let sys_b = systems_by_id.get(&b).unwrap();
-            // If one of them has forced ordering (non-empty run_after), choose that ordering.
-            if !sys_a.run_after.is_empty() && sys_b.run_after.is_empty() {
-                false // choose b->a, so that a (with run_after) comes later.
-            } else if sys_a.run_after.is_empty() && !sys_b.run_after.is_empty() {
-                true // choose a->b.
-            } else {
-                // Otherwise, fall back to listing order.
-                // Favor the ordering consistent with the listing order.
-                id_to_index[&a] < id_to_index[&b]
-            }
-        };
-        // Now add the chosen edge in the graph.
-        if chosen {
-            // That means: a -> b.
-            graph.entry(a).or_default().push(b);
-            *in_degree.entry(b).or_default() += 1;
-        } else {
-            // Means: b -> a.
-            graph.entry(b).or_default().push(a);
-            *in_degree.entry(a).or_default() += 1;
-        }
-    }
-
-    // --- Step 4: Topological Sort ---
-    let mut ready: Vec<SystemId> = in_degree
-        .iter()
-        .filter_map(|(&id, &deg)| if deg == 0 { Some(id) } else { None })
-        .collect();
-    let mut scheduled: Vec<Vec<SystemId>> = Vec::new();
-    let mut visited = HashSet::new();
-
-    while !ready.is_empty() {
-        // Sort ready queue by listing order.
-        ready.sort_by_key(|id| id_to_index[id]);
-        let mut batch = Vec::new();
-        let mut used_writes = HashSet::new();
-        let mut i = 0;
-        while i < ready.len() {
-            let candidate = ready[i];
-            let sys = systems_by_id.get(&candidate).unwrap();
-            // Check for conflicts within the batch: systems writing the same resource can't run in parallel.
-            let conflict = sys.dependencies.iter().any(|dep| {
-                matches!(dep.access, Access::Write) && used_writes.contains(&dep.resource)
-            });
-            if !conflict {
-                batch.push(candidate);
-                for dep in &sys.dependencies {
-                    if let Access::Write = dep.access {
-                        used_writes.insert(dep.resource.clone());
-                    }
+                    graph.get_mut(&b.id).unwrap().remove(&a.id);
                 }
-                ready.remove(i);
-            } else {
-                i += 1;
             }
         }
-        if batch.is_empty() {
-            return Err(EcsError::CycleDetectedInSystemRunOrder);
-        }
-        for sys_id in &batch {
-            visited.insert(*sys_id);
-            if let Some(dependents) = graph.get(sys_id) {
-                for &dep in dependents {
-                    if let Some(deg) = in_degree.get_mut(&dep) {
-                        *deg -= 1;
-                        if *deg == 0 {
-                            ready.push(dep);
+    }
+
+    // Break remaining cycles by removing one edge per cycle, tie-breaking by highest SystemId
+    // Helper to find a cycle and return its edges
+    fn find_cycle(
+        graph: &HashMap<SystemId, HashSet<SystemId>>,
+    ) -> Option<Vec<(SystemId, SystemId)>> {
+        fn dfs(
+            u: SystemId,
+            graph: &HashMap<SystemId, HashSet<SystemId>>,
+            visited: &mut HashSet<SystemId>,
+            stack: &mut Vec<SystemId>,
+            stack_set: &mut HashSet<SystemId>,
+        ) -> Option<Vec<(SystemId, SystemId)>> {
+            visited.insert(u);
+            stack.push(u);
+            stack_set.insert(u);
+            if let Some(neis) = graph.get(&u) {
+                for &v in neis {
+                    if !visited.contains(&v) {
+                        if let Some(cycle) = dfs(v, graph, visited, stack, stack_set) {
+                            return Some(cycle);
                         }
+                    } else if stack_set.contains(&v) {
+                        // Found a cycle: collect edges from v to u
+                        let mut cycle = Vec::new();
+                        let mut started = false;
+                        let mut prev = u;
+                        for &node in stack.iter() {
+                            if node == v {
+                                started = true;
+                                prev = v;
+                                continue;
+                            }
+                            if started {
+                                cycle.push((prev, node));
+                                prev = node;
+                            }
+                        }
+                        // close the cycle
+                        cycle.push((u, v));
+                        return Some(cycle);
                     }
                 }
             }
+            stack.pop();
+            stack_set.remove(&u);
+            None
         }
-        scheduled.push(batch);
+
+        let mut visited = HashSet::new();
+        let mut stack = Vec::new();
+        let mut stack_set = HashSet::new();
+        for &u in graph.keys() {
+            if !visited.contains(&u) {
+                if let Some(cycle) = dfs(u, graph, &mut visited, &mut stack, &mut stack_set) {
+                    return Some(cycle);
+                }
+            }
+        }
+        None
     }
-    if visited.len() != systems.len() {
+
+    // Remove one edge per cycle, choosing the edge with highest source ID
+    while let Some(cycle_edges) = find_cycle(&graph) {
+        if let Some(&(rem_u, rem_v)) = cycle_edges.iter().max_by_key(|&&(u, _)| u) {
+            graph.get_mut(&rem_u).unwrap().remove(&rem_v);
+        }
+    }
+
+    // Compute in-degrees
+    let mut in_deg: HashMap<SystemId, usize> = systems.iter().map(|s| (s.id, 0)).collect();
+    for (&_u, succs) in &graph {
+        for &v in succs {
+            *in_deg.get_mut(&v).unwrap() += 1;
+        }
+    }
+
+    // Kahn’s algorithm, layered
+    let mut layers: Vec<Vec<SystemId>> = Vec::new();
+    let mut queue: VecDeque<SystemId> = in_deg
+        .iter()
+        .filter_map(|(&id, &d)| if d == 0 { Some(id) } else { None })
+        .collect();
+    let mut visited = 0;
+
+    while !queue.is_empty() {
+        let mut next = VecDeque::new();
+        let mut layer = Vec::new();
+
+        while let Some(u) = queue.pop_front() {
+            layer.push(u);
+            visited += 1;
+            for &v in graph.get(&u).unwrap_or(&HashSet::new()) {
+                let d = in_deg.get_mut(&v).unwrap();
+                *d -= 1;
+                if *d == 0 {
+                    next.push_back(v);
+                }
+            }
+        }
+
+        layer.sort();
+        layers.push(layer);
+        queue = next;
+    }
+
+    if visited != n {
+        // detect any remaining cycle edge
+        for (&u, succs) in &graph {
+            for &v in succs {
+                if *in_deg.get(&u).unwrap() > 0 && *in_deg.get(&v).unwrap() > 0 {
+                    let nu = &name_by_id[&u].type_name_raw;
+                    let nv = &name_by_id[&v].type_name_raw;
+                    return Err(EcsError::CycleDetectedBetweenSystems(
+                        nu.clone(),
+                        nv.clone(),
+                    ));
+                }
+            }
+        }
         return Err(EcsError::CycleDetectedInSystemRunOrder);
     }
-    Ok(scheduled)
+
+    Ok(layers)
 }
 
 #[cfg(test)]
@@ -325,12 +352,12 @@ mod tests {
             ordered,
             vec![
                 // First group
-                (0, "Transformer"), // reads x, writes y
+                (0, "Backflow"), // reads y, writes x
                 // Second group
-                (1, "Consumer"), // reads y
-                (1, "Backflow"), // reads y, writes x
+                (1, "Producer"),    // reads x
+                (1, "Transformer"), // reads x, writes y
                 // Third group
-                (2, "Producer") // reads x
+                (2, "Consumer"), // reads y
             ]
         );
     }

@@ -91,6 +91,8 @@ pub enum EcsError {
     WorldWithoutArchetypes(String),
     #[error("World {1} uses undefined archetype {0}.")]
     MissingArchetypeInWorld(String, String),
+    #[error("A cycle was detected in the system run order: {0} vs {1}.")]
+    CycleDetectedBetweenSystems(String, String),
     #[error("A cycle was detected in the system run order (run_after edges).")]
     CycleDetectedInSystemRunOrder,
     #[error("System {1} depends on undefined system {0}.")]
