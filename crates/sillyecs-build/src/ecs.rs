@@ -98,6 +98,15 @@ pub enum EcsError {
     #[error("System {1} depends on undefined system {0}.")]
     MissingSystemDependency(String, String),
     #[error(
+        "System {system} (phase '{system_phase}') has a run_after dependency on system {dependency} in phase '{dependency_phase}'. Cross-phase run_after edges have no effect; inter-phase ordering is enforced by phase order itself. Remove the dependency or move both systems into the same phase."
+    )]
+    CrossPhaseRunAfter {
+        system: String,
+        system_phase: String,
+        dependency: String,
+        dependency_phase: String,
+    },
+    #[error(
         "A cycle was detected in the system run order (run_after edges): System {0} depends on itself."
     )]
     SystemDependsOnItself(String),
@@ -238,23 +247,35 @@ impl Ecs {
     }
 
     pub(crate) fn ensure_system_consistency(&mut self) -> Result<(), EcsError> {
+        let system_phases: HashMap<_, _> =
+            self.systems.iter().map(|s| (&s.name, &s.phase)).collect();
+
         for system in &self.systems {
             let required_components: HashSet<_> =
                 system.inputs.iter().chain(&system.outputs).collect();
 
             // Ensure all `run_after` dependencies exist in self.systems
             for dependency in &system.run_after {
-                if !self.systems.iter().any(|s| s.name == *dependency) {
+                let Some(dep_phase) = system_phases.get(dependency) else {
                     return Err(EcsError::MissingSystemDependency(
                         dependency.type_name_raw.clone(),
                         system.name.type_name.clone(),
                     ));
-                }
+                };
 
                 if dependency == &system.name {
                     return Err(EcsError::SystemDependsOnItself(
                         system.name.type_name.clone(),
                     ));
+                }
+
+                if *dep_phase != &system.phase {
+                    return Err(EcsError::CrossPhaseRunAfter {
+                        system: system.name.type_name.clone(),
+                        system_phase: system.phase.type_name_raw.clone(),
+                        dependency: dependency.type_name_raw.clone(),
+                        dependency_phase: dep_phase.type_name_raw.clone(),
+                    });
                 }
             }
 

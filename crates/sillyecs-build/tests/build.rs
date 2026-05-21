@@ -1,4 +1,4 @@
-use sillyecs_build::EcsCode;
+use sillyecs_build::{EcsCode, EcsError};
 use std::io::BufReader;
 
 #[test]
@@ -51,5 +51,54 @@ systems:
             "{name} output contained the unreachable `todo!` arm, which means a phase-state \
              hook was left unset at codegen time"
         );
+    }
+}
+
+/// Regression for issue #28: a `run_after` edge that points at a system in a different phase
+/// used to pass validation silently and then be dropped by the per-phase scheduler. It must be
+/// rejected at build time so the misconfiguration is visible to the user.
+#[test]
+fn cross_phase_run_after_is_rejected() {
+    const YAML: &str = r#"
+components:
+  - name: Position
+archetypes:
+  - name: Particle
+    components: [Position]
+worlds:
+  - name: Main
+    archetypes: [Particle]
+phases:
+  - name: Update
+  - name: Render
+    manual: true
+systems:
+  - name: Tick
+    phase: Update
+    outputs: [Position]
+  - name: Draw
+    phase: Render
+    run_after: [Tick]
+    inputs: [Position]
+"#;
+
+    let reader = BufReader::new(YAML.as_bytes());
+    let err = match EcsCode::generate(reader) {
+        Ok(_) => panic!("cross-phase run_after must fail"),
+        Err(e) => e,
+    };
+    match err {
+        EcsError::CrossPhaseRunAfter {
+            system,
+            system_phase,
+            dependency,
+            dependency_phase,
+        } => {
+            assert_eq!(system, "DrawSystem");
+            assert_eq!(system_phase, "Render");
+            assert_eq!(dependency, "Tick");
+            assert_eq!(dependency_phase, "Update");
+        }
+        other => panic!("expected CrossPhaseRunAfter, got {other:?}"),
     }
 }
