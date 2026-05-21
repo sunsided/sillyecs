@@ -10,6 +10,7 @@ mod system_scheduler;
 mod world;
 
 pub use crate::code::EcsCode;
+pub use crate::ecs::EcsError;
 use serde::Serialize;
 use std::fmt::{Display, Formatter};
 
