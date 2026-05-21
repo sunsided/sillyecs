@@ -456,7 +456,8 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
     pub fn apply_system_phases(&mut self)
     where
         E: SystemPhaseEvents,
-        Q: WorldCommandSender + WorldCommandReceiver
+        Q: WorldCommandSender + WorldCommandReceiver,
+        Self: WorldUserCommandHandler<UserCommand = <Q as WorldUserCommand>::UserCommand>,
     {
         self.on_begin_frame();
         self.handle_commands();
@@ -526,7 +527,8 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
     pub fn par_apply_system_phases(&mut self)
     where
         E: SystemPhaseEvents,
-        Q: WorldCommandSender + WorldCommandReceiver
+        Q: WorldCommandSender + WorldCommandReceiver,
+        Self: WorldUserCommandHandler<UserCommand = <Q as WorldUserCommand>::UserCommand>,
     {
         self.on_begin_frame();
         self.handle_commands();
@@ -601,7 +603,8 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
     fn apply_system_phase_{{ phase.name.field }}(&mut self)
     where
         E: SystemPhaseEvents,
-        Q: WorldCommandSender + WorldCommandReceiver
+        Q: WorldCommandSender + WorldCommandReceiver,
+        Self: WorldUserCommandHandler<UserCommand = <Q as WorldUserCommand>::UserCommand>,
     {
         self.on_begin_{{ phase.name.field }}_phase();
         let result = System{{ phase.name.type }}Events::on_begin_phase(
@@ -655,7 +658,8 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
     fn apply_system_phase_{{ phase.name.field }}_without_events(&mut self)
     where
         E: SystemPhaseEvents,
-        Q: WorldCommandSender + WorldCommandReceiver
+        Q: WorldCommandSender + WorldCommandReceiver,
+        Self: WorldUserCommandHandler<UserCommand = <Q as WorldUserCommand>::UserCommand>,
     {
         {%- if world.scheduled_systems[phase.name] | length == 0 %}
         // no systems in this phase
@@ -888,7 +892,8 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
     fn par_apply_system_phase_{{ phase.name.field }}(&mut self)
     where
         E: SystemPhaseEvents,
-        Q: WorldCommandSender + WorldCommandReceiver
+        Q: WorldCommandSender + WorldCommandReceiver,
+        Self: WorldUserCommandHandler<UserCommand = <Q as WorldUserCommand>::UserCommand>,
     {
         self.on_begin_{{ phase.name.field }}_phase();
         let result = System{{ phase.name.type }}Events::on_begin_phase(
@@ -1181,7 +1186,8 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
     /// Handles all queued commands.
     fn handle_commands(&mut self)
     where
-        Q: WorldCommandReceiver
+        Q: WorldCommandReceiver,
+        Self: WorldUserCommandHandler<UserCommand = <Q as WorldUserCommand>::UserCommand>,
     {
         loop {
             match self.command_queue.recv() {
