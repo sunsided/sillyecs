@@ -10,13 +10,60 @@ A silly little compile-time generated archetype ECS in Rust.
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
+- [Features](#features)
 - [Installation](#installation)
 - [Usage](#usage)
-    - [Command Queue and Application-Specific Commands](#command-queue-and-application-specific-commands)
+  - [Command Queue and Application-Specific Commands](#command-queue-and-application-specific-commands)
 - [Examples](#examples)
-    - [WGPU Shader Compilation](#wgpu-shader-compilation)
+  - [WGPU Shader Compilation](#wgpu-shader-compilation)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
+## Features
+
+`sillyecs` generates a fully monomorphized ECS at build time from a YAML schema. There is no
+type-erased component storage, no dynamic dispatch in the hot path, and no runtime registration.
+The runtime crate is intentionally tiny; nearly all behavior lives in the code that is generated
+into your project.
+
+- **Compile-time codegen.** A YAML schema describes components, archetypes, systems, phases,
+  worlds, and user states. `sillyecs-build` validates it (duplicate components, undefined
+  references, cyclic system dependencies, archetype coverage, …) and emits strongly-typed Rust
+  via Jinja2 templates.
+- **Archetype storage in Struct-of-Arrays layout.** Each archetype keeps a `Vec<EntityId>` and one
+  `Vec<C>` per component, so systems iterate over contiguous component slices and stay
+  cache-friendly.
+- **Automatic system scheduling.** Per phase, the build crate analyzes each system's component
+  reads/writes, user-state reads/writes, frame-context use, and explicit `run_after` edges,
+  resolves bidirectional conflicts via forced-edge reachability, and emits layered groups
+  (Kahn's algorithm) that can run in parallel.
+- **Sequential and Rayon-parallel execution paths.** Every phase gets both
+  `apply_system_phase_X()` and `par_apply_system_phase_X()` variants.
+- **Rich phase lifecycle.** Each system exposes `is_ready` → `on_begin_phase` → optional
+  `preflight` → `apply_single`/`apply_many`/`apply_all` → optional `postflight` → `on_end_phase`,
+  with phase-level `on_begin_phase`/`on_end_phase` events on top.
+- **Fine-grained state access.** User states declared with `use: …` can be configured per
+  lifecycle hook (`check`, `begin_phase`, `preflight`, `system`, `postflight`, `end_phase`) as
+  `none`/`read`/`write`. Generated signatures match exactly; the scheduler accounts for state
+  conflicts the same way it accounts for component conflicts.
+- **Flexible phase types.** Phases can be `manual` (caller drives them), `on_request` (atomic
+  request flag, swap-on-read), or fixed-step with an accumulator loop (`60 Hz` / `0.016 s`
+  syntax).
+- **Deferred world commands.** Spawn, despawn, and user-defined commands flow through a
+  pluggable `WorldCommandSender`/`WorldCommandReceiver`. Commands are drained before and after
+  each phase, not between systems.
+- **`NonZeroU64` IDs.** `ArchetypeId`, `SystemId`, `WorldId`, and `EntityId` are niche-optimized
+  enums with `const` value tables and `Display` impls.
+- **Cross-archetype component iteration.** For every component, generated traits
+  (`IterXComponents`, `IterMutXComponents`, `IterXEntities`) yield flat iterators over every
+  archetype that carries it.
+- **Entity frontloading.** Archetypes support `frontload`/`frontload_by_indices_sorted`/
+  `frontload_scan` to partition entities (e.g. for quadtree-driven culling) without breaking the
+  archetype invariants.
+- **Pluggable `EntityLocationMap`.** The entity → archetype/index lookup is left as a type alias
+  so callers can drop in `fxhash`, `ahash`, or anything else.
+- **Optional unchecked accessors.** Setting `allow_unsafe: true` enables `get_*_unchecked`
+  variants for hot loops; the default safe paths remain available.
 
 ## Installation
 
