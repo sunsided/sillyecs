@@ -1,6 +1,5 @@
 //! # Utility functions for `sillyecs`.
 
-mod archetypes;
 mod entity_id;
 mod flatten_copy_slices;
 mod flatten_slices;
