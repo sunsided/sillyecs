@@ -542,11 +542,11 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
 
         // The {{ phase.name.raw }} phase is conditional.
         if self.phase_flags.is_{{ phase.name.field }}_requested() {
-            self.apply_system_phase_{{ phase.name.field }}();
+            self.par_apply_system_phase_{{ phase.name.field }}();
         }
         {%- else %}
         // The {{ phase.name.raw }} phase always runs.
-        self.apply_system_phase_{{ phase.name.field }}();
+        self.par_apply_system_phase_{{ phase.name.field }}();
         {%- endif %}
         {%- else %}
         {%- if phase.on_request %}
@@ -557,7 +557,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
             self.context.fixed_time_secs = SystemPhase::{{ phase.name.field | upper }}_SECS;
             self.fixed_accumulators.{{ phase.name.field }} += self.context.delta_time_secs;
             while self.fixed_accumulators.{{ phase.name.field }} >= SystemPhase::{{ phase.name.field | upper }}_SECS {
-                self.apply_system_phase_{{ phase.name.field }}();
+                self.par_apply_system_phase_{{ phase.name.field }}();
                 self.fixed_accumulators.{{ phase.name.field }} -= SystemPhase::{{ phase.name.field | upper }}_SECS;
             }
         }
@@ -567,7 +567,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
         self.context.fixed_time_secs = SystemPhase::{{ phase.name.field | upper }}_SECS;
         self.fixed_accumulators.{{ phase.name.field }} += self.context.delta_time_secs;
         while self.fixed_accumulators.{{ phase.name.field }} >= SystemPhase::{{ phase.name.field | upper }}_SECS {
-            self.apply_system_phase_{{ phase.name.field }}();
+            self.par_apply_system_phase_{{ phase.name.field }}();
             self.fixed_accumulators.{{ phase.name.field }} -= SystemPhase::{{ phase.name.field | upper }}_SECS;
         }
         {%- endif %}
