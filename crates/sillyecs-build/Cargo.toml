@@ -11,7 +11,7 @@ version = "0.0.6"
 edition = "2024"
 
 [dependencies]
-minijinja = { version = "2.9.0", default-features = false, features = ["builtins", "serde"] }
-serde = { version = "1.0.219", features = ["derive"] }
+minijinja = { version = "2.20.0", default-features = false, features = ["builtins", "serde"] }
+serde = { version = "1.0.228", features = ["derive"] }
 serde_yaml = "0.9.34"
-thiserror = "2.0.12"
+thiserror = "2.0.18"

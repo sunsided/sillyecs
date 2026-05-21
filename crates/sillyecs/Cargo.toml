@@ -11,8 +11,8 @@ version = "0.0.6"
 edition = "2024"
 
 [dev-dependencies]
-criterion = "0.5.1"
-rand = "0.9.1"
+criterion = "0.8.2"
+rand = "0.10.1"
 
 [[bench]]
 name = "flatten_slices"
