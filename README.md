@@ -67,7 +67,7 @@ into your project.
 
 ## Installation
 
-`sillyecs` is a maily build-time dependency (`sillyecs-build`) that comes with a utility crate (`sillyecs`).
+`sillyecs` is a mainly build-time dependency (`sillyecs-build`) that comes with a utility crate (`sillyecs`).
 To use them, add this to your `Cargo.toml`:
 
 ```toml
