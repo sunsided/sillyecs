@@ -319,14 +319,14 @@ impl {{ archetype.name.type }} {
     #[allow(dead_code)]
     #[inline]
     pub fn get_{{component.field}}_component_at(&self, index: usize) -> Option<&{{component.type}}> {
-        if index > self.len() {
+        if index >= self.len() {
             return None;
         }
 
         {%- if ecs.allow_unsafe %}
         Some(unsafe { self.get_{{component.field}}_component_at_unchecked(index) })
         {%- else %}
-        Some(&self.{{ component_name.fields }}[index])
+        Some(&self.{{ component.fields }}[index])
         {%- endif %}
     }
 
@@ -334,14 +334,14 @@ impl {{ archetype.name.type }} {
     #[allow(dead_code)]
     #[inline]
     pub fn get_{{component.field}}_component_at_mut(&mut self, index: usize) -> Option<&mut {{component.type}}> {
-        if index > self.len() {
+        if index >= self.len() {
             return None;
         }
 
         {%- if ecs.allow_unsafe %}
         Some(unsafe { self.get_{{component.field}}_component_at_unchecked_mut(index) })
         {%- else %}
-        Some(&mut self.{{ component_name.fields }}[index])
+        Some(&mut self.{{ component.fields }}[index])
         {%- endif %}
     }
 
@@ -364,7 +364,7 @@ impl {{ archetype.name.type }} {
     /// Gets the entity at the specified index.
     #[allow(dead_code)]
     pub fn get_entity_at(&self, index: usize) -> Option<{{ archetype.name.raw }}EntityRef> {
-        if index > self.len() {
+        if index >= self.len() {
             return None;
         }
 
@@ -383,7 +383,7 @@ impl {{ archetype.name.type }} {
     /// Mutably gets the entity at the specified index.
     #[allow(dead_code)]
     pub fn get_entity_at_mut(&mut self, index: usize) -> Option<{{ archetype.name.raw }}EntityMut> {
-        if index > self.len() {
+        if index >= self.len() {
             return None;
         }
 
@@ -572,7 +572,11 @@ impl {{ archetype.name.type }} {
     {%- for promotion in archetype.promotion_infos %}
 
     /// Promotes this [`{{ archetype.name.type }}`] to [`{{ promotion.target.type }}`].
-    #[deprecated]
+    ///
+    /// **Deprecated:** this in-place promotion bypasses the world's entity-location map and
+    /// can leave the world in an inconsistent state. Despawn and respawn through the world
+    /// instead.
+    #[deprecated(note = "Bypasses the world entity location map; despawn and respawn via the world instead.")]
     pub fn promote_to_{{ promotion.target.fields }}(
         self,
         {%- for field in promotion.components_to_add %}

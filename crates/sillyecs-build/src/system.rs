@@ -132,6 +132,17 @@ impl StateUse {
             || self.postflight.unwrap_or(self.default).is_write()
             || self.end_phase.unwrap_or(self.default).is_write()
     }
+
+    /// Fills every unset lifecycle access hook with [`Self::default`] so templates can rely on
+    /// concrete `none`/`read`/`write` values instead of falling through on null.
+    pub fn apply_defaults(&mut self) {
+        set_default_state(&mut self.check, self.default);
+        set_default_state(&mut self.begin_phase, self.default);
+        set_default_state(&mut self.preflight, self.default);
+        set_default_state(&mut self.system, self.default);
+        set_default_state(&mut self.postflight, self.default);
+        set_default_state(&mut self.end_phase, self.default);
+    }
 }
 
 fn set_default_state(state: &mut Option<AccessType>, default: AccessType) {
@@ -179,12 +190,7 @@ impl System {
 
     fn apply_state_defaults(&mut self) {
         for state in &mut self.states {
-            set_default_state(&mut state.check, state.default);
-            set_default_state(&mut state.begin_phase, state.default);
-            set_default_state(&mut state.preflight, state.default);
-            set_default_state(&mut state.system, state.default);
-            set_default_state(&mut state.postflight, state.default);
-            set_default_state(&mut state.end_phase, state.default);
+            state.apply_defaults();
         }
     }
 
@@ -400,6 +406,10 @@ impl SystemPhase {
                 self.fixed_hertz = 1.0 / sec;
                 self.fixed = true;
             }
+        }
+
+        for state in &mut self.states {
+            state.apply_defaults();
         }
     }
 }

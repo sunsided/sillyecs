@@ -66,8 +66,6 @@ impl EcsCode {
             ecs => ecs,
         })?;
 
-        println!("{}", component_code);
-        println!("{}", archetype_code);
         Ok(EcsCode {
             components: component_code,
             archetypes: archetype_code,
