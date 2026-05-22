@@ -433,7 +433,7 @@ pub trait Apply{{ system.name.type }}: System {
         context: &::sillyecs::FrameContext,
         {%- endif %}
         {%- if (system.lookup | count) > 0 %}
-        lookup: Box<&dyn {{system.name.raw}}ComponentLookup>,
+        lookup: &dyn {{system.name.raw}}ComponentLookup,
         {%- endif -%}
         {%- for state in system.states %}
             {%- set access = state.preflight | default(value="none") %}
@@ -482,7 +482,7 @@ pub trait Apply{{ system.name.type }}: System {
         context: &::sillyecs::FrameContext,
         {%- endif %}
         {%- if (system.lookup | count) > 0 %}
-        lookup: Box<&dyn {{system.name.raw}}ComponentLookup>,
+        lookup: &dyn {{system.name.raw}}ComponentLookup,
         {%- endif -%}
         {%- for state in system.states %}
             {%- set access = state.postflight | default(value="none") %}

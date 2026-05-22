@@ -715,7 +715,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                     &self.context,
                     {%- endif %}
                     {%- if (system.lookup | count) > 0 %}
-                    Box::new(&self.archetypes),
+                    &self.archetypes,
                     {%- endif -%}
                     {%- for state in system.states %}
                         {%- set access = state.preflight | default(value="none") %}
@@ -814,7 +814,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                     &self.context,
                     {%- endif %}
                     {%- if (system.lookup | count) > 0 %}
-                    Box::new(&self.archetypes),
+                    &self.archetypes,
                     {%- endif -%}
                     {%- for state in system.states %}
                         {%- set access = state.postflight | default(value="none") %}
@@ -982,7 +982,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                                 &self.context,
                                 {%- endif %}
                                 {%- if (system.lookup | count) > 0 %}
-                                Box::new(&self.archetypes),
+                                &self.archetypes,
                                 {%- endif -%}
                                 {%- for state in system.states %}
                                     {%- set access = state.preflight | default(value="none") %}
@@ -1081,7 +1081,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                                 &self.context,
                                 {%- endif %}
                                 {%- if (system.lookup | count) > 0 %}
-                                Box::new(&self.archetypes),
+                                &self.archetypes,
                                 {%- endif -%}
                                 {%- for state in system.states %}
                                     {%- set access = state.postflight | default(value="none") %}

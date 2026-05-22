@@ -54,6 +54,54 @@ systems:
     }
 }
 
+/// Regression for issue #27: per-tick `Box::new(&self.archetypes)` heap allocation was emitted in
+/// preflight/postflight call sites of systems with `lookup:` entries. The trait method now takes
+/// `&dyn XComponentLookup` directly and the call sites pass `&self.archetypes` without boxing.
+#[test]
+fn lookup_methods_take_bare_reference_not_box() {
+    const YAML: &str = r#"
+components:
+  - name: Position
+  - name: Velocity
+archetypes:
+  - name: Particle
+    components: [Position, Velocity]
+worlds:
+  - name: Main
+    archetypes: [Particle]
+phases:
+  - name: Update
+systems:
+  - name: Move
+    phase: Update
+    inputs: [Velocity]
+    outputs: [Position]
+    lookup: [Position]
+    preflight: true
+    postflight: true
+"#;
+
+    let reader = BufReader::new(YAML.as_bytes());
+    let code = EcsCode::generate(reader).expect("Failed to build ECS");
+
+    assert!(
+        !code.systems.contains("Box<&dyn"),
+        "trait method must not wrap lookup reference in Box"
+    );
+    assert!(
+        !code.world.contains("Box::new(&self.archetypes)"),
+        "preflight/postflight call sites must not allocate a Box around &self.archetypes"
+    );
+    assert!(
+        code.systems.contains("&dyn MoveComponentLookup"),
+        "trait method should accept &dyn MoveComponentLookup directly"
+    );
+    assert!(
+        code.world.contains("&self.archetypes,"),
+        "preflight/postflight call sites should pass &self.archetypes directly"
+    );
+}
+
 /// Regression for issue #28: a `run_after` edge that points at a system in a different phase
 /// used to pass validation silently and then be dropped by the per-phase scheduler. It must be
 /// rejected at build time so the misconfiguration is visible to the user.
