@@ -53,7 +53,25 @@ where
 
 {%- if ecs.any_phase_on_request %}
 
-/// Spawns an entity into the world.
+/// Single-consumer request flags for on-request phases.
+///
+/// Each flag is an [`AtomicBool`](core::sync::atomic::AtomicBool) toggled by a
+/// `set` (`Release`) and consumed by a swap-to-`false` (`AcqRel`) on read.
+///
+/// # Semantics
+///
+/// - **Fire-and-forget**: multiple `set_*` calls before the next read coalesce
+///   into a single execution. There is no request queue or counter.
+/// - **Single consumer**: exactly one caller is expected to invoke the
+///   `is_*_requested` reader per tick (the world's `tick`). If multiple
+///   consumers race on the same flag, only one observes `true` because the
+///   swap clears the flag atomically.
+/// - **Swap-on-read**: reading the flag also clears it. A request raised
+///   *after* the swap but *before* the phase body executes within the same
+///   tick is preserved by being observed on the next tick.
+/// - **Ordering**: `set_*` uses `Release`, `is_*_requested` uses `AcqRel`,
+///   so any writes that happened-before a `set_*` are visible to the
+///   consumer that observes `true`.
 #[derive(Debug, Default)]
 struct ConditionalPhaseFlags {
     {%- for phase in ecs.phases %}
@@ -67,14 +85,23 @@ struct ConditionalPhaseFlags {
 impl ConditionalPhaseFlags {
     {%- for phase in ecs.phases %}
     {%- if phase.on_request %}
-    /// Returns whether the [`{{ phase.name.raw }}`]({{ phase.name.type }}) phase was requested
-    /// and atomically sets the flag to `false`.
+    /// Atomically reads and clears the request flag for the
+    /// [`{{ phase.name.raw }}`]({{ phase.name.type }}) phase.
+    ///
+    /// Returns `true` if a request was pending. The flag is cleared with
+    /// `AtomicBool::swap(false, AcqRel)`, so concurrent callers race: at
+    /// most one observes `true`. This is intended for the single-consumer
+    /// scheduler path; see [`ConditionalPhaseFlags`] for full semantics.
     #[inline]
     pub fn is_{{ phase.name.field }}_requested(&self) -> bool {
         self.{{ phase.name.field }}_requested.swap(false, core::sync::atomic::Ordering::AcqRel)
     }
 
-    /// Sets the request status of the [`{{ phase.name.raw }}`]({{ phase.name.type }}) phase.
+    /// Sets the request flag for the [`{{ phase.name.raw }}`]({{ phase.name.type }}) phase.
+    ///
+    /// Multiple `set_*` calls before the next consumer read coalesce into a
+    /// single phase execution. Uses `Release` ordering, so writes made
+    /// before this call are visible to the consumer that observes `true`.
     #[inline]
     pub fn set_{{ phase.name.field }}_requested(&self) {
         self.{{ phase.name.field }}_requested
@@ -351,7 +378,22 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
     {%- for phase in ecs.phases %}
     {%- if phase.on_request %}
 
-    /// Requests the execution of the [`{{ phase.name.raw }}`]({{ phase.name.type }}) phase.
+    /// Requests one execution of the [`{{ phase.name.raw }}`]({{ phase.name.type }}) phase
+    /// on the next tick.
+    ///
+    /// The request is a single boolean flag, not a queue: repeated calls
+    /// before the next tick coalesce into a single phase run. The flag is
+    /// consumed (cleared) when the scheduler observes it, so once the phase
+    /// has begun running on a tick, a request raised mid-tick will fire on
+    /// the *following* tick.
+    ///
+    /// The flag is set with [`Release`](core::sync::atomic::Ordering::Release)
+    /// ordering and read with [`AcqRel`](core::sync::atomic::Ordering::AcqRel),
+    /// so writes performed before this call happen-before the phase body
+    /// observed by the consumer that clears the flag.
+    ///
+    /// Designed for a single consumer (the world's `tick`); concurrent
+    /// readers would race because the swap-on-read clears the flag.
     #[inline]
     pub fn request_{{ phase.name.field }}_phase(&self) {
         self.phase_flags.set_{{ phase.name.field }}_requested();
