@@ -61,6 +61,82 @@ pub enum Resource {
     UserState(StateNameRef),
 }
 
+/// Finds a cycle in `graph` and returns its edges in traversal order, or `None` if the graph is
+/// acyclic. Implemented as an iterative tri-color DFS over an explicit work stack so deep system
+/// graphs cannot overflow the thread stack.
+fn find_cycle(graph: &HashMap<SystemId, HashSet<SystemId>>) -> Option<Vec<(SystemId, SystemId)>> {
+    // Colors: 0 = White (unseen), 1 = Gray (on current DFS path), 2 = Black (done).
+    let mut color: HashMap<SystemId, u8> = HashMap::with_capacity(graph.len());
+    let mut parent: HashMap<SystemId, SystemId> = HashMap::new();
+
+    let neighbors_of = |u: SystemId| -> std::vec::IntoIter<SystemId> {
+        let mut v: Vec<SystemId> = graph
+            .get(&u)
+            .map(|s| s.iter().copied().collect())
+            .unwrap_or_default();
+        // Sort for deterministic cycle discovery (graph stores `HashSet`).
+        v.sort_by_key(|id| id.0);
+        v.into_iter()
+    };
+
+    for &start in graph.keys() {
+        if color.get(&start).copied().unwrap_or(0) != 0 {
+            continue;
+        }
+        color.insert(start, 1);
+        let mut work: Vec<(SystemId, std::vec::IntoIter<SystemId>)> =
+            vec![(start, neighbors_of(start))];
+
+        while let Some((u, mut it)) = work.pop() {
+            match it.next() {
+                Some(v) => {
+                    // Resume `u` after exploring `v`.
+                    work.push((u, it));
+                    let c = color.get(&v).copied().unwrap_or(0);
+                    if c == 0 {
+                        parent.insert(v, u);
+                        color.insert(v, 1);
+                        work.push((v, neighbors_of(v)));
+                    } else if c == 1 {
+                        // Back-edge u -> v closes a cycle. Walk parents from `u` back to `v`.
+                        let mut cycle = vec![(u, v)];
+                        let mut cur = u;
+                        while cur != v {
+                            let p = *parent
+                                .get(&cur)
+                                .expect("gray node must have a parent on the DFS path");
+                            cycle.push((p, cur));
+                            cur = p;
+                        }
+                        cycle.reverse();
+                        return Some(cycle);
+                    }
+                }
+                None => {
+                    color.insert(u, 2);
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Builds the cycle path (`[n0, n1, ..., n_{k-1}, n0]`) from cycle edges produced by
+/// [`find_cycle`].
+fn cycle_path(
+    cycle_edges: &[(SystemId, SystemId)],
+    name_by_id: &HashMap<SystemId, crate::system::SystemName>,
+) -> Vec<String> {
+    let mut path: Vec<String> = cycle_edges
+        .iter()
+        .map(|&(u, _)| name_by_id[&u].type_name_raw.clone())
+        .collect();
+    if let Some(first) = cycle_edges.first() {
+        path.push(name_by_id[&first.0].type_name_raw.clone());
+    }
+    path
+}
+
 /// Schedules systems into parallelizable batches using resource dependencies and forced `run_after` ordering.
 ///
 /// Forced `run_after` edges (from a system referenced in run_after to the current system) are added first.
@@ -176,65 +252,7 @@ pub fn schedule_systems(systems: &[System]) -> Result<Vec<Vec<SystemId>>, EcsErr
         }
     }
 
-    // Helper: find a cycle in `graph` and return its edges (or `None` if acyclic).
-    fn find_cycle(
-        graph: &HashMap<SystemId, HashSet<SystemId>>,
-    ) -> Option<Vec<(SystemId, SystemId)>> {
-        fn dfs(
-            u: SystemId,
-            graph: &HashMap<SystemId, HashSet<SystemId>>,
-            visited: &mut HashSet<SystemId>,
-            stack: &mut Vec<SystemId>,
-            stack_set: &mut HashSet<SystemId>,
-        ) -> Option<Vec<(SystemId, SystemId)>> {
-            visited.insert(u);
-            stack.push(u);
-            stack_set.insert(u);
-            if let Some(neis) = graph.get(&u) {
-                for &v in neis {
-                    if !visited.contains(&v) {
-                        if let Some(cycle) = dfs(v, graph, visited, stack, stack_set) {
-                            return Some(cycle);
-                        }
-                    } else if stack_set.contains(&v) {
-                        // Found a cycle: collect edges from v to u
-                        let mut cycle = Vec::new();
-                        let mut started = false;
-                        let mut prev = u;
-                        for &node in stack.iter() {
-                            if node == v {
-                                started = true;
-                                prev = v;
-                                continue;
-                            }
-                            if started {
-                                cycle.push((prev, node));
-                                prev = node;
-                            }
-                        }
-                        // close the cycle
-                        cycle.push((u, v));
-                        return Some(cycle);
-                    }
-                }
-            }
-            stack.pop();
-            stack_set.remove(&u);
-            None
-        }
-
-        let mut visited = HashSet::new();
-        let mut stack = Vec::new();
-        let mut stack_set = HashSet::new();
-        for &u in graph.keys() {
-            if !visited.contains(&u) {
-                if let Some(cycle) = dfs(u, graph, &mut visited, &mut stack, &mut stack_set) {
-                    return Some(cycle);
-                }
-            }
-        }
-        None
-    }
+    // (Cycle detection lives at module scope; see `find_cycle`.)
 
     // Remove one edge per cycle, choosing the edge whose source system has the
     // lexicographically-greatest name. Tie-breaking by name (rather than by SystemId) keeps
@@ -292,18 +310,25 @@ pub fn schedule_systems(systems: &[System]) -> Result<Vec<Vec<SystemId>>, EcsErr
     }
 
     if visited != n {
-        // detect any remaining cycle edge
-        for (&u, succs) in &graph {
-            for &v in succs {
-                if *in_deg.get(&u).unwrap() > 0 && *in_deg.get(&v).unwrap() > 0 {
-                    let nu = &name_by_id[&u].type_name_raw;
-                    let nv = &name_by_id[&v].type_name_raw;
-                    return Err(EcsError::CycleDetectedBetweenSystems(
-                        nu.clone(),
-                        nv.clone(),
-                    ));
-                }
-            }
+        // Re-run cycle detection on the residual graph to surface the full path of the cycle
+        // (rather than two arbitrary endpoints) for diagnostics.
+        let residual: HashMap<SystemId, HashSet<SystemId>> = graph
+            .iter()
+            .filter(|(u, _)| in_deg.get(u).copied().unwrap_or(0) > 0)
+            .map(|(&u, succs)| {
+                let kept: HashSet<SystemId> = succs
+                    .iter()
+                    .copied()
+                    .filter(|v| in_deg.get(v).copied().unwrap_or(0) > 0)
+                    .collect();
+                (u, kept)
+            })
+            .collect();
+        if let Some(cycle_edges) = find_cycle(&residual) {
+            return Err(EcsError::CycleDetectedBetweenSystems(cycle_path(
+                &cycle_edges,
+                &name_by_id,
+            )));
         }
         return Err(EcsError::CycleDetectedInSystemRunOrder);
     }
@@ -494,6 +519,71 @@ mod tests {
             ordered,
             vec![(0, "Alpha"), (1, "Beta"), (2, "Zulu")],
             "cycle break must drop the edge from the lexicographically-greatest source",
+        );
+    }
+
+    /// `find_cycle` must terminate without overflowing the thread stack on graphs whose longest
+    /// path is far deeper than the recursive implementation could tolerate. A linear chain of
+    /// 50_000 nodes with a single back-edge at the end is enough to overflow the default
+    /// 8 MiB stack with the previous recursive DFS.
+    #[test]
+    fn find_cycle_handles_deep_graphs_without_stack_overflow() {
+        const N: u64 = 50_000;
+        let mut graph: HashMap<SystemId, HashSet<SystemId>> = HashMap::new();
+        for i in 0..N {
+            graph
+                .entry(SystemId(i))
+                .or_default()
+                .insert(SystemId(i + 1));
+        }
+        graph.entry(SystemId(N)).or_default(); // sink, no outgoing edges
+        assert!(find_cycle(&graph).is_none(), "linear chain must be acyclic");
+
+        // Close the chain into a cycle and confirm it is detected without recursion.
+        graph.get_mut(&SystemId(N)).unwrap().insert(SystemId(0));
+        let cycle = find_cycle(&graph).expect("back-edge must produce a cycle");
+        assert_eq!(
+            cycle.len() as u64,
+            N + 1,
+            "cycle should include every edge in the chain plus the back-edge",
+        );
+    }
+
+    /// `cycle_path` should render the cycle as a closed walk `[n0, ..., n_{k-1}, n0]`, and the
+    /// resulting `EcsError::CycleDetectedBetweenSystems` should format it as an arrow-separated
+    /// path. The previous error variant only named two endpoints.
+    #[test]
+    fn cycle_path_renders_full_path_in_error_message() {
+        let names = [
+            (SystemId(1), sysname("Alpha")),
+            (SystemId(2), sysname("Beta")),
+            (SystemId(3), sysname("Gamma")),
+        ];
+        let name_by_id: HashMap<SystemId, _> = names.into_iter().collect();
+
+        // Triangle: Alpha -> Beta -> Gamma -> Alpha.
+        let cycle_edges = vec![
+            (SystemId(1), SystemId(2)),
+            (SystemId(2), SystemId(3)),
+            (SystemId(3), SystemId(1)),
+        ];
+
+        let path = cycle_path(&cycle_edges, &name_by_id);
+        assert_eq!(
+            path,
+            vec![
+                "Alpha".to_string(),
+                "Beta".to_string(),
+                "Gamma".to_string(),
+                "Alpha".to_string(),
+            ],
+            "cycle path must list every node in order and close back to the start",
+        );
+
+        let err = EcsError::CycleDetectedBetweenSystems(path);
+        assert_eq!(
+            err.to_string(),
+            "A cycle was detected in the system run order: Alpha -> Beta -> Gamma -> Alpha.",
         );
     }
 }
