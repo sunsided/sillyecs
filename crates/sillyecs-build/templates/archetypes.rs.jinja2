@@ -517,9 +517,17 @@ impl {{ archetype.name.type }} {
     }
 
     /// Dynamically determines whether this archetype has a specific component.
-    pub const fn has_components<Id>(&self, id: ComponentId) -> bool {
+    // `matches!` arm-list is generated from the archetype's component IDs; whether those IDs are
+    // contiguous (and could be expressed as a range pattern) depends on the user's YAML, so
+    // silence the suggestion globally for this generated check.
+    #[allow(clippy::manual_range_patterns)]
+    pub const fn has_components(&self, id: ComponentId) -> bool {
         let id = id.as_u64();
-        {% for id in archetype.component_ids %}id == {{ id }} || {% endfor %}false
+        {% if archetype.component_ids -%}
+        matches!(id, {% for id in archetype.component_ids %}{{ id }}{% if not loop.last %} | {% endif %}{% endfor %})
+        {%- else -%}
+        false
+        {%- endif %}
     }
 
     /// Spawn a new entity into the world. Must be called through the world for proper bookkeeping.

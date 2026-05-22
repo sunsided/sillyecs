@@ -126,6 +126,10 @@ impl SystemPhase {
     {%- if phase.fixed %}
 
     /// The number of seconds the [`{{ phase.name.raw }}`](SystemPhase::{{ phase.name.raw }}) fixed-time step should run.
+    // `fixed_secs` is computed as `1.0 / hertz` in `f32` precision, but serializing through
+    // `minijinja` widens it to `f64`, so the rendered literal carries more digits than `f32`
+    // can represent. Truncation back to `f32` is the intended behavior.
+    #[allow(clippy::excessive_precision)]
     pub const {{ phase.name.field | upper }}_SECS: f32 = {{ phase.fixed_secs }};
 
     /// The frequency of the [`{{ phase.name.raw }}`](SystemPhase::{{ phase.name.raw }}) fixed-time step.
@@ -600,7 +604,7 @@ pub trait Apply{{ system.name.type }}: System {
         for {{ system.component_untuple_code }} in zipped_iter {
             self.apply_single(
                 {%- if system.needs_context %}
-                &context,
+                context,
                 {%- endif %}
                 {%- for state in system.states %}
                     {%- set access = state.system | default(value="none") %}
