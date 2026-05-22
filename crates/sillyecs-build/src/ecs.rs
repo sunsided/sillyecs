@@ -1,8 +1,8 @@
-use crate::archetype::Archetype;
-use crate::component::Component;
+use crate::archetype::{Archetype, ArchetypeId};
+use crate::component::{Component, ComponentId};
 use crate::state::State;
-use crate::system::{System, SystemPhase};
-use crate::world::World;
+use crate::system::{System, SystemId, SystemPhase};
+use crate::world::{World, WorldId};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
@@ -34,6 +34,8 @@ pub struct Ecs {
 
 impl Ecs {
     pub(crate) fn finish(&mut self) -> Result<(), EcsError> {
+        self.assign_ids();
+
         let cloned_archetypes = self.archetypes.clone();
         for archetype in &mut self.archetypes {
             archetype.finish(&self.components, &cloned_archetypes);
@@ -62,6 +64,25 @@ impl Ecs {
         }
 
         Ok(())
+    }
+
+    /// Assigns deterministic, per-`Ecs` IDs to components, archetypes, systems, and worlds in
+    /// their order of declaration. IDs start at `1` so they remain valid for the
+    /// `NonZeroU64`-backed constants the templates emit, and they are a pure function of the
+    /// input YAML (no global process-wide counters).
+    fn assign_ids(&mut self) {
+        for (index, component) in self.components.iter_mut().enumerate() {
+            component.id = ComponentId(index as u64 + 1);
+        }
+        for (index, archetype) in self.archetypes.iter_mut().enumerate() {
+            archetype.id = ArchetypeId(index as u64 + 1);
+        }
+        for (index, system) in self.systems.iter_mut().enumerate() {
+            system.id = SystemId(index as u64 + 1);
+        }
+        for (index, world) in self.worlds.iter_mut().enumerate() {
+            world.id = WorldId(index as u64 + 1);
+        }
     }
 }
 

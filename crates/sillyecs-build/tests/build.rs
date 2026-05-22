@@ -54,6 +54,60 @@ systems:
     }
 }
 
+/// Regression for issue #25: previously, `ArchetypeId`, `SystemId`, `WorldId`, and `ComponentId`
+/// were assigned by process-wide `AtomicU64` counters in the build crate, which made successive
+/// `EcsCode::generate` calls in the same process emit *different* numeric IDs for the same input
+/// YAML. IDs are now assigned per-`Ecs` from the deserialization order, so two generations from
+/// the same YAML must produce byte-identical output.
+#[test]
+fn ids_are_deterministic_across_generate_calls() {
+    const YAML: &str = r#"
+components:
+  - name: Position
+  - name: Velocity
+archetypes:
+  - name: Particle
+    components: [Position, Velocity]
+  - name: Static
+    components: [Position]
+worlds:
+  - name: Main
+    archetypes: [Particle, Static]
+  - name: Secondary
+    archetypes: [Particle]
+phases:
+  - name: Update
+systems:
+  - name: Move
+    phase: Update
+    inputs: [Velocity]
+    outputs: [Position]
+  - name: Settle
+    phase: Update
+    inputs: [Position]
+"#;
+
+    let first = EcsCode::generate(BufReader::new(YAML.as_bytes())).expect("first generate");
+    let second = EcsCode::generate(BufReader::new(YAML.as_bytes())).expect("second generate");
+
+    assert_eq!(
+        first.components, second.components,
+        "component IDs / generated component module drifted between generate() calls"
+    );
+    assert_eq!(
+        first.archetypes, second.archetypes,
+        "archetype IDs / generated archetype module drifted between generate() calls"
+    );
+    assert_eq!(
+        first.systems, second.systems,
+        "system IDs / generated system module drifted between generate() calls"
+    );
+    assert_eq!(
+        first.world, second.world,
+        "world IDs / generated world module drifted between generate() calls"
+    );
+}
+
 /// Regression for issue #27: per-tick `Box::new(&self.archetypes)` heap allocation was emitted in
 /// preflight/postflight call sites of systems with `lookup:` entries. The trait method now takes
 /// `&dyn XComponentLookup` directly and the call sites pass `&self.archetypes` without boxing.

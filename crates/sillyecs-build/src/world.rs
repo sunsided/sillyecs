@@ -6,12 +6,9 @@ use crate::state::State;
 use crate::system::{System, SystemPhase, SystemPhaseRef};
 use crate::system_scheduler::schedule_systems;
 use serde::{Deserialize, Deserializer, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::hash::Hash;
 use std::ops::Deref;
-use std::sync::atomic::AtomicU64;
-
-static WORLD_IDS: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct World {
@@ -29,12 +26,14 @@ pub struct World {
     #[serde(skip_deserializing)]
     pub states: Vec<State>,
 
-    /// The systems in scheduling order (based on this world's systems).
+    /// The systems in scheduling order (based on this world's systems). Ordered by phase name so
+    /// that codegen output is deterministic between runs.
     #[serde(default, skip_deserializing)]
-    pub scheduled_systems: HashMap<SystemPhaseRef, Vec<Vec<System>>>,
-    /// The components used in this world (based on this world's archetypes).
+    pub scheduled_systems: BTreeMap<SystemPhaseRef, Vec<Vec<System>>>,
+    /// The components used in this world (based on this world's archetypes). Ordered by component
+    /// and archetype name so that codegen output is deterministic between runs.
     #[serde(default, skip_deserializing)]
-    pub components: HashMap<ComponentRef, HashSet<ArchetypeRef>>,
+    pub components: BTreeMap<ComponentRef, BTreeSet<ArchetypeRef>>,
 }
 
 impl World {
@@ -59,7 +58,7 @@ impl World {
                     .and_modify(|set| {
                         set.insert(archetype.name.clone());
                     })
-                    .or_insert(HashSet::from([archetype.name.clone()]));
+                    .or_insert(BTreeSet::from([archetype.name.clone()]));
             }
 
             self.archetypes.push(archetype.clone());
@@ -103,7 +102,7 @@ impl World {
     }
 
     pub(crate) fn scheduled_systems(&mut self, phases: &[SystemPhase]) -> Result<(), EcsError> {
-        let mut phase_groups = HashMap::new();
+        let mut phase_groups = BTreeMap::new();
         for phase in phases {
             let systems_in_group: Vec<_> = self
                 .systems
@@ -135,15 +134,9 @@ impl World {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 #[serde(transparent)]
-pub struct WorldId(u64);
-
-impl Default for WorldId {
-    fn default() -> Self {
-        Self(WORLD_IDS.fetch_add(1, std::sync::atomic::Ordering::SeqCst))
-    }
-}
+pub struct WorldId(pub(crate) u64);
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 #[serde(transparent)]

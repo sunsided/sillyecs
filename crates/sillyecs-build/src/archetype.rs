@@ -1,10 +1,7 @@
 use crate::Name;
 use crate::component::{Component, ComponentId, ComponentRef};
 use core::ops::Deref;
-use core::sync::atomic::AtomicU64;
 use serde::{Deserialize, Deserializer, Serialize};
-
-static ARCHETYPE_IDS: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Archetype {
@@ -83,15 +80,9 @@ impl Archetype {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 #[serde(transparent)]
-pub struct ArchetypeId(u64);
-
-impl Default for ArchetypeId {
-    fn default() -> Self {
-        Self(ARCHETYPE_IDS.fetch_add(1, core::sync::atomic::Ordering::SeqCst))
-    }
-}
+pub struct ArchetypeId(pub(crate) u64);
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 #[serde(transparent)]

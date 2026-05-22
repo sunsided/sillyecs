@@ -7,9 +7,6 @@ use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::HashSet;
 use std::fmt::{Display, Formatter};
 use std::ops::Deref;
-use std::sync::atomic::AtomicU64;
-
-static SYSTEM_IDS: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -291,15 +288,9 @@ impl System {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 #[serde(transparent)]
 pub struct SystemId(pub(crate) u64);
-
-impl Default for SystemId {
-    fn default() -> Self {
-        Self(SYSTEM_IDS.fetch_add(1, std::sync::atomic::Ordering::SeqCst))
-    }
-}
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct SystemPhase {
