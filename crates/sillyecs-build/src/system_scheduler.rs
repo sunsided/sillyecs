@@ -16,14 +16,21 @@
 //! # Conflict tie-break direction
 //!
 //! When two systems have a bidirectional resource conflict that is not resolved by any
-//! `run_after` edge (direct or transitive), the scheduler removes one of the two candidate
-//! edges so that one system can run before the other. The system whose name compares
-//! lexicographically *less* is chosen to run first: i.e. the alphabetically-earlier name
-//! becomes the predecessor and the alphabetically-later name becomes the successor.
+//! `run_after` edge (direct or transitive), the scheduler picks a direction so one system runs
+//! before the other. The name-based tie-break (alphabetically-earlier name becomes the
+//! predecessor) is applied *cycle-aware*: if keeping the name-based direction would create a
+//! cycle with the already-committed graph (forced `run_after` edges plus previously-resolved
+//! pairs), the direction is flipped instead. This prevents name-based tie-breaks from
+//! "fighting" user-specified `run_after` chains. If both directions would still create a
+//! cycle, the name-based direction is kept and the leftover cycle is resolved by the
+//! cycle-break step below.
 //!
-//! The same comparison breaks any cycle that survives bidirectional-conflict resolution: the
-//! edge whose source system has the lexicographically *greatest* name is dropped, so the
-//! alphabetically-latest system in the cycle loses its outgoing edge.
+//! The cycle-break step uses the same lexicographic comparison: the edge whose source system
+//! has the lexicographically *greatest* name is dropped. **Forced `run_after` edges are
+//! preferred-to-keep**: cycle-break only drops a forced edge when every edge in the cycle is
+//! forced (which means the user specified a contradiction). When a cycle is broken — and
+//! especially when a forced edge is dropped — sillyecs emits a `cargo:warning` so the user
+//! sees the scheduler had to override their intent.
 //!
 //! After Kahn's algorithm produces a layer, the layer is also sorted by name, so the sequential
 //! call order *within* a parallel group is independent of YAML declaration order.
@@ -63,13 +70,16 @@ pub enum Resource {
 
 /// Schedules systems into parallelizable batches using resource dependencies and forced `run_after` ordering.
 ///
-/// Forced `run_after` edges (from a system referenced in run_after to the current system) are added first.
-/// Then resource–based candidate edges (writer → reader or writer → writer) are collected.
-/// For each unordered pair of systems that share conflicting candidate edges (i.e. edges in both directions),
-/// the conflict is resolved by honoring any forced ordering (direct or transitive); if neither applies, the
-/// system with the lexicographically-earlier name is chosen as the predecessor. Any cycle that remains is
-/// broken by removing the outgoing edge of the system whose name compares greatest. See the module-level
-/// docs for the rationale.
+/// Forced `run_after` edges are added first. Resource conflicts are then classified per-pair:
+/// writer-vs-reader (one direction) and writer-vs-writer (bidirectional candidate). Writer-vs-reader
+/// edges are added directly, unless a forced chain already orders the pair in the opposite
+/// direction — the user's forced order wins. Bidirectional pairs are resolved in deterministic
+/// name order: a forced (transitively) reachable side wins; otherwise the name-based tie-break is
+/// applied *cycle-aware*, flipping direction if the name-earlier-predecessor choice would form a
+/// cycle with the already-committed graph. Any cycle that still remains is broken by removing the
+/// outgoing edge of the system whose name compares greatest, preferring to drop non-forced edges.
+/// Each cycle break emits a `cargo:warning` so the user is notified that their ordering
+/// constraints could not be fully satisfied. See the module-level docs for the rationale.
 pub fn schedule_systems(systems: &[System]) -> Result<Vec<Vec<SystemId>>, EcsError> {
     let n = systems.len();
 
@@ -101,7 +111,7 @@ pub fn schedule_systems(systems: &[System]) -> Result<Vec<Vec<SystemId>>, EcsErr
         forced_adj.entry(u).or_default().push(v);
     }
 
-    // Helper: check transitive forced reachability u →* v
+    // Helper: check transitive forced reachability u →* v (forced edges only)
     fn forced_reachable(
         adj: &HashMap<SystemId, Vec<SystemId>>,
         start: SystemId,
@@ -125,54 +135,114 @@ pub fn schedule_systems(systems: &[System]) -> Result<Vec<Vec<SystemId>>, EcsErr
         false
     }
 
-    // Add resource-based edges: any writer → (reader or writer) of same resource
-    for a in systems {
-        for b in systems {
-            if a.id == b.id {
+    // Helper: would adding `from → to` create a cycle in the current graph?
+    // Equivalent to: is `from` reachable from `to` using existing edges?
+    fn would_cycle(
+        graph: &HashMap<SystemId, HashSet<SystemId>>,
+        from: SystemId,
+        to: SystemId,
+    ) -> bool {
+        let mut stack = vec![to];
+        let mut seen = HashSet::new();
+        while let Some(u) = stack.pop() {
+            if u == from {
+                return true;
+            }
+            if !seen.insert(u) {
                 continue;
             }
-            if a.dependencies.iter().any(|da| {
-                da.access == Access::Write
-                    && b.dependencies.iter().any(|db| db.resource == da.resource)
-            }) {
-                graph.entry(a.id).or_default().insert(b.id);
+            if let Some(neis) = graph.get(&u) {
+                for &w in neis {
+                    stack.push(w);
+                }
             }
         }
+        false
     }
 
-    // Resolve bidirectional conflicts
+    // Classify resource conflicts per unordered pair.
+    // - Unidirectional (only one side writes a shared resource): add that edge unless the
+    //   user's forced chain orders the pair the other way (in which case the forced order wins).
+    // - Bidirectional (both write a shared resource): defer to the resolution step below.
+    let mut bidirectional: Vec<(SystemId, SystemId)> = Vec::new();
     for a in systems {
         for b in systems {
             if a.id >= b.id {
                 continue;
             }
-            let has_ab = graph.get(&a.id).map_or(false, |s| s.contains(&b.id));
-            let has_ba = graph.get(&b.id).map_or(false, |s| s.contains(&a.id));
-            if has_ab && has_ba {
-                // honor any forced (direct or transitive)
-                let reach_ab = forced_reachable(&forced_adj, a.id, b.id);
-                let reach_ba = forced_reachable(&forced_adj, b.id, a.id);
-                if reach_ab && !reach_ba {
-                    // a should precede b: remove b→a
-                    graph.get_mut(&b.id).unwrap().remove(&a.id);
-                    continue;
+            let a_writes_shared = a.dependencies.iter().any(|da| {
+                da.access == Access::Write
+                    && b.dependencies.iter().any(|db| db.resource == da.resource)
+            });
+            let b_writes_shared = b.dependencies.iter().any(|db| {
+                db.access == Access::Write
+                    && a.dependencies.iter().any(|da| da.resource == db.resource)
+            });
+            match (a_writes_shared, b_writes_shared) {
+                (false, false) => {}
+                (true, false) => {
+                    if !forced_reachable(&forced_adj, b.id, a.id) {
+                        graph.entry(a.id).or_default().insert(b.id);
+                    }
                 }
-                if reach_ba && !reach_ab {
-                    graph.get_mut(&a.id).unwrap().remove(&b.id);
-                    continue;
+                (false, true) => {
+                    if !forced_reachable(&forced_adj, a.id, b.id) {
+                        graph.entry(b.id).or_default().insert(a.id);
+                    }
                 }
-                // No clear forced preference: tie-break by system name. The system with the
-                // lexicographically-earlier name runs first, so we drop the edge that would make
-                // it the successor. System names are guaranteed unique by
-                // `Ecs::ensure_system_consistency`, so this comparison is total.
-                if a.name.type_name_raw < b.name.type_name_raw {
-                    // a precedes b: keep a→b, drop b→a
-                    graph.get_mut(&b.id).unwrap().remove(&a.id);
-                } else {
-                    // b precedes a: keep b→a, drop a→b
-                    graph.get_mut(&a.id).unwrap().remove(&b.id);
+                (true, true) => {
+                    bidirectional.push((a.id, b.id));
                 }
             }
+        }
+    }
+
+    // Resolve bidirectional pairs in deterministic name order (independent of YAML / id order).
+    // Pairs are collected as `(a.id, b.id)` with `a.id < b.id`, but `SystemId` ordering can
+    // disagree with name ordering, so the sort key must be canonicalized to the name pair
+    // `(min(name_a, name_b), max(name_a, name_b))` — otherwise YAML reordering could change
+    // resolution order and, via the cycle-aware tie-break, the final schedule.
+    fn canonical_name_pair<'a>(
+        names: &'a HashMap<SystemId, crate::system::SystemName>,
+        a: SystemId,
+        b: SystemId,
+    ) -> (&'a str, &'a str) {
+        let na = names[&a].type_name_raw.as_str();
+        let nb = names[&b].type_name_raw.as_str();
+        if na <= nb { (na, nb) } else { (nb, na) }
+    }
+    bidirectional.sort_by(|&(a1, b1), &(a2, b2)| {
+        canonical_name_pair(&name_by_id, a1, b1).cmp(&canonical_name_pair(&name_by_id, a2, b2))
+    });
+
+    for (a_id, b_id) in bidirectional {
+        let reach_ab = forced_reachable(&forced_adj, a_id, b_id);
+        let reach_ba = forced_reachable(&forced_adj, b_id, a_id);
+        if reach_ab && !reach_ba {
+            graph.entry(a_id).or_default().insert(b_id);
+            continue;
+        }
+        if reach_ba && !reach_ab {
+            graph.entry(b_id).or_default().insert(a_id);
+            continue;
+        }
+        // Cycle-aware name tie-break: prefer the alphabetically-earlier name as predecessor;
+        // flip if that direction would create a cycle with the already-committed graph.
+        let a_name = &name_by_id[&a_id].type_name_raw;
+        let b_name = &name_by_id[&b_id].type_name_raw;
+        let (pred, succ) = if a_name < b_name {
+            (a_id, b_id)
+        } else {
+            (b_id, a_id)
+        };
+        if !would_cycle(&graph, pred, succ) {
+            graph.entry(pred).or_default().insert(succ);
+        } else if !would_cycle(&graph, succ, pred) {
+            graph.entry(succ).or_default().insert(pred);
+        } else {
+            // Both directions would close a cycle: the conflict was unavoidable.
+            // Keep the name direction and let the cycle-break step handle it.
+            graph.entry(pred).or_default().insert(succ);
         }
     }
 
@@ -236,16 +306,45 @@ pub fn schedule_systems(systems: &[System]) -> Result<Vec<Vec<SystemId>>, EcsErr
         None
     }
 
-    // Remove one edge per cycle, choosing the edge whose source system has the
-    // lexicographically-greatest name. Tie-breaking by name (rather than by SystemId) keeps
-    // scheduling independent of YAML declaration order.
+    // Remove one edge per cycle. Prefer dropping non-forced edges so user-specified `run_after`
+    // ordering is honored whenever possible; only drop a forced edge if every edge in the cycle
+    // is forced (the user has specified a contradictory ordering). Among the candidates, pick the
+    // edge whose source system has the lexicographically-greatest name so the choice is
+    // independent of YAML declaration order. Each cycle break is reported via `cargo:warning` so
+    // the user sees that their ordering or data-dependency constraints could not all be
+    // satisfied.
     while let Some(cycle_edges) = find_cycle(&graph) {
-        if let Some(&(rem_u, rem_v)) = cycle_edges
+        let non_forced_pick = cycle_edges
             .iter()
+            .filter(|e| !forced_edges.contains(e))
             .max_by_key(|&&(u, _)| &name_by_id[&u].type_name_raw)
-        {
-            graph.get_mut(&rem_u).unwrap().remove(&rem_v);
-        }
+            .copied();
+        let (rem_u, rem_v) = match non_forced_pick {
+            Some(edge) => edge,
+            None => cycle_edges
+                .iter()
+                .max_by_key(|&&(u, _)| &name_by_id[&u].type_name_raw)
+                .copied()
+                .expect("find_cycle returned an empty cycle"),
+        };
+        let cycle_path: Vec<&str> = cycle_edges
+            .iter()
+            .map(|&(u, _)| name_by_id[&u].type_name_raw.as_str())
+            .collect();
+        let dropped_forced = forced_edges.contains(&(rem_u, rem_v));
+        let detail = if dropped_forced {
+            " — dropping a USER-SPECIFIED run_after edge; the requested ordering cannot be satisfied"
+        } else {
+            ""
+        };
+        println!(
+            "cargo:warning=sillyecs scheduler: cycle detected through systems [{}], dropping edge {} -> {}{}",
+            cycle_path.join(", "),
+            name_by_id[&rem_u].type_name_raw,
+            name_by_id[&rem_v].type_name_raw,
+            detail,
+        );
+        graph.get_mut(&rem_u).unwrap().remove(&rem_v);
     }
 
     // Compute in-degrees
@@ -495,5 +594,74 @@ mod tests {
             vec![(0, "Alpha"), (1, "Beta"), (2, "Zulu")],
             "cycle break must drop the edge from the lexicographically-greatest source",
         );
+    }
+
+    /// Regression for sillyecs scheduler vs. user `run_after`: every system writes a shared
+    /// resource (so each pair is in conflict), and a `run_after` chain pins the order. The
+    /// alphabetically-earliest system (`DynamicLight`) `run_after`s `Render`, so the name-based
+    /// tie-break with `FrameGlobals` (`DynamicLight < FrameGlobals`, also `FrameGlobals < Render`)
+    /// must not put `DynamicLight` in front of `Render`. The cycle-aware bidirectional resolver
+    /// flips the offending tie-break so the user's forced chain is preserved end-to-end.
+    #[test]
+    fn cycle_aware_tiebreak_preserves_forced_chain_against_name_order() {
+        // All systems write to the same resource `g`. Run-after chain:
+        //   RenderBackground -> RenderSky -> Render -> DynamicLight
+        // FrameGlobals has no `run_after`. Alphabetical order is:
+        //   DynamicLight < FrameGlobals < Render < RenderBackground < RenderSky
+        // The naive name tie-break would put `DynamicLight` before `FrameGlobals` and
+        // `FrameGlobals` before `Render`, but `Render -> DynamicLight` is forced, which would
+        // require dropping a user-specified `run_after` to break the resulting cycle.
+        let systems = vec![
+            create_system(1, "RenderBackground", vec![], vec!["g"], vec![]),
+            create_system(2, "RenderSky", vec![], vec!["g"], vec!["RenderBackground"]),
+            create_system(3, "Render", vec![], vec!["g"], vec!["RenderSky"]),
+            create_system(4, "DynamicLight", vec![], vec!["g"], vec!["Render"]),
+            create_system(5, "FrameGlobals", vec![], vec!["g"], vec![]),
+        ];
+
+        let sorted = schedule_systems(&systems).unwrap();
+
+        let mut ordered: Vec<(usize, &str)> = vec![];
+        for (group_idx, group) in sorted.iter().enumerate() {
+            for sys_id in group {
+                let sys = systems.iter().find(|s| s.id == *sys_id).unwrap();
+                ordered.push((group_idx, &sys.name.type_name_raw));
+            }
+        }
+
+        // Every system is in its own layer (they all write `g`) and the forced chain holds.
+        let position = |name: &str| ordered.iter().position(|(_, n)| *n == name).unwrap();
+        assert!(
+            position("RenderBackground") < position("RenderSky"),
+            "forced edge RenderBackground -> RenderSky must be honored: {:?}",
+            ordered
+        );
+        assert!(
+            position("RenderSky") < position("Render"),
+            "forced edge RenderSky -> Render must be honored: {:?}",
+            ordered
+        );
+        assert!(
+            position("Render") < position("DynamicLight"),
+            "forced edge Render -> DynamicLight must be honored: {:?}",
+            ordered
+        );
+        // FrameGlobals shares a write conflict with every other system, so it cannot share a
+        // layer with any of them.
+        let frame_layer = ordered
+            .iter()
+            .find(|(_, n)| *n == "FrameGlobals")
+            .unwrap()
+            .0;
+        for (layer, name) in &ordered {
+            if *name == "FrameGlobals" {
+                continue;
+            }
+            assert_ne!(
+                *layer, frame_layer,
+                "FrameGlobals must not share a layer with {} (both write `g`)",
+                name
+            );
+        }
     }
 }
