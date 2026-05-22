@@ -3,9 +3,6 @@ use crate::archetype::{Archetype, ArchetypeId, ArchetypeRef};
 use crate::system::{System, SystemId, SystemName};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::ops::Deref;
-use std::sync::atomic::AtomicU64;
-
-static COMPONENT_IDS: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Component {
@@ -38,15 +35,9 @@ pub struct Component {
 
 pub type ComponentRef = ComponentName;
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 #[serde(transparent)]
-pub struct ComponentId(u64);
-
-impl Default for ComponentId {
-    fn default() -> Self {
-        Self(COMPONENT_IDS.fetch_add(1, std::sync::atomic::Ordering::SeqCst))
-    }
-}
+pub struct ComponentId(pub(crate) u64);
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 #[serde(transparent)]
