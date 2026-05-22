@@ -36,7 +36,11 @@ into your project.
 - **Automatic system scheduling.** Per phase, the build crate analyzes each system's component
   reads/writes, user-state reads/writes, frame-context use, and explicit `run_after` edges,
   resolves bidirectional conflicts via forced-edge reachability, and emits layered groups
-  (Kahn's algorithm) that can run in parallel.
+  (Kahn's algorithm) that can run in parallel. When two systems have a bidirectional resource
+  conflict that no `run_after` chain resolves, the alphabetically-earlier system name runs first;
+  the same name comparison breaks any surviving cycle, with the alphabetically-latest source
+  losing its outgoing edge. Within-layer order is also sorted by name. Scheduling is therefore
+  independent of the order in which systems appear in YAML; only renaming a system affects it.
 - **Sequential and Rayon-parallel execution paths.** Every phase gets both
   `apply_system_phase_X()` and `par_apply_system_phase_X()` variants.
 - **Rich phase lifecycle.** Each system exposes `is_ready` → `on_begin_phase` → optional

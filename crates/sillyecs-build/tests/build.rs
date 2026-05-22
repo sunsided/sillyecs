@@ -245,3 +245,39 @@ systems:
         other => panic!("expected CrossPhaseRunAfter, got {other:?}"),
     }
 }
+
+/// The scheduler's name-based tie-break is only total if system names are unique. Two systems
+/// declared with the same name in YAML must therefore be rejected at validation time, not
+/// silently collapsed by the internal `name -> phase` HashMap.
+#[test]
+fn duplicate_system_name_is_rejected() {
+    const YAML: &str = r#"
+components:
+  - name: Position
+archetypes:
+  - name: Particle
+    components: [Position]
+worlds:
+  - name: Main
+    archetypes: [Particle]
+phases:
+  - name: Update
+systems:
+  - name: Tick
+    phase: Update
+    outputs: [Position]
+  - name: Tick
+    phase: Update
+    inputs: [Position]
+"#;
+
+    let reader = BufReader::new(YAML.as_bytes());
+    let err = match EcsCode::generate(reader) {
+        Ok(_) => panic!("duplicate system name must fail"),
+        Err(e) => e,
+    };
+    match err {
+        EcsError::DuplicateSystem(name) => assert_eq!(name, "Tick"),
+        other => panic!("expected DuplicateSystem, got {other:?}"),
+    }
+}

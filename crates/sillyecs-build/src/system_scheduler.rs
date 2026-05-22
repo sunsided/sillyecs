@@ -12,6 +12,26 @@
 //! The main entry point is the [`schedule_systems`] function which takes a slice of systems
 //! and returns an ordered list of system batches that can be executed in parallel while
 //! respecting all dependencies and constraints.
+//!
+//! # Conflict tie-break direction
+//!
+//! When two systems have a bidirectional resource conflict that is not resolved by any
+//! `run_after` edge (direct or transitive), the scheduler removes one of the two candidate
+//! edges so that one system can run before the other. The system whose name compares
+//! lexicographically *less* is chosen to run first: i.e. the alphabetically-earlier name
+//! becomes the predecessor and the alphabetically-later name becomes the successor.
+//!
+//! The same comparison breaks any cycle that survives bidirectional-conflict resolution: the
+//! edge whose source system has the lexicographically *greatest* name is dropped, so the
+//! alphabetically-latest system in the cycle loses its outgoing edge.
+//!
+//! After Kahn's algorithm produces a layer, the layer is also sorted by name, so the sequential
+//! call order *within* a parallel group is independent of YAML declaration order.
+//!
+//! Tie-breaking by name (rather than by `SystemId`) makes scheduling independent of the order
+//! in which systems are declared in YAML. Renaming a system can still re-order it, but
+//! re-ordering systems in the YAML file will not. System names are guaranteed unique by
+//! `Ecs::ensure_system_consistency`, so the comparison is total.
 
 use crate::component::ComponentName;
 use crate::ecs::EcsError;
@@ -46,7 +66,10 @@ pub enum Resource {
 /// Forced `run_after` edges (from a system referenced in run_after to the current system) are added first.
 /// Then resource–based candidate edges (writer → reader or writer → writer) are collected.
 /// For each unordered pair of systems that share conflicting candidate edges (i.e. edges in both directions),
-/// the conflict is resolved by honoring any forced ordering (direct or transitive); if neither applies, a tie-break by ID is used.
+/// the conflict is resolved by honoring any forced ordering (direct or transitive); if neither applies, the
+/// system with the lexicographically-earlier name is chosen as the predecessor. Any cycle that remains is
+/// broken by removing the outgoing edge of the system whose name compares greatest. See the module-level
+/// docs for the rationale.
 pub fn schedule_systems(systems: &[System]) -> Result<Vec<Vec<SystemId>>, EcsError> {
     let n = systems.len();
 
@@ -138,18 +161,22 @@ pub fn schedule_systems(systems: &[System]) -> Result<Vec<Vec<SystemId>>, EcsErr
                     graph.get_mut(&a.id).unwrap().remove(&b.id);
                     continue;
                 }
-                // no clear forced preference: tie-break by ID
-                if a.id < b.id {
-                    graph.get_mut(&a.id).unwrap().remove(&b.id);
-                } else {
+                // No clear forced preference: tie-break by system name. The system with the
+                // lexicographically-earlier name runs first, so we drop the edge that would make
+                // it the successor. System names are guaranteed unique by
+                // `Ecs::ensure_system_consistency`, so this comparison is total.
+                if a.name.type_name_raw < b.name.type_name_raw {
+                    // a precedes b: keep a→b, drop b→a
                     graph.get_mut(&b.id).unwrap().remove(&a.id);
+                } else {
+                    // b precedes a: keep b→a, drop a→b
+                    graph.get_mut(&a.id).unwrap().remove(&b.id);
                 }
             }
         }
     }
 
-    // Break remaining cycles by removing one edge per cycle, tie-breaking by highest SystemId
-    // Helper to find a cycle and return its edges
+    // Helper: find a cycle in `graph` and return its edges (or `None` if acyclic).
     fn find_cycle(
         graph: &HashMap<SystemId, HashSet<SystemId>>,
     ) -> Option<Vec<(SystemId, SystemId)>> {
@@ -209,9 +236,14 @@ pub fn schedule_systems(systems: &[System]) -> Result<Vec<Vec<SystemId>>, EcsErr
         None
     }
 
-    // Remove one edge per cycle, choosing the edge with highest source ID
+    // Remove one edge per cycle, choosing the edge whose source system has the
+    // lexicographically-greatest name. Tie-breaking by name (rather than by SystemId) keeps
+    // scheduling independent of YAML declaration order.
     while let Some(cycle_edges) = find_cycle(&graph) {
-        if let Some(&(rem_u, rem_v)) = cycle_edges.iter().max_by_key(|&&(u, _)| u) {
+        if let Some(&(rem_u, rem_v)) = cycle_edges
+            .iter()
+            .max_by_key(|&&(u, _)| &name_by_id[&u].type_name_raw)
+        {
             graph.get_mut(&rem_u).unwrap().remove(&rem_v);
         }
     }
@@ -248,7 +280,13 @@ pub fn schedule_systems(systems: &[System]) -> Result<Vec<Vec<SystemId>>, EcsErr
             }
         }
 
-        layer.sort();
+        // Sort within-layer by system name (not `SystemId`) so the sequential call order inside
+        // a parallel group is also independent of YAML declaration order.
+        layer.sort_by(|x, y| {
+            name_by_id[x]
+                .type_name_raw
+                .cmp(&name_by_id[y].type_name_raw)
+        });
         layers.push(layer);
         queue = next;
     }
@@ -386,13 +424,76 @@ mod tests {
         assert_eq!(
             ordered,
             vec![
-                // First group
-                (0, "Consumer"), // reads y
+                // First group (name-sorted: Backflow < Consumer)
                 (0, "Backflow"), // reads y, writes x
-                // Second group
+                (0, "Consumer"), // reads y
+                // Second group (name-sorted: Producer < Transformer)
                 (1, "Producer"),    // reads x
                 (1, "Transformer")  // reads x, writes y, forced to run after Consumer
             ]
+        );
+    }
+
+    /// Bidirectional resource conflict between two systems whose name order *disagrees* with
+    /// `SystemId` order. The old ID-based tie-break would let the higher-`SystemId` system run
+    /// first; the name-based tie-break makes the alphabetically-earlier name run first.
+    #[test]
+    fn bidirectional_tiebreak_uses_name_not_id() {
+        let systems = vec![
+            // id=1, but lexicographically *latest* name -> must NOT run first
+            create_system(1, "ZuluWriter", vec!["b"], vec!["a"], vec![]),
+            // id=2, but lexicographically *earliest* name -> must run first
+            create_system(2, "AlphaWriter", vec!["a"], vec!["b"], vec![]),
+        ];
+
+        let sorted = schedule_systems(&systems).unwrap();
+
+        let mut ordered: Vec<(usize, &str)> = vec![];
+        for (group_idx, group) in sorted.iter().enumerate() {
+            for sys_id in group {
+                let sys = systems.iter().find(|s| s.id == *sys_id).unwrap();
+                ordered.push((group_idx, &sys.name.type_name_raw));
+            }
+        }
+
+        // Under the old ID rule this would be `[(0, "ZuluWriter"), (1, "AlphaWriter")]`.
+        assert_eq!(
+            ordered,
+            vec![(0, "AlphaWriter"), (1, "ZuluWriter")],
+            "alphabetically-earlier name must run first regardless of SystemId",
+        );
+    }
+
+    /// Three-system resource cycle (no bidirectional pair, so resolution skips to the cycle-break
+    /// step). The cycle-break rule drops the outgoing edge of the lexicographically-*greatest*
+    /// name. The old ID-based rule would drop the highest-`SystemId` source instead; the IDs are
+    /// chosen so the two rules pick different edges and therefore different schedules.
+    #[test]
+    fn cycle_break_uses_greatest_name_not_highest_id() {
+        // Cycle: Zulu(1) -> Alpha(2) -> Beta(3) -> Zulu(1).
+        //
+        // Old rule: drop Beta -> Zulu (Beta has highest id). Schedule: Zulu, Alpha, Beta.
+        // New rule: drop Zulu -> Alpha (Zulu has greatest name). Schedule: Alpha, Beta, Zulu.
+        let systems = vec![
+            create_system(1, "Zulu", vec!["c"], vec!["a"], vec![]),
+            create_system(2, "Alpha", vec!["a"], vec!["b"], vec![]),
+            create_system(3, "Beta", vec!["b"], vec!["c"], vec![]),
+        ];
+
+        let sorted = schedule_systems(&systems).unwrap();
+
+        let mut ordered: Vec<(usize, &str)> = vec![];
+        for (group_idx, group) in sorted.iter().enumerate() {
+            for sys_id in group {
+                let sys = systems.iter().find(|s| s.id == *sys_id).unwrap();
+                ordered.push((group_idx, &sys.name.type_name_raw));
+            }
+        }
+
+        assert_eq!(
+            ordered,
+            vec![(0, "Alpha"), (1, "Beta"), (2, "Zulu")],
+            "cycle break must drop the edge from the lexicographically-greatest source",
         );
     }
 }

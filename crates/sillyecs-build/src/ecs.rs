@@ -118,6 +118,8 @@ pub enum EcsError {
     DuplicateComponentInSystem(String, String),
     #[error("Duplicate archetype '{0}' and '{1}'")]
     DuplicateArchetype(String, String),
+    #[error("System '{0}' is defined more than once.")]
+    DuplicateSystem(String),
     #[error("Failed to process template: {0}")]
     TemplateError(#[from] minijinja::Error),
     #[error("System {0} requires components not covered by any archetype.")]
@@ -291,6 +293,16 @@ impl Ecs {
     }
 
     pub(crate) fn ensure_system_consistency(&mut self) -> Result<(), EcsError> {
+        // Reject duplicate system names up front. The scheduler relies on names being unique to
+        // make its name-based tie-break total (and the `system_phases` HashMap below would
+        // otherwise silently collapse duplicates onto the last phase declared).
+        let mut seen_names = HashSet::new();
+        for system in &self.systems {
+            if !seen_names.insert(&system.name) {
+                return Err(EcsError::DuplicateSystem(system.name.type_name_raw.clone()));
+            }
+        }
+
         let system_phases: HashMap<_, _> =
             self.systems.iter().map(|s| (&s.name, &s.phase)).collect();
 
