@@ -12,6 +12,21 @@
 //! The main entry point is the [`schedule_systems`] function which takes a slice of systems
 //! and returns an ordered list of system batches that can be executed in parallel while
 //! respecting all dependencies and constraints.
+//!
+//! # Conflict tie-break direction
+//!
+//! When two systems have a bidirectional resource conflict that is not resolved by any
+//! `run_after` edge (direct or transitive), the scheduler removes one of the two candidate
+//! edges so that one system can run before the other. The system whose name compares
+//! lexicographically *less* is chosen to run first: i.e. the alphabetically-earlier name
+//! becomes the predecessor and the alphabetically-later name becomes the successor.
+//!
+//! The same rule is used to break any cycle that survives bidirectional-conflict resolution:
+//! the edge whose source system has the lexicographically *greatest* name is dropped.
+//!
+//! Tie-breaking by name (rather than by `SystemId`) makes scheduling independent of the order
+//! in which systems are declared in YAML. Renaming a system can still re-order it, but
+//! re-ordering systems in the YAML file will not.
 
 use crate::component::ComponentName;
 use crate::ecs::EcsError;
@@ -46,7 +61,10 @@ pub enum Resource {
 /// Forced `run_after` edges (from a system referenced in run_after to the current system) are added first.
 /// Then resource–based candidate edges (writer → reader or writer → writer) are collected.
 /// For each unordered pair of systems that share conflicting candidate edges (i.e. edges in both directions),
-/// the conflict is resolved by honoring any forced ordering (direct or transitive); if neither applies, a tie-break by ID is used.
+/// the conflict is resolved by honoring any forced ordering (direct or transitive); if neither applies, the
+/// system with the lexicographically-earlier name is chosen as the predecessor. Any cycle that remains is
+/// broken by removing the outgoing edge of the system whose name compares greatest. See the module-level
+/// docs for the rationale.
 pub fn schedule_systems(systems: &[System]) -> Result<Vec<Vec<SystemId>>, EcsError> {
     let n = systems.len();
 
@@ -138,11 +156,17 @@ pub fn schedule_systems(systems: &[System]) -> Result<Vec<Vec<SystemId>>, EcsErr
                     graph.get_mut(&a.id).unwrap().remove(&b.id);
                     continue;
                 }
-                // no clear forced preference: tie-break by ID
-                if a.id < b.id {
-                    graph.get_mut(&a.id).unwrap().remove(&b.id);
-                } else {
+                // No clear forced preference: tie-break by system name. The system with the
+                // lexicographically-earlier name runs first, so we drop the edge that would make
+                // it the successor. This makes scheduling independent of YAML declaration order.
+                let a_name = &name_by_id[&a.id].type_name_raw;
+                let b_name = &name_by_id[&b.id].type_name_raw;
+                if a_name < b_name {
+                    // a precedes b: keep a→b, drop b→a
                     graph.get_mut(&b.id).unwrap().remove(&a.id);
+                } else {
+                    // b precedes a: keep b→a, drop a→b
+                    graph.get_mut(&a.id).unwrap().remove(&b.id);
                 }
             }
         }
@@ -209,9 +233,14 @@ pub fn schedule_systems(systems: &[System]) -> Result<Vec<Vec<SystemId>>, EcsErr
         None
     }
 
-    // Remove one edge per cycle, choosing the edge with highest source ID
+    // Remove one edge per cycle, choosing the edge whose source system has the
+    // lexicographically-greatest name. Tie-breaking by name (rather than by SystemId) keeps
+    // scheduling independent of YAML declaration order.
     while let Some(cycle_edges) = find_cycle(&graph) {
-        if let Some(&(rem_u, rem_v)) = cycle_edges.iter().max_by_key(|&&(u, _)| u) {
+        if let Some(&(rem_u, rem_v)) = cycle_edges
+            .iter()
+            .max_by_key(|&&(u, _)| &name_by_id[&u].type_name_raw)
+        {
             graph.get_mut(&rem_u).unwrap().remove(&rem_v);
         }
     }
