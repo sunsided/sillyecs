@@ -198,16 +198,21 @@ pub fn schedule_systems(systems: &[System]) -> Result<Vec<Vec<SystemId>>, EcsErr
     }
 
     // Resolve bidirectional pairs in deterministic name order (independent of YAML / id order).
+    // Pairs are collected as `(a.id, b.id)` with `a.id < b.id`, but `SystemId` ordering can
+    // disagree with name ordering, so the sort key must be canonicalized to the name pair
+    // `(min(name_a, name_b), max(name_a, name_b))` — otherwise YAML reordering could change
+    // resolution order and, via the cycle-aware tie-break, the final schedule.
+    fn canonical_name_pair<'a>(
+        names: &'a HashMap<SystemId, crate::system::SystemName>,
+        a: SystemId,
+        b: SystemId,
+    ) -> (&'a str, &'a str) {
+        let na = names[&a].type_name_raw.as_str();
+        let nb = names[&b].type_name_raw.as_str();
+        if na <= nb { (na, nb) } else { (nb, na) }
+    }
     bidirectional.sort_by(|&(a1, b1), &(a2, b2)| {
-        let (na1, nb1) = (
-            &name_by_id[&a1].type_name_raw,
-            &name_by_id[&b1].type_name_raw,
-        );
-        let (na2, nb2) = (
-            &name_by_id[&a2].type_name_raw,
-            &name_by_id[&b2].type_name_raw,
-        );
-        (na1, nb1).cmp(&(na2, nb2))
+        canonical_name_pair(&name_by_id, a1, b1).cmp(&canonical_name_pair(&name_by_id, a2, b2))
     });
 
     for (a_id, b_id) in bidirectional {
