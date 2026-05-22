@@ -188,6 +188,7 @@ pub struct EntityWithIdAndData<Data: EntityData> {
 
 /// Marker trait for entity data.
 pub trait EntityData {
+    #[allow(dead_code)]
     const ARCHETYPE_ID: ArchetypeId;
 }
 
@@ -310,7 +311,7 @@ impl {{ archetype.name.type }} {
     /// Iterates all entities in this archetype.
     #[inline]
     #[allow(dead_code)]
-    pub fn iter(&self) -> {{ archetype.name.raw }}EntityIterator {
+    pub fn iter(&self) -> {{ archetype.name.raw }}EntityIterator<'_> {
         {{ archetype.name.raw }}EntityIterator::new(self)
     }
     {%- for component in archetype.components %}
@@ -363,7 +364,7 @@ impl {{ archetype.name.type }} {
 
     /// Gets the entity at the specified index.
     #[allow(dead_code)]
-    pub fn get_entity_at(&self, index: usize) -> Option<{{ archetype.name.raw }}EntityRef> {
+    pub fn get_entity_at(&self, index: usize) -> Option<{{ archetype.name.raw }}EntityRef<'_>> {
         if index >= self.len() {
             return None;
         }
@@ -382,7 +383,7 @@ impl {{ archetype.name.type }} {
 
     /// Mutably gets the entity at the specified index.
     #[allow(dead_code)]
-    pub fn get_entity_at_mut(&mut self, index: usize) -> Option<{{ archetype.name.raw }}EntityMut> {
+    pub fn get_entity_at_mut(&mut self, index: usize) -> Option<{{ archetype.name.raw }}EntityMut<'_>> {
         if index >= self.len() {
             return None;
         }
@@ -401,7 +402,7 @@ impl {{ archetype.name.type }} {
 
     /// Gets the entity at the specified index.
     #[allow(dead_code)]
-    pub unsafe fn get_entity_at_unchecked(&self, index: usize) -> {{ archetype.name.raw }}EntityRef {
+    pub unsafe fn get_entity_at_unchecked(&self, index: usize) -> {{ archetype.name.raw }}EntityRef<'_> {
         {{ archetype.name.raw }}EntityRef {
             entity_id: *self.entities.get_unchecked(index),
             {%- for component_name in archetype.components %}
@@ -412,7 +413,7 @@ impl {{ archetype.name.type }} {
 
     /// Gets the entity at the specified index.
     #[allow(dead_code)]
-    pub unsafe fn get_entity_at_unchecked_mut(&mut self, index: usize) -> {{ archetype.name.raw }}EntityMut {
+    pub unsafe fn get_entity_at_unchecked_mut(&mut self, index: usize) -> {{ archetype.name.raw }}EntityMut<'_> {
         {{ archetype.name.raw }}EntityMut {
             entity_id: *self.entities.get_unchecked(index),
             {%- for component_name in archetype.components %}
