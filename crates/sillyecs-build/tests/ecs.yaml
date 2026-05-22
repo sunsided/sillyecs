@@ -126,6 +126,7 @@ phases:
   - name: FixedUpdate
     fixed: 60Hz
   - name: Update
+    on_request: true
   - name: Render
     manual: true
     states:

@@ -53,7 +53,22 @@ where
 
 {%- if ecs.any_phase_on_request %}
 
-/// Spawns an entity into the world.
+/// Single-consumer request flags for on-request phases.
+///
+/// Each flag is an [`AtomicBool`](core::sync::atomic::AtomicBool) set with
+/// `store(true, Release)` and consumed with `swap(false, AcqRel)`.
+///
+/// # Semantics
+///
+/// - **Coalescing**: repeated requests before the next consumer read collapse
+///   into a single phase execution. There is no queue or counter.
+/// - **Single consumer**: the flag is read exactly once per `apply_system_phases`
+///   / `par_apply_system_phases` invocation. Multiple concurrent readers
+///   would race - the swap clears the flag atomically, so only one observes
+///   `true`.
+/// - **Swap-on-read**: a request raised between the swap and the phase body
+///   on the same `apply_system_phases` call is *not* serviced this call; it
+///   remains set and fires on the next one.
 #[derive(Debug, Default)]
 struct ConditionalPhaseFlags {
     {%- for phase in ecs.phases %}
@@ -67,14 +82,20 @@ struct ConditionalPhaseFlags {
 impl ConditionalPhaseFlags {
     {%- for phase in ecs.phases %}
     {%- if phase.on_request %}
-    /// Returns whether the [`{{ phase.name.raw }}`]({{ phase.name.type }}) phase was requested
-    /// and atomically sets the flag to `false`.
+    /// Reads and clears the request flag for the
+    /// [`{{ phase.name.raw }}`]({{ phase.name.type }}) phase via
+    /// `swap(false, AcqRel)`. Returns `true` if a request was pending.
+    ///
+    /// See [`ConditionalPhaseFlags`] for the consumer contract.
     #[inline]
     pub fn is_{{ phase.name.field }}_requested(&self) -> bool {
         self.{{ phase.name.field }}_requested.swap(false, core::sync::atomic::Ordering::AcqRel)
     }
 
-    /// Sets the request status of the [`{{ phase.name.raw }}`]({{ phase.name.type }}) phase.
+    /// Sets the request flag for the [`{{ phase.name.raw }}`]({{ phase.name.type }}) phase
+    /// via `store(true, Release)`.
+    ///
+    /// See [`ConditionalPhaseFlags`] for the consumer contract.
     #[inline]
     pub fn set_{{ phase.name.field }}_requested(&self) {
         self.{{ phase.name.field }}_requested
@@ -100,7 +121,7 @@ impl Clone for ConditionalPhaseFlags {
 {%- endif %}
 {% for world in ecs.worlds %}
 
-/// A world  all archetypes.
+/// A world containing all archetypes.
 #[derive(Debug)]
 pub struct {{ world.name.type }}<E, Q> {
     /// The archetypes.
@@ -351,7 +372,33 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
     {%- for phase in ecs.phases %}
     {%- if phase.on_request %}
 
-    /// Requests the execution of the [`{{ phase.name.raw }}`]({{ phase.name.type }}) phase.
+    /// Requests execution of the [`{{ phase.name.raw }}`]({{ phase.name.type }}) phase.
+    ///
+    /// # Semantics
+    ///
+    /// - **Coalescing**: the request is a single boolean flag, not a queue.
+    ///   Multiple calls before the scheduler consumes the flag collapse into
+    ///   a single observation.
+    /// - **Same-call vs next-call**: the flag is read by
+    ///   [`apply_system_phases`](Self::apply_system_phases) (or
+    ///   [`par_apply_system_phases`](Self::par_apply_system_phases)) when
+    ///   that call reaches this phase. If `request_*_phase` is invoked
+    ///   *before* the scheduler reaches the phase within the current call
+    ///   (for example from `handle_commands` or an earlier phase), the
+    ///   phase runs in the *same* call. If invoked *after* the read on a
+    ///   given call, the request remains set and fires on the next call.
+    /// - **Fixed-time phases**: if the phase is also fixed-time, observing
+    ///   the flag enables the catch-up loop for this call, which may run
+    ///   the phase body multiple times to drain the fixed-time
+    ///   accumulator. The flag itself is still consumed exactly once.
+    /// - **Ordering**: the flag is stored with
+    ///   [`Release`](core::sync::atomic::Ordering::Release) and read with
+    ///   [`AcqRel`](core::sync::atomic::Ordering::AcqRel), so writes
+    ///   performed before this call happen-before the phase body run by
+    ///   the consumer that clears the flag.
+    /// - **Single consumer**: only the world's `apply_system_phases` /
+    ///   `par_apply_system_phases` should read the flag. Concurrent readers
+    ///   would race because the swap-on-read clears the flag.
     #[inline]
     pub fn request_{{ phase.name.field }}_phase(&self) {
         self.phase_flags.set_{{ phase.name.field }}_requested();

@@ -8,6 +8,47 @@ fn it_works() {
     EcsCode::generate(reader).expect("Failed to build ECS");
 }
 
+/// The `Update` phase in `ecs.yaml` has `on_request: true`, so the world template
+/// must emit the conditional-phase helpers (`request_update_phase`,
+/// `ConditionalPhaseFlags`, `set_update_requested`, `is_update_requested`) and
+/// document them. Regression for issue #32: the doc strings on those helpers were
+/// either missing or wrong (the struct doc said "Spawns an entity into the world.").
+#[test]
+fn on_request_phase_emits_documented_helpers() {
+    let file = include_str!("ecs.yaml");
+    let reader = BufReader::new(file.as_bytes());
+    let code = EcsCode::generate(reader).expect("Failed to build ECS");
+
+    assert!(code.world.contains("struct ConditionalPhaseFlags"));
+    assert!(code.world.contains("fn request_update_phase"));
+    assert!(code.world.contains("fn set_update_requested"));
+    assert!(code.world.contains("fn is_update_requested"));
+
+    // The `Spawn` impls for archetypes legitimately carry "Spawns an entity into the world."
+    // The previous ConditionalPhaseFlags doc was a copy of that, immediately above
+    // `struct ConditionalPhaseFlags`. Check the new struct doc replaced it there.
+    let flags_block_idx = code
+        .world
+        .find("struct ConditionalPhaseFlags")
+        .expect("ConditionalPhaseFlags struct missing");
+    let preceding = &code.world[..flags_block_idx];
+    let doc_start = preceding
+        .rfind("///")
+        .expect("ConditionalPhaseFlags struct has no doc comment");
+    assert!(
+        !preceding[doc_start..].contains("Spawns an entity into the world."),
+        "stale ConditionalPhaseFlags doc comment leaked into generated output"
+    );
+    assert!(
+        code.world.contains("Single-consumer request flags"),
+        "ConditionalPhaseFlags doc block missing from generated output"
+    );
+    assert!(
+        code.world.contains("Requests execution of"),
+        "request_X_phase doc block missing from generated output"
+    );
+}
+
 /// Regression for the codegen bug where a `SystemPhase` `states:` entry that omits any of the
 /// per-lifecycle access hooks caused the templates to emit
 /// `todo!("Invalid state use in ECS construction"),` in parameter lists, producing invalid Rust.
