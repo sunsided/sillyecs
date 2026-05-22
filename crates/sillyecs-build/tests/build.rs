@@ -44,7 +44,7 @@ fn on_request_phase_emits_documented_helpers() {
         "ConditionalPhaseFlags doc block missing from generated output"
     );
     assert!(
-        code.world.contains("Requests one execution of"),
+        code.world.contains("Requests execution of"),
         "request_X_phase doc block missing from generated output"
     );
 }

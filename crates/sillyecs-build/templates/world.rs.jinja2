@@ -372,18 +372,25 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
     {%- for phase in ecs.phases %}
     {%- if phase.on_request %}
 
-    /// Requests one execution of the [`{{ phase.name.raw }}`]({{ phase.name.type }}) phase.
+    /// Requests execution of the [`{{ phase.name.raw }}`]({{ phase.name.type }}) phase.
     ///
     /// # Semantics
     ///
     /// - **Coalescing**: the request is a single boolean flag, not a queue.
-    ///   Multiple calls before the next [`apply_system_phases`](Self::apply_system_phases)
-    ///   (or [`par_apply_system_phases`](Self::par_apply_system_phases))
-    ///   collapse into a single phase run.
-    /// - **Timing**: the flag is consumed (cleared) the next time
-    ///   `apply_system_phases` reaches this phase. A request raised between
-    ///   that read and the phase body on the same call is *not* serviced
-    ///   then; it remains set and fires on the next call.
+    ///   Multiple calls before the scheduler consumes the flag collapse into
+    ///   a single observation.
+    /// - **Same-call vs next-call**: the flag is read by
+    ///   [`apply_system_phases`](Self::apply_system_phases) (or
+    ///   [`par_apply_system_phases`](Self::par_apply_system_phases)) when
+    ///   that call reaches this phase. If `request_*_phase` is invoked
+    ///   *before* the scheduler reaches the phase within the current call
+    ///   (for example from `handle_commands` or an earlier phase), the
+    ///   phase runs in the *same* call. If invoked *after* the read on a
+    ///   given call, the request remains set and fires on the next call.
+    /// - **Fixed-time phases**: if the phase is also fixed-time, observing
+    ///   the flag enables the catch-up loop for this call, which may run
+    ///   the phase body multiple times to drain the fixed-time
+    ///   accumulator. The flag itself is still consumed exactly once.
     /// - **Ordering**: the flag is stored with
     ///   [`Release`](core::sync::atomic::Ordering::Release) and read with
     ///   [`AcqRel`](core::sync::atomic::Ordering::AcqRel), so writes
