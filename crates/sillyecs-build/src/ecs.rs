@@ -34,7 +34,7 @@ pub struct Ecs {
 
 impl Ecs {
     pub(crate) fn finish(&mut self) -> Result<(), EcsError> {
-        self.assign_ids();
+        self.assign_ids()?;
 
         let cloned_archetypes = self.archetypes.clone();
         for archetype in &mut self.archetypes {
@@ -70,7 +70,16 @@ impl Ecs {
     /// their order of declaration. IDs start at `1` so they remain valid for the
     /// `NonZeroU64`-backed constants the templates emit, and they are a pure function of the
     /// input YAML (no global process-wide counters).
-    fn assign_ids(&mut self) {
+    ///
+    /// `ComponentId`, `ArchetypeId`, and `SystemId` are emitted as `#[repr(u32)]` enum
+    /// discriminants in generated code, so the count for each kind must fit in `u32`. The check
+    /// is done here so a too-large input fails fast with a clear error instead of producing
+    /// invalid Rust that fails to compile with a confusing out-of-range discriminant message.
+    fn assign_ids(&mut self) -> Result<(), EcsError> {
+        check_u32_capacity("components", self.components.len())?;
+        check_u32_capacity("archetypes", self.archetypes.len())?;
+        check_u32_capacity("systems", self.systems.len())?;
+
         for (index, component) in self.components.iter_mut().enumerate() {
             component.id = ComponentId(index as u64 + 1);
         }
@@ -83,7 +92,16 @@ impl Ecs {
         for (index, world) in self.worlds.iter_mut().enumerate() {
             world.id = WorldId(index as u64 + 1);
         }
+
+        Ok(())
     }
+}
+
+fn check_u32_capacity(kind: &'static str, count: usize) -> Result<(), EcsError> {
+    if count > u32::MAX as usize {
+        return Err(EcsError::TooManyIds { kind, count });
+    }
+    Ok(())
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -135,6 +153,11 @@ pub enum EcsError {
     MissingStateInSystem(String, String),
     #[error("State '{0}' is defined multiple times.")]
     StateDefinedMultipleTimes(String),
+    #[error(
+        "Too many {kind}: {count} declared, but generated `#[repr(u32)]` IDs only support up to {max}.",
+        max = u32::MAX
+    )]
+    TooManyIds { kind: &'static str, count: usize },
 }
 
 impl Ecs {

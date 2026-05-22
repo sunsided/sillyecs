@@ -7,7 +7,6 @@ use crate::system::{System, SystemPhase, SystemPhaseRef};
 use crate::system_scheduler::schedule_systems;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
-use std::hash::Hash;
 use std::ops::Deref;
 
 #[derive(Debug, Serialize, Deserialize)]
