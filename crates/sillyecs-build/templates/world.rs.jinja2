@@ -1450,7 +1450,7 @@ pub trait EntityAccess {
     fn get_{{ archetype.name.field }}_entity(
         &self,
         entity_id: ::sillyecs::EntityId
-    ) -> Option<{{ archetype.name.raw }}EntityRef>
+    ) -> Option<{{ archetype.name.raw }}EntityRef<'_>>
     {
         None
     }
@@ -1466,7 +1466,7 @@ pub trait EntityAccessMut: EntityAccess {
     fn get_{{ archetype.name.field }}_entity_mut(
         &mut self,
         entity_id: ::sillyecs::EntityId
-    ) -> Option<{{ archetype.name.raw }}EntityMut>
+    ) -> Option<{{ archetype.name.raw }}EntityMut<'_>>
     {
         None
     }
@@ -1484,7 +1484,7 @@ impl<E, Q> EntityAccess for {{ world.name.type }}<E, Q> {
     fn get_{{ archetype.name.field }}_entity(
         &self,
         entity_id: ::sillyecs::EntityId
-    ) -> Option<{{ archetype.name.raw }}EntityRef>
+    ) -> Option<{{ archetype.name.raw }}EntityRef<'_>>
     {
         EntityAccess::get_{{ archetype.name.field }}_entity(&self.archetypes, entity_id)
     }
@@ -1503,7 +1503,7 @@ impl<E, Q> EntityAccessMut for {{ world.name.type }}<E, Q> {
     fn get_{{ archetype.name.field }}_entity_mut(
         &mut self,
         entity_id: ::sillyecs::EntityId
-    ) -> Option<{{ archetype.name.raw }}EntityMut>
+    ) -> Option<{{ archetype.name.raw }}EntityMut<'_>>
     {
         EntityAccessMut::get_{{ archetype.name.field }}_entity_mut(&mut self.archetypes, entity_id)
     }
@@ -1551,7 +1551,7 @@ impl EntityAccess for {{ world.name.type }}Archetypes {
     fn get_{{ archetype.name.field }}_entity(
         &self,
         entity_id: ::sillyecs::EntityId
-    ) -> Option<{{ archetype.name.raw }}EntityRef>
+    ) -> Option<{{ archetype.name.raw }}EntityRef<'_>>
     {
         let ear = self.entity_locations.get(&entity_id)?.clone();
         if ear.archetype != {{ archetype.name.type }}::ID {
@@ -1575,7 +1575,7 @@ impl EntityAccessMut for {{ world.name.type }}Archetypes {
     fn get_{{ archetype.name.field }}_entity_mut(
         &mut self,
         entity_id: ::sillyecs::EntityId
-    ) -> Option<{{ archetype.name.raw }}EntityMut>
+    ) -> Option<{{ archetype.name.raw }}EntityMut<'_>>
     {
         let ear = self.entity_locations.get(&entity_id)?.clone();
         if ear.archetype != {{ archetype.name.type }}::ID {
