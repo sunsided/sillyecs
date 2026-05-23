@@ -5,6 +5,7 @@ mod flatten_copy_slices;
 mod flatten_slices;
 mod flatten_slices_mut;
 mod frame_context;
+mod izip;
 mod world;
 mod world_id;
 
@@ -16,6 +17,6 @@ pub use frame_context::FrameContext;
 pub use world::World;
 pub use world_id::WorldId;
 
-// Re-exported so generated code can emit a flat zip-and-destructure expression
-// without forcing downstream crates to depend on `itertools` directly.
-pub use itertools::izip;
+// `izip!` is defined in the `izip` module with `#[macro_export]`, which
+// already places it at the crate root for downstream users (`sillyecs::izip!`).
+// The module itself stays private; the macro definition carries its own docs.
