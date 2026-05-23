@@ -5,7 +5,6 @@ mod flatten_copy_slices;
 mod flatten_slices;
 mod flatten_slices_mut;
 mod frame_context;
-mod izip;
 mod world;
 mod world_id;
 
