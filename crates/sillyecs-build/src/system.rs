@@ -244,46 +244,32 @@ impl System {
                 unreachable!();
             }
         } else {
-            let mut iter_stack = String::new();
-            let mut untuple_stack = String::new();
-            for output in self.outputs.iter().rev() {
-                if iter_stack.is_empty() {
-                    iter_stack = format!("{name}.iter_mut()", name = output.field_name_plural);
-                    untuple_stack = output.field_name.to_string();
-                } else {
-                    iter_stack = format!(
-                        "{name}.iter_mut().zip({iter_stack})",
-                        name = output.field_name_plural
-                    );
-                    untuple_stack = format!("({name}, {untuple_stack})", name = output.field_name);
-                }
-            }
-
-            for input in self.inputs.iter().rev() {
-                if iter_stack.is_empty() {
-                    iter_stack = format!("{name}.iter()", name = input.field_name_plural);
-                    untuple_stack = input.field_name.to_string();
-                } else {
-                    iter_stack = format!(
-                        "{name}.iter().zip({iter_stack})",
-                        name = input.field_name_plural
-                    );
-                    untuple_stack = format!("({name}, {untuple_stack})", name = input.field_name);
-                }
-            }
+            // Multi-component case: emit a flat `izip!(...)` over the component
+            // slices and a flat destructuring pattern. The argument order here
+            // (entity, inputs..., outputs...) must match the order in which the
+            // templates consume the bindings when forwarding to `apply_single`
+            // / `apply_many`.
+            let mut iters: Vec<String> = Vec::with_capacity(num_components);
+            let mut names: Vec<String> = Vec::with_capacity(num_components);
 
             if self.entities {
-                if iter_stack.is_empty() {
-                    iter_stack = "entities.iter()".to_string();
-                    untuple_stack = "entity".to_string();
-                } else {
-                    iter_stack = format!("entities.iter().zip({iter_stack})",);
-                    untuple_stack = format!("(entity, {untuple_stack})");
-                }
+                iters.push("entities.iter()".to_string());
+                names.push("entity".to_string());
+            }
+            for input in &self.inputs {
+                iters.push(format!("{name}.iter()", name = input.field_name_plural));
+                names.push(input.field_name.to_string());
+            }
+            for output in &self.outputs {
+                iters.push(format!(
+                    "{name}.iter_mut()",
+                    name = output.field_name_plural
+                ));
+                names.push(output.field_name.to_string());
             }
 
-            self.component_iter_code = iter_stack;
-            self.component_untuple_code = untuple_stack;
+            self.component_iter_code = format!("::sillyecs::izip!({})", iters.join(", "));
+            self.component_untuple_code = format!("({})", names.join(", "));
         }
     }
 }

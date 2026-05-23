@@ -15,3 +15,7 @@ pub use flatten_slices_mut::FlattenSlicesMut;
 pub use frame_context::FrameContext;
 pub use world::World;
 pub use world_id::WorldId;
+
+// Re-exported so generated code can emit a flat zip-and-destructure expression
+// without forcing downstream crates to depend on `itertools` directly.
+pub use itertools::izip;
