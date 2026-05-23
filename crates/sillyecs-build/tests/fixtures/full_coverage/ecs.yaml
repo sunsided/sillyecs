@@ -28,6 +28,11 @@ archetypes:
   - name: Decoration
     components: [Position, Sprite]
 
+views:
+  - name: Movable
+    description: A position plus velocity shared by Particle and LivingParticle.
+    components: [Position, Velocity]
+
 worlds:
   - name: Main
     archetypes: [Particle, LivingParticle, Decoration]

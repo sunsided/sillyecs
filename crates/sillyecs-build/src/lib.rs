@@ -7,6 +7,7 @@ mod ecs;
 mod state;
 mod system;
 mod system_scheduler;
+mod view;
 mod world;
 
 pub use crate::code::EcsCode;

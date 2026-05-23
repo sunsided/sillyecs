@@ -33,6 +33,7 @@ impl EcsCode {
         ecs.ensure_component_consistency()?;
         ecs.ensure_distinct_archetype_components()?;
         ecs.ensure_system_consistency()?;
+        ecs.ensure_view_consistency()?;
         ecs.ensure_world_consistency()?;
         ecs.finish()?;
 

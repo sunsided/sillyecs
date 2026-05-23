@@ -246,6 +246,203 @@ systems:
     }
 }
 
+/// Issue #4: an archetype component view defines a fixed subset of components that may be
+/// shared across multiple archetypes. The world template must emit per-view struct and
+/// accessor pairs so that a single archetype match can return all requested components by
+/// index instead of relying on N separate entity-location lookups.
+#[test]
+fn view_emits_structs_and_accessors() {
+    const YAML: &str = r#"
+components:
+  - name: Position
+  - name: Velocity
+  - name: Sprite
+archetypes:
+  - name: Particle
+    components: [Position, Velocity]
+  - name: Decoration
+    components: [Position, Sprite]
+views:
+  - name: Movable
+    components: [Position, Velocity]
+worlds:
+  - name: Main
+    archetypes: [Particle, Decoration]
+phases:
+  - name: Update
+systems:
+  - name: Move
+    phase: Update
+    inputs: [Velocity]
+    outputs: [Position]
+"#;
+
+    let code = EcsCode::generate(BufReader::new(YAML.as_bytes())).expect("Failed to build ECS");
+
+    assert!(
+        code.world.contains("pub struct MovableView<'archetype>"),
+        "MovableView struct missing from generated world output"
+    );
+    assert!(
+        code.world.contains("pub struct MovableViewMut<'archetype>"),
+        "MovableViewMut struct missing from generated world output"
+    );
+    assert!(
+        code.world.contains("pub trait ViewAccess"),
+        "ViewAccess trait missing from generated world output"
+    );
+    assert!(
+        code.world.contains("pub trait ViewAccessMut: ViewAccess"),
+        "ViewAccessMut trait missing from generated world output"
+    );
+    assert!(
+        code.world.contains("fn get_movable_view("),
+        "get_movable_view accessor missing from generated world output"
+    );
+    assert!(
+        code.world.contains("fn get_movable_view_mut("),
+        "get_movable_view_mut accessor missing from generated world output"
+    );
+    // Only Particle (Position + Velocity) satisfies the Movable view; Decoration must be excluded.
+    let body_start = code
+        .world
+        .find("fn get_movable_view(")
+        .expect("get_movable_view emitted");
+    let body = &code.world[body_start..body_start.saturating_add(2000)];
+    assert!(
+        body.contains("ParticleArchetype::ID"),
+        "Movable view must dispatch on the Particle archetype"
+    );
+    assert!(
+        !body.contains("DecorationArchetype::ID"),
+        "Movable view must not dispatch on the Decoration archetype (missing Velocity)"
+    );
+}
+
+/// A view referencing an undefined component must be rejected at validation time so users get a
+/// clear error instead of a cryptic codegen failure later.
+#[test]
+fn view_with_unknown_component_is_rejected() {
+    const YAML: &str = r#"
+components:
+  - name: Position
+archetypes:
+  - name: Particle
+    components: [Position]
+views:
+  - name: Bogus
+    components: [Velocity]
+worlds:
+  - name: Main
+    archetypes: [Particle]
+phases:
+  - name: Update
+systems:
+  - name: Tick
+    phase: Update
+    outputs: [Position]
+"#;
+
+    let err = match EcsCode::generate(BufReader::new(YAML.as_bytes())) {
+        Ok(_) => panic!("view referencing undefined component must fail"),
+        Err(e) => e,
+    };
+    match err {
+        EcsError::MissingComponentInView(component, view) => {
+            assert_eq!(component, "VelocityComponent");
+            assert_eq!(view, "Bogus");
+        }
+        other => panic!("expected MissingComponentInView, got {other:?}"),
+    }
+}
+
+/// A view whose component set is not satisfied by any archetype is a configuration mistake; the
+/// resulting accessor would only ever return `None`. Reject it at build time instead.
+#[test]
+fn view_without_matching_archetype_is_rejected() {
+    const YAML: &str = r#"
+components:
+  - name: Position
+  - name: Velocity
+archetypes:
+  - name: Static
+    components: [Position]
+views:
+  - name: Movable
+    components: [Position, Velocity]
+worlds:
+  - name: Main
+    archetypes: [Static]
+phases:
+  - name: Update
+systems:
+  - name: Tick
+    phase: Update
+    outputs: [Position]
+"#;
+
+    let err = match EcsCode::generate(BufReader::new(YAML.as_bytes())) {
+        Ok(_) => panic!("view with no matching archetype must fail"),
+        Err(e) => e,
+    };
+    match err {
+        EcsError::NoMatchingArchetypeForView(name) => assert_eq!(name, "Movable"),
+        other => panic!("expected NoMatchingArchetypeForView, got {other:?}"),
+    }
+}
+
+/// Views that match archetypes outside the world's own archetype list must be filtered out per
+/// world; otherwise the generated `ViewAccess` impl on `<W>Archetypes` would try to dispatch on
+/// archetype IDs the world does not own.
+#[test]
+fn view_accessor_only_emits_for_world_archetypes() {
+    const YAML: &str = r#"
+components:
+  - name: Position
+  - name: Velocity
+archetypes:
+  - name: Particle
+    components: [Position, Velocity]
+  - name: Static
+    components: [Position]
+views:
+  - name: Movable
+    components: [Position, Velocity]
+worlds:
+  - name: Main
+    archetypes: [Static]
+phases:
+  - name: Update
+systems:
+  - name: Tick
+    phase: Update
+    outputs: [Position]
+"#;
+
+    let code = EcsCode::generate(BufReader::new(YAML.as_bytes())).expect("Failed to build ECS");
+
+    // Top-level view struct still emits because Movable matches Particle at the ECS level.
+    assert!(
+        code.world.contains("pub struct MovableView<'archetype>"),
+        "MovableView struct must still emit at the ECS level"
+    );
+    // The MainWorld owns only Static, which does not satisfy Movable; no per-world accessor impl
+    // should be emitted. The trait itself still carries default `fn get_movable_view(...)` methods,
+    // so check specifically for the impl block on the world's archetype storage.
+    assert!(
+        !code
+            .world
+            .contains("impl ViewAccess for MainWorldArchetypes"),
+        "MainWorld must not emit a ViewAccess impl because none of its archetypes satisfy any view"
+    );
+    assert!(
+        !code
+            .world
+            .contains("impl ViewAccessMut for MainWorldArchetypes"),
+        "MainWorld must not emit a ViewAccessMut impl because none of its archetypes satisfy any view"
+    );
+}
+
 /// The scheduler's name-based tie-break is only total if system names are unique. Two systems
 /// declared with the same name in YAML must therefore be rejected at validation time, not
 /// silently collapsed by the internal `name -> phase` HashMap.

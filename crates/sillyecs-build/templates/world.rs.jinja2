@@ -1799,3 +1799,190 @@ impl<'a, E, Q> IterMut{{ component.raw }}Components<'a> for {{ world.name.type }
 }
 {%- endfor %}
 {%- endfor %}
+{%- for view in ecs.views %}
+
+/// A read-only view of an entity exposing a fixed subset of its components.
+///
+{%- if view.description %}
+/// {{ view.description }}
+{%- else %}
+/// Shared across all archetypes that contain every listed component.
+{%- endif %}
+///
+/// Use [`ViewAccess::get_{{ view.name.field }}_view`] on the world to look up the view
+/// for an entity with a single archetype match.
+#[derive(Debug)]
+#[allow(dead_code)]
+pub struct {{ view.name.type }}<'archetype> {
+    pub entity_id: ::sillyecs::EntityId,
+    {%- for component in view.components %}
+    pub {{ component.field }}: &'archetype {{ component.type }},
+    {%- endfor %}
+}
+
+/// A mutable view of an entity exposing a fixed subset of its components.
+///
+{%- if view.description %}
+/// {{ view.description }}
+{%- else %}
+/// Shared across all archetypes that contain every listed component.
+{%- endif %}
+///
+/// Use [`ViewAccessMut::get_{{ view.name.field }}_view_mut`] on the world to look up the
+/// view for an entity with a single archetype match.
+#[derive(Debug)]
+#[allow(dead_code)]
+pub struct {{ view.name.type }}Mut<'archetype> {
+    pub entity_id: ::sillyecs::EntityId,
+    {%- for component in view.components %}
+    pub {{ component.field }}: &'archetype mut {{ component.type }},
+    {%- endfor %}
+}
+{%- endfor %}
+{%- if (ecs.views | length) > 0 %}
+
+/// Read-only access to component views by [`::sillyecs::EntityId`].
+#[allow(dead_code)]
+pub trait ViewAccess {
+    {%- for view in ecs.views %}
+
+    /// Looks up the [`{{ view.name.type }}`] for an entity, if it lives in an
+    /// archetype that satisfies the view.
+    #[allow(dead_code, unused)]
+    #[inline]
+    fn get_{{ view.name.field }}_view(&self, entity_id: ::sillyecs::EntityId) -> Option<{{ view.name.type }}<'_>> {
+        None
+    }
+    {%- endfor %}
+}
+
+/// Mutable access to component views by [`::sillyecs::EntityId`].
+#[allow(dead_code)]
+pub trait ViewAccessMut: ViewAccess {
+    {%- for view in ecs.views %}
+
+    /// Mutably looks up the [`{{ view.name.type }}Mut`] for an entity, if it lives in
+    /// an archetype that satisfies the view.
+    #[allow(dead_code, unused)]
+    #[inline]
+    fn get_{{ view.name.field }}_view_mut(&mut self, entity_id: ::sillyecs::EntityId) -> Option<{{ view.name.type }}Mut<'_>> {
+        None
+    }
+    {%- endfor %}
+}
+{%- endif %}
+{%- for world in ecs.worlds %}
+{%- if (world.views | length) > 0 %}
+
+//noinspection RsSortImplTraitMembers
+impl ViewAccess for {{ world.name.type }}Archetypes {
+    {%- for view in world.views %}
+
+    /// Looks up the [`{{ view.name.type }}`] for an entity in this world.
+    ///
+    /// Resolves to the entity's archetype through a single entity-location
+    /// lookup, then returns indexed references to every component named in
+    /// the view. The archetypes considered are:
+    {%- for archetype in view.archetypes %}
+    /// - [`{{ archetype.raw }}`]({{ archetype.type }})
+    {%- endfor %}
+    #[allow(dead_code)]
+    fn get_{{ view.name.field }}_view(&self, entity_id: ::sillyecs::EntityId) -> Option<{{ view.name.type }}<'_>> {
+        let ear = self.entity_locations.get(&entity_id)?.clone();
+        match ear.archetype {
+            {%- for archetype in view.archetypes %}
+            {{ archetype.type }}::ID => {
+                let archetype = &self.collection.{{ archetype.field }};
+                if ear.index >= archetype.len() {
+                    return None;
+                }
+                {%- if ecs.allow_unsafe %}
+                Some({{ view.name.type }} {
+                    entity_id,
+                    {%- for component in view.components %}
+                    {{ component.field }}: unsafe { archetype.get_{{ component.field }}_component_at_unchecked(ear.index) },
+                    {%- endfor %}
+                })
+                {%- else %}
+                Some({{ view.name.type }} {
+                    entity_id,
+                    {%- for component in view.components %}
+                    {{ component.field }}: &archetype.{{ component.fields }}[ear.index],
+                    {%- endfor %}
+                })
+                {%- endif %}
+            }
+            {%- endfor %}
+            #[allow(unreachable_patterns)]
+            _ => None,
+        }
+    }
+    {%- endfor %}
+}
+
+//noinspection RsSortImplTraitMembers
+impl ViewAccessMut for {{ world.name.type }}Archetypes {
+    {%- for view in world.views %}
+
+    /// Mutably looks up the [`{{ view.name.type }}Mut`] for an entity in this world.
+    #[allow(dead_code)]
+    fn get_{{ view.name.field }}_view_mut(&mut self, entity_id: ::sillyecs::EntityId) -> Option<{{ view.name.type }}Mut<'_>> {
+        let ear = self.entity_locations.get(&entity_id)?.clone();
+        match ear.archetype {
+            {%- for archetype in view.archetypes %}
+            {{ archetype.type }}::ID => {
+                let archetype = &mut self.collection.{{ archetype.field }};
+                if ear.index >= archetype.len() {
+                    return None;
+                }
+                {%- if ecs.allow_unsafe %}
+                Some({{ view.name.type }}Mut {
+                    entity_id,
+                    {%- for component in view.components %}
+                    {{ component.field }}: unsafe { &mut *(archetype.{{ component.fields }}.as_mut_ptr().add(ear.index)) },
+                    {%- endfor %}
+                })
+                {%- else %}
+                Some({{ view.name.type }}Mut {
+                    entity_id,
+                    {%- for component in view.components %}
+                    {{ component.field }}: &mut archetype.{{ component.fields }}[ear.index],
+                    {%- endfor %}
+                })
+                {%- endif %}
+            }
+            {%- endfor %}
+            #[allow(unreachable_patterns)]
+            _ => None,
+        }
+    }
+    {%- endfor %}
+}
+
+//noinspection RsSortImplTraitMembers
+impl<E, Q> ViewAccess for {{ world.name.type }}<E, Q> {
+    {%- for view in world.views %}
+
+    /// Delegates to [`ViewAccess::get_{{ view.name.field }}_view`] on the world's archetype storage.
+    #[allow(dead_code)]
+    #[inline]
+    fn get_{{ view.name.field }}_view(&self, entity_id: ::sillyecs::EntityId) -> Option<{{ view.name.type }}<'_>> {
+        ViewAccess::get_{{ view.name.field }}_view(&self.archetypes, entity_id)
+    }
+    {%- endfor %}
+}
+
+//noinspection RsSortImplTraitMembers
+impl<E, Q> ViewAccessMut for {{ world.name.type }}<E, Q> {
+    {%- for view in world.views %}
+
+    /// Delegates to [`ViewAccessMut::get_{{ view.name.field }}_view_mut`] on the world's archetype storage.
+    #[allow(dead_code)]
+    #[inline]
+    fn get_{{ view.name.field }}_view_mut(&mut self, entity_id: ::sillyecs::EntityId) -> Option<{{ view.name.type }}Mut<'_>> {
+        ViewAccessMut::get_{{ view.name.field }}_view_mut(&mut self.archetypes, entity_id)
+    }
+    {%- endfor %}
+}
+{%- endif %}
+{%- endfor %}

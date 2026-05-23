@@ -2,6 +2,7 @@ use crate::archetype::{Archetype, ArchetypeId};
 use crate::component::{Component, ComponentId};
 use crate::state::State;
 use crate::system::{System, SystemId, SystemPhase};
+use crate::view::View;
 use crate::world::{World, WorldId};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -27,6 +28,9 @@ pub struct Ecs {
     /// The user states.
     #[serde(default)]
     pub states: Vec<State>,
+    /// Named component views shared across archetypes.
+    #[serde(default)]
+    pub views: Vec<View>,
     /// Allow the generation of unsafe code.
     #[serde(default)]
     pub allow_unsafe: bool,
@@ -49,6 +53,10 @@ impl Ecs {
             component.finish(&self.archetypes, &self.systems);
         }
 
+        for view in &mut self.views {
+            view.finish(&self.components, &self.archetypes);
+        }
+
         for state in &mut self.states {
             state.finish(&self.systems);
         }
@@ -60,7 +68,13 @@ impl Ecs {
         }
 
         for world in &mut self.worlds {
-            world.finish(&self.archetypes, &self.systems, &self.states, &self.phases)?;
+            world.finish(
+                &self.archetypes,
+                &self.systems,
+                &self.states,
+                &self.phases,
+                &self.views,
+            )?;
         }
 
         Ok(())
@@ -160,6 +174,16 @@ pub enum EcsError {
         max = u32::MAX
     )]
     TooManyIds { kind: &'static str, count: usize },
+    #[error("View '{0}' is defined more than once.")]
+    DuplicateView(String),
+    #[error("Component '{0}' in view '{1}' is not defined in the ECS components.")]
+    MissingComponentInView(String, String),
+    #[error("Component '{0}' in view '{1}' is referenced more than once.")]
+    DuplicateComponentInView(String, String),
+    #[error("View '{0}' requires components not covered by any archetype.")]
+    NoMatchingArchetypeForView(String),
+    #[error("View '{0}' has no components.")]
+    ViewWithoutComponents(String),
 }
 
 impl Ecs {
@@ -267,6 +291,55 @@ impl Ecs {
                         system.name.type_name.clone(),
                     ));
                 }
+            }
+        }
+
+        Ok(())
+    }
+
+    pub(crate) fn ensure_view_consistency(&self) -> Result<(), EcsError> {
+        let defined_components: HashSet<_> = self.components.iter().map(|c| &c.name).collect();
+
+        let mut seen_view_names = HashSet::new();
+        for view in &self.views {
+            if !seen_view_names.insert(&view.name) {
+                return Err(EcsError::DuplicateView(view.name.type_name_raw.clone()));
+            }
+
+            if view.components.is_empty() {
+                return Err(EcsError::ViewWithoutComponents(
+                    view.name.type_name_raw.clone(),
+                ));
+            }
+
+            let mut seen_components = HashSet::new();
+            for component_ref in &view.components {
+                if !seen_components.insert(component_ref) {
+                    return Err(EcsError::DuplicateComponentInView(
+                        component_ref.type_name.clone(),
+                        view.name.type_name_raw.clone(),
+                    ));
+                }
+
+                if !defined_components.contains(component_ref) {
+                    return Err(EcsError::MissingComponentInView(
+                        component_ref.type_name.clone(),
+                        view.name.type_name_raw.clone(),
+                    ));
+                }
+            }
+
+            let required: HashSet<_> = view.components.iter().collect();
+            if !self.archetypes.iter().any(|archetype| {
+                archetype
+                    .components
+                    .iter()
+                    .collect::<HashSet<_>>()
+                    .is_superset(&required)
+            }) {
+                return Err(EcsError::NoMatchingArchetypeForView(
+                    view.name.type_name_raw.clone(),
+                ));
             }
         }
 
