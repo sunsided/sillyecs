@@ -75,3 +75,12 @@ systems:
     states:
       - use: Renderer
         system: write
+
+  # Dirty-iteration system (issue #2): exercises the apply_many_dirty / apply_all_dirty
+  # codegen path. Targets the Decoration archetype, which gets `dirty: true` inferred
+  # automatically because this system uses it.
+  - name: TouchDecorations
+    phase: Update
+    entities: true
+    iteration: dirty
+    outputs: [Sprite]

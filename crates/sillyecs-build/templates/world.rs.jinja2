@@ -453,6 +453,47 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
             )
     }
     {%- endfor %}
+    {%- for archetype in world.archetypes %}
+    {%- if archetype.dirty %}
+
+    /// Marks the entity at `index` in the [`{{ archetype.name.type }}`] archetype as dirty.
+    /// Returns `false` if the index is out of bounds.
+    #[allow(dead_code)]
+    #[inline]
+    pub fn mark_{{ archetype.name.field }}_dirty(&mut self, index: usize) -> bool {
+        self.archetypes.collection.{{ archetype.name.field }}.mark_dirty(index)
+    }
+
+    /// Marks the entity identified by `entity_id` as dirty when it lives in the
+    /// [`{{ archetype.name.type }}`] archetype. Returns `false` if the entity is unknown or in a
+    /// different archetype.
+    #[allow(dead_code)]
+    pub fn mark_{{ archetype.name.field }}_dirty_by_id(&mut self, entity_id: ::sillyecs::EntityId) -> bool {
+        let loc = match self.archetypes.entity_locations.get(&entity_id) {
+            Some(loc) => loc.clone(),
+            None => return false,
+        };
+        if loc.archetype != {{ archetype.name.type }}::ID {
+            return false;
+        }
+        self.archetypes.collection.{{ archetype.name.field }}.mark_dirty(loc.index)
+    }
+
+    /// Marks every entity in the [`{{ archetype.name.type }}`] archetype as dirty.
+    #[allow(dead_code)]
+    #[inline]
+    pub fn mark_all_{{ archetype.name.fields }}_dirty(&mut self) {
+        self.archetypes.collection.{{ archetype.name.field }}.mark_all_dirty();
+    }
+
+    /// Clears the dirty set of the [`{{ archetype.name.type }}`] archetype.
+    #[allow(dead_code)]
+    #[inline]
+    pub fn clear_{{ archetype.name.fields }}_dirty(&mut self) {
+        self.archetypes.collection.{{ archetype.name.field }}.clear_dirty();
+    }
+    {%- endif %}
+    {%- endfor %}
 
     /// Runs a per-frame update of the frame context at the start of a frame.
     fn on_begin_frame(&mut self) {
@@ -797,6 +838,19 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
 
             // Systems
             {
+                {%- if system.iteration_dirty %}
+                // Materialize the dirty-index slice per archetype. Allocation lives on the
+                // stack frame above the borrows so the `&[usize]` references remain valid for
+                // the duration of the `apply_all_dirty` call.
+                {%- for archetype in system.affected_archetypes %}
+                let dirty_{{ loop.index0 }} = self.archetypes.collection.{{ archetype.field }}.collect_dirty_sorted();
+                {%- endfor %}
+                let dirty_indices: [&[usize]; {{ system.affected_archetypes | length }}] = [
+                    {%- for archetype in system.affected_archetypes %}
+                    dirty_{{ loop.index0 }}.as_slice(),
+                    {%- endfor %}
+                ];
+                {%- endif %}
                 {%- if system.needs_entities %}
                 let entities: [&[::sillyecs::EntityId]; {{ system.affected_archetypes | length }}] = [
                     {%- for archetype in system.affected_archetypes %}
@@ -820,7 +874,11 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                 {%- endfor %}
 
                 // Apply {{ system.name.type }} to all archetypes
+                {%- if system.iteration_dirty %}
+                self.systems.{{ system.name.field }}.apply_all_dirty(
+                {%- else %}
                 self.systems.{{ system.name.field }}.apply_all(
+                {%- endif %}
                     {%- if system.needs_context %}
                     &self.context,
                     {%- endif %}
@@ -836,6 +894,9 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                             todo!("Invalid state use in ECS construction"),
                         {%- endif %}
                     {%- endfor %}
+                    {%- if system.iteration_dirty %}
+                    dirty_indices,
+                    {%- endif %}
                     {%- if system.needs_entities %}
                     entities,
                     {%- endif %}
@@ -915,6 +976,13 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
             .ok();
         }
         {%- endfor %}
+        {%- endfor %}
+        {%- endif %}
+        {%- if world.dirty_archetypes_per_phase[phase.name] %}
+
+        // Clear the dirty sets of archetypes touched by any dirty-iteration system in this phase.
+        {%- for archetype in world.dirty_archetypes_per_phase[phase.name] %}
+        self.archetypes.collection.{{ archetype.field }}.clear_dirty();
         {%- endfor %}
         {%- endif %}
 
@@ -1064,6 +1132,16 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
 
                         // Systems
                         {
+                            {%- if system.iteration_dirty %}
+                            {%- for archetype in system.affected_archetypes %}
+                            let dirty_{{ loop.index0 }} = self.archetypes.collection.{{ archetype.field }}.collect_dirty_sorted();
+                            {%- endfor %}
+                            let dirty_indices: [&[usize]; {{ system.affected_archetypes | length }}] = [
+                                {%- for archetype in system.affected_archetypes %}
+                                dirty_{{ loop.index0 }}.as_slice(),
+                                {%- endfor %}
+                            ];
+                            {%- endif %}
                             {%- if system.needs_entities %}
                             let entities: [&[::sillyecs::EntityId]; {{ system.affected_archetypes | length }}] = [
                                 {%- for archetype in system.affected_archetypes %}
@@ -1087,7 +1165,11 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                             {%- endfor %}
 
                             // Apply {{ system.name.type }} to all archetypes
+                            {%- if system.iteration_dirty %}
+                            self.systems.{{ system.name.field }}.apply_all_dirty(
+                            {%- else %}
                             self.systems.{{ system.name.field }}.apply_all(
+                            {%- endif %}
                                 {%- if system.needs_context %}
                                 &self.context,
                                 {%- endif %}
@@ -1103,6 +1185,9 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                                         todo!("Invalid state use in ECS construction"),
                                     {%- endif %}
                                 {%- endfor %}
+                                {%- if system.iteration_dirty %}
+                                dirty_indices,
+                                {%- endif %}
                                 {%- if system.needs_entities %}
                                 entities,
                                 {%- endif %}
@@ -1210,6 +1295,13 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
         )
         .inspect_err(|error| tracing::error!(%error, "Failed to handle phase end events"))
         .ok();
+        {%- if world.dirty_archetypes_per_phase[phase.name] %}
+
+        // Clear the dirty sets of archetypes touched by any dirty-iteration system in this phase.
+        {%- for archetype in world.dirty_archetypes_per_phase[phase.name] %}
+        self.archetypes.collection.{{ archetype.field }}.clear_dirty();
+        {%- endfor %}
+        {%- endif %}
 
         // Process all commands.
         self.handle_commands();

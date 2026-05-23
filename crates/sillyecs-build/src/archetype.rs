@@ -25,6 +25,12 @@ pub struct Archetype {
     /// The number of components. Available after a call to [`Archetype::finish`](Archetype::finish).
     #[serde(skip_deserializing, default)]
     pub component_count: usize,
+
+    /// Whether this archetype tracks dirty entities. Can be set explicitly via YAML
+    /// (`dirty: true`) or inferred during [`Ecs::finish`](crate::ecs::Ecs::finish) when any
+    /// system with `iteration: dirty` targets this archetype.
+    #[serde(default)]
+    pub dirty: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
