@@ -1,6 +1,7 @@
 # sillyecs
 
-A silly little compile-time generated archetype ECS in Rust.
+A zero-overhead, compile-time-scheduled archetype ECS in Rust.
+Started as a silly little ECS implementation, strives to be more.
 
 [![Crates.io](https://img.shields.io/crates/v/sillyecs)](https://crates.io/crates/sillyecs)
 [![License](https://img.shields.io/badge/license-EUPL--1.2-blue.svg)](LICENSE)
@@ -13,6 +14,7 @@ A silly little compile-time generated archetype ECS in Rust.
 - [Features](#features)
 - [Installation](#installation)
 - [Usage](#usage)
+  - [Archetype Component Views](#archetype-component-views)
   - [Command Queue and Application-Specific Commands](#command-queue-and-application-specific-commands)
 - [Examples](#examples)
   - [WGPU Shader Compilation](#wgpu-shader-compilation)
@@ -41,6 +43,8 @@ into your project.
   the same name comparison breaks any surviving cycle, with the alphabetically-latest source
   losing its outgoing edge. Within-layer order is also sorted by name. Scheduling is therefore
   independent of the order in which systems appear in YAML; only renaming a system affects it.
+  Cross-phase `run_after` edges are rejected at build time with a descriptive error. Dependency
+  cycles are detected iteratively and reported as the full offending path.
 - **Sequential and Rayon-parallel execution paths.** Every phase gets both
   `apply_system_phase_X()` and `par_apply_system_phase_X()` variants.
 - **Rich phase lifecycle.** Each system exposes `is_ready` → `on_begin_phase` → optional
@@ -61,6 +65,11 @@ into your project.
 - **Cross-archetype component iteration.** For every component, generated traits
   (`IterXComponents`, `IterMutXComponents`, `IterXEntities`) yield flat iterators over every
   archetype that carries it.
+- **Archetype component views.** A `views:` block names a fixed subset of components shared
+  across multiple archetypes. The build crate auto-resolves which archetypes qualify (any whose
+  component set is a superset of the view). Generated `ViewAccess` / `ViewAccessMut` traits expose
+  `get_<view>_view(EntityId)` and `get_<view>_view_mut(EntityId)`: one entity-location lookup,
+  one archetype match, all view components by index - no further map lookups.
 - **Entity frontloading.** Archetypes support `frontload`/`frontload_by_indices_sorted`/
   `frontload_scan` to partition entities (e.g. for quadtree-driven culling) without breaking the
   archetype invariants.
@@ -132,14 +141,20 @@ archetypes:
     components:
       - Position
       - Collider
-    promotions:
+    promotions:         # deprecated: bypasses world entity-location map; despawn+respawn instead
       - BackgroundObject
 
   - name: BackgroundObject
     components:
       - Position
-    promotions:
+    promotions:         # deprecated: see above
       - ForegroundObject
+
+views:
+  - name: Movable        # auto-resolves to Particle and Player (both have Position + Velocity)
+    components:
+      - Position
+      - Velocity
 
 phases:
   - name: Startup
@@ -202,6 +217,31 @@ include!(concat!(env!("OUT_DIR"), "/world_gen.rs"));
 ```
 
 The compiler will tell you which traits and functions to implement.
+
+### Archetype Component Views
+
+A view names a fixed component subset shared by multiple archetypes. With the `Movable` view from
+the example above, the world exposes a single-lookup accessor:
+
+```rust
+// One entity-location lookup, one archetype match, both components by index.
+if let Some(view) = world.get_movable_view(entity_id) {
+    println!("pos={:?} vel={:?}", view.position, view.velocity);
+}
+
+// Mutable access:
+if let Some(mut view) = world.get_movable_view_mut(entity_id) {
+    view.velocity.x *= 0.9;
+}
+```
+
+Compare to the pre-views approach, which required two separate map lookups:
+
+```rust
+// Before views: two lookups, two archetype matches.
+let pos = world.get_position_component(entity_id);
+let vel = world.get_velocity_component(entity_id);
+```
 
 ### Command Queue and Application-Specific Commands
 
