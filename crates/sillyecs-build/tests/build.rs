@@ -443,6 +443,69 @@ systems:
     );
 }
 
+/// A multi-line YAML description on a view must not leak un-commented continuation lines into
+/// generated Rust. The doc-comment line in the template emits a single `///` prefix; the
+/// `doc_lines` filter has to re-prefix every embedded newline so the output stays syntactically
+/// valid as a doc comment block.
+#[test]
+fn view_description_multiline_renders_as_doc_lines() {
+    const YAML: &str = "
+components:
+  - name: Position
+  - name: Velocity
+archetypes:
+  - name: Particle
+    components: [Position, Velocity]
+views:
+  - name: Movable
+    description: |
+      First line of the description.
+      Second line that would otherwise break the doc comment.
+    components: [Position, Velocity]
+worlds:
+  - name: Main
+    archetypes: [Particle]
+phases:
+  - name: Update
+systems:
+  - name: Tick
+    phase: Update
+    outputs: [Position]
+";
+
+    let code = EcsCode::generate(BufReader::new(YAML.as_bytes())).expect("Failed to build ECS");
+
+    let struct_start = code
+        .world
+        .find("pub struct MovableView<'archetype>")
+        .expect("MovableView struct missing");
+    let preceding = &code.world[..struct_start];
+    let doc_block_start = preceding
+        .rfind("/// A read-only view of an entity")
+        .expect("MovableView doc block missing");
+    let doc_block = &preceding[doc_block_start..];
+
+    assert!(
+        doc_block.contains("/// First line of the description."),
+        "first description line should be emitted with `///` prefix"
+    );
+    assert!(
+        doc_block.contains("/// Second line that would otherwise break the doc comment."),
+        "second description line must be re-prefixed with `///` instead of leaking as bare Rust"
+    );
+
+    for line in doc_block.lines() {
+        let trimmed = line.trim_start();
+        if trimmed.is_empty() {
+            continue;
+        }
+        assert!(
+            trimmed.starts_with("///") || trimmed.starts_with("#[") || trimmed.starts_with("pub "),
+            "doc block above MovableView contains non-comment line: {line:?}"
+        );
+    }
+}
+
 /// The scheduler's name-based tie-break is only total if system names are unique. Two systems
 /// declared with the same name in YAML must therefore be rejected at validation time, not
 /// silently collapsed by the internal `name -> phase` HashMap.

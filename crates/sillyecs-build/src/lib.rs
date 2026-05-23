@@ -90,6 +90,16 @@ fn snake_case_filter(value: String) -> String {
     pascal_to_snake(value.trim())
 }
 
+/// Renders a (possibly multi-line) user string as the continuation of a Rust doc
+/// comment. The template is expected to emit the first `/// ` prefix; every line
+/// produced by this filter after a newline is prefixed with `/// ` so embedded
+/// newlines in YAML descriptions don't leak unguarded text into the generated
+/// Rust output.
+pub(crate) fn doc_lines_filter(value: String) -> String {
+    let trimmed = value.trim_end_matches('\n');
+    trimmed.replace('\n', "\n/// ")
+}
+
 fn pascal_to_snake(type_name: &str) -> String {
     let field_name = type_name
         .chars()

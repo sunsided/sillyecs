@@ -1,5 +1,5 @@
 use crate::ecs::{Ecs, EcsError};
-use crate::snake_case_filter;
+use crate::{doc_lines_filter, snake_case_filter};
 use minijinja::{Environment, context};
 use std::fs::File;
 use std::io::{BufReader, Write};
@@ -39,6 +39,7 @@ impl EcsCode {
 
         let mut env = Environment::new();
         env.add_filter("snake_case", snake_case_filter);
+        env.add_filter("doc_lines", doc_lines_filter);
 
         env.add_template("world", include_str!("../templates/world.rs.jinja2"))?;
         env.add_template(

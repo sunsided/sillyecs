@@ -1804,7 +1804,7 @@ impl<'a, E, Q> IterMut{{ component.raw }}Components<'a> for {{ world.name.type }
 /// A read-only view of an entity exposing a fixed subset of its components.
 ///
 {%- if view.description %}
-/// {{ view.description }}
+/// {{ view.description | doc_lines }}
 {%- else %}
 /// Shared across all archetypes that contain every listed component.
 {%- endif %}
@@ -1823,7 +1823,7 @@ pub struct {{ view.name.type }}<'archetype> {
 /// A mutable view of an entity exposing a fixed subset of its components.
 ///
 {%- if view.description %}
-/// {{ view.description }}
+/// {{ view.description | doc_lines }}
 {%- else %}
 /// Shared across all archetypes that contain every listed component.
 {%- endif %}
