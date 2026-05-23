@@ -244,46 +244,62 @@ impl System {
                 unreachable!();
             }
         } else {
-            let mut iter_stack = String::new();
-            let mut untuple_stack = String::new();
-            for output in self.outputs.iter().rev() {
-                if iter_stack.is_empty() {
-                    iter_stack = format!("{name}.iter_mut()", name = output.field_name_plural);
-                    untuple_stack = output.field_name.to_string();
-                } else {
-                    iter_stack = format!(
-                        "{name}.iter_mut().zip({iter_stack})",
-                        name = output.field_name_plural
-                    );
-                    untuple_stack = format!("({name}, {untuple_stack})", name = output.field_name);
-                }
-            }
-
-            for input in self.inputs.iter().rev() {
-                if iter_stack.is_empty() {
-                    iter_stack = format!("{name}.iter()", name = input.field_name_plural);
-                    untuple_stack = input.field_name.to_string();
-                } else {
-                    iter_stack = format!(
-                        "{name}.iter().zip({iter_stack})",
-                        name = input.field_name_plural
-                    );
-                    untuple_stack = format!("({name}, {untuple_stack})", name = input.field_name);
-                }
-            }
+            // Multi-component case: emit a `.zip(...)`-chained iterator with a
+            // trailing `.map(...)` that flattens the right-nested tuple into a
+            // flat `(a, b, c, ...)`. The destructuring pattern in the template
+            // is then a flat tuple, which is easier to read and gives `rustc`
+            // a uniform shape regardless of arity. This keeps the runtime
+            // crate dependency-free: no `izip!` macro is needed, the
+            // expansion that `itertools::izip!` would produce is materialized
+            // here at codegen time as a plain expression.
+            //
+            // The argument order (entity, inputs..., outputs...) must match
+            // the order in which the surrounding templates feed the bindings
+            // to `apply_single` / `apply_many`.
+            let mut iters: Vec<String> = Vec::with_capacity(num_components);
+            let mut names: Vec<String> = Vec::with_capacity(num_components);
 
             if self.entities {
-                if iter_stack.is_empty() {
-                    iter_stack = "entities.iter()".to_string();
-                    untuple_stack = "entity".to_string();
-                } else {
-                    iter_stack = format!("entities.iter().zip({iter_stack})",);
-                    untuple_stack = format!("(entity, {untuple_stack})");
-                }
+                iters.push("entities.iter()".to_string());
+                names.push("entity".to_string());
+            }
+            for input in &self.inputs {
+                iters.push(format!("{name}.iter()", name = input.field_name_plural));
+                names.push(input.field_name.to_string());
+            }
+            for output in &self.outputs {
+                iters.push(format!(
+                    "{name}.iter_mut()",
+                    name = output.field_name_plural
+                ));
+                names.push(output.field_name.to_string());
             }
 
-            self.component_iter_code = iter_stack;
-            self.component_untuple_code = untuple_stack;
+            // Build the zip chain: `iters[0].zip(iters[1]).zip(iters[2])...`.
+            let mut iter_expr = iters[0].clone();
+            for next in &iters[1..] {
+                iter_expr = format!("{iter_expr}.zip({next})");
+            }
+
+            // For N >= 3, the chained `.zip(...)` yields a right-nested tuple
+            // `((a, b), c)` etc. Add a `.map(...)` that destructures the
+            // nesting back into a flat tuple. For N == 2 the zip output is
+            // already a flat 2-tuple, so we skip the map to keep the emitted
+            // code minimal.
+            if iters.len() >= 3 {
+                // Closure input pattern: walk from the innermost zip outward
+                // so the pattern matches the right-nested zip output.
+                // Example for 4 iters: `(((a, b), c), d)`.
+                let mut closure_pat = format!("({}, {})", names[0], names[1]);
+                for name in &names[2..] {
+                    closure_pat = format!("({closure_pat}, {name})");
+                }
+                let flat_tuple = format!("({})", names.join(", "));
+                iter_expr = format!("{iter_expr}.map(|{closure_pat}| {flat_tuple})");
+            }
+
+            self.component_iter_code = iter_expr;
+            self.component_untuple_code = format!("({})", names.join(", "));
         }
     }
 }
