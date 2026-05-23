@@ -1,0 +1,72 @@
+# Fixture covers the items called out in issue #39:
+#   - non-trivial command queue with a real `UserCommand` type (see user.rs)
+#   - a phase with partial-hook state-use entries (`Render` phase below)
+#   - at least one archetype with `allow_unsafe: false` (file-level default)
+#   - promotions (Particle -> LivingParticle)
+#   - frontload (generated unconditionally, exercised by archetype shape)
+#   - system with `lookup`
+#   - at least one fixed-step phase (`FixedUpdate`)
+
+allow_unsafe: false
+
+states:
+  - name: Input
+  - name: Renderer
+
+components:
+  - name: Position
+  - name: Velocity
+  - name: Health
+  - name: Sprite
+
+archetypes:
+  - name: Particle
+    components: [Position, Velocity]
+    promotions: [LivingParticle]
+  - name: LivingParticle
+    components: [Position, Velocity, Health]
+  - name: Decoration
+    components: [Position, Sprite]
+
+worlds:
+  - name: Main
+    archetypes: [Particle, LivingParticle, Decoration]
+
+phases:
+  - name: Boot
+    manual: true
+  - name: FixedUpdate
+    fixed: 60Hz
+  - name: Update
+    on_request: true
+  - name: Render
+    manual: true
+    states:
+      # Partial-hook entry: no per-hook fields spelled out. Regression for issue #36.
+      - use: Renderer
+        default: write
+
+systems:
+  - name: Step
+    phase: FixedUpdate
+    context: true
+    inputs: [Velocity]
+    outputs: [Position]
+    lookup: [Position]
+    preflight: true
+    postflight: true
+
+  - name: Heal
+    phase: Update
+    commands: true
+    states:
+      - use: Input
+    outputs: [Health]
+
+  - name: Draw
+    phase: Render
+    entities: true
+    inputs: [Position, Sprite]
+    states:
+      - use: Renderer
+        system: write
