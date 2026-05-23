@@ -17,6 +17,19 @@ pub enum AccessType {
     Write,
 }
 
+/// How a system iterates the entities of its affected archetypes.
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum SystemIteration {
+    /// Iterate every entity of every affected archetype.
+    #[default]
+    All,
+    /// Iterate only the dirty entities tracked by each affected archetype. Archetypes touched
+    /// by a `Dirty` system are automatically marked as dirty-tracking during ECS finalization,
+    /// and the dirty set is cleared at the end of each phase that contains a dirty system.
+    Dirty,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct System {
     /// The ID of the system. Automatically generatedd.
@@ -60,6 +73,14 @@ pub struct System {
     pub postflight: bool,
     /// The phase in which to run the system.
     pub phase: SystemPhaseRef,
+    /// How the system iterates its affected archetypes' entities.
+    #[serde(default)]
+    pub iteration: SystemIteration,
+    /// Convenience flag mirroring `iteration == SystemIteration::Dirty`. Computed during
+    /// deserialization-time defaulting; exposed to templates so they can branch without
+    /// learning the enum representation.
+    #[serde(default, skip_deserializing)]
+    pub iteration_dirty: bool,
     /// The optional input components to the system.
     #[serde(default)]
     pub inputs: Vec<ComponentName>,
@@ -81,6 +102,14 @@ pub struct System {
     /// The code to untuple component values. Available after a call to [`System::finish`](System::finish).
     #[serde(skip_deserializing, default)]
     pub component_untuple_code: String,
+    /// The dirty-variant iteration code (prepends `dirty_indices` to the zip chain). Available
+    /// after a call to [`System::finish`](System::finish), populated only when
+    /// [`iteration`](Self::iteration) is [`SystemIteration::Dirty`].
+    #[serde(skip_deserializing, default)]
+    pub component_iter_code_dirty: String,
+    /// The dirty-variant untuple code matching [`component_iter_code_dirty`](Self::component_iter_code_dirty).
+    #[serde(skip_deserializing, default)]
+    pub component_untuple_code_dirty: String,
     /// The dependencies. Available after a call to [`System::finish_dependencies`](System::finish_dependencies) (e.g. via [`System::finish`](System::finish)).
     #[serde(skip)]
     pub dependencies: Vec<Dependency>,
@@ -195,6 +224,7 @@ impl System {
         // Set dependencies after default states
         self.apply_state_defaults();
         self.finish_dependencies();
+        self.iteration_dirty = matches!(self.iteration, SystemIteration::Dirty);
 
         let mut ids_and_names = Vec::new();
         'archetype: for archetype in archetypes {
@@ -300,6 +330,50 @@ impl System {
 
             self.component_iter_code = iter_expr;
             self.component_untuple_code = format!("({})", names.join(", "));
+        }
+
+        if self.iteration_dirty {
+            // Build the dirty-variant iter expression. The zip chain always starts with
+            // `dirty_indices.iter()` so each archetype-step receives its own dirty index slice
+            // alongside the entity / component slices. Same flat-tuple shape as `apply_all`
+            // emission above so `apply_all_dirty` can use a single destructuring pattern.
+            let mut iters: Vec<String> = vec!["dirty_indices.iter()".to_string()];
+            let mut names: Vec<String> = vec!["dirty".to_string()];
+
+            if self.entities {
+                iters.push("entities.iter()".to_string());
+                names.push("entity".to_string());
+            }
+            for input in &self.inputs {
+                iters.push(format!("{name}.iter()", name = input.field_name_plural));
+                names.push(input.field_name.to_string());
+            }
+            for output in &self.outputs {
+                iters.push(format!(
+                    "{name}.iter_mut()",
+                    name = output.field_name_plural
+                ));
+                names.push(output.field_name.to_string());
+            }
+
+            debug_assert!(iters.len() >= 2);
+
+            let mut iter_expr = iters[0].clone();
+            for next in &iters[1..] {
+                iter_expr = format!("{iter_expr}.zip({next})");
+            }
+
+            if iters.len() >= 3 {
+                let mut closure_pat = format!("({}, {})", names[0], names[1]);
+                for name in &names[2..] {
+                    closure_pat = format!("({closure_pat}, {name})");
+                }
+                let flat_tuple = format!("({})", names.join(", "));
+                iter_expr = format!("{iter_expr}.map(|{closure_pat}| {flat_tuple})");
+            }
+
+            self.component_iter_code_dirty = iter_expr;
+            self.component_untuple_code_dirty = format!("({})", names.join(", "));
         }
     }
 }

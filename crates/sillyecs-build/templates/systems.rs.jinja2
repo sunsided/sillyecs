@@ -701,6 +701,143 @@ pub trait Apply{{ system.name.type }}: System {
             );
         }
     }
+    {%- if system.iteration_dirty %}
+
+    /// Applies the system to the dirty subset of entities of a single affected archetype.
+    ///
+    /// Called by [`apply_all_dirty`](Self::apply_all_dirty) once per archetype. The default
+    /// implementation indexes every component slice by each dirty index and forwards to
+    /// [`apply_single`](Self::apply_single); override this if you need to drive the iteration
+    /// yourself (e.g. to batch lookups or short-circuit work).
+    #[allow(unused_variables)]
+    fn apply_many_dirty(
+        &mut self,
+        {%- if system.needs_context %}
+        context: &::sillyecs::FrameContext,
+        {%- endif %}
+        {%- for state in system.states %}
+            {%- set access = state.system | default(value="none") %}
+            {%- if access == "none" %}
+                {# skip #}
+            {%- elif access == "read" %}
+                {{ state.use.field }}: &{{ state.use.type }},
+            {%- elif access == "write" %}
+                {{ state.use.field }}: &mut {{ state.use.type }},
+            {%- else %}
+                todo!("Invalid state use in ECS construction"),
+            {%- endif %}
+        {%- endfor %}
+        dirty: &[usize],
+        {%- if system.needs_entities %}
+        entities: &[::sillyecs::EntityId],
+        {%- endif %}
+        {%- for input in system.inputs %}
+        {{ input.fields }}: &[{{ input.type }}],
+        {%- endfor %}
+        {%- for output in system.outputs %}
+        {{ output.fields }}: &mut [{{ output.type }}],
+        {%- endfor %}
+        {%- if system.emits_commands %}
+        commands: &impl WorldCommandSender
+        {%- endif %}
+    ) {
+        for &idx in dirty {
+            self.apply_single(
+                {%- if system.needs_context %}
+                context,
+                {%- endif %}
+                {%- for state in system.states %}
+                    {%- set access = state.system | default(value="none") %}
+                    {%- if access == "none" %}
+                        {# skip #}
+                    {%- else %}
+                        {{ state.use.field }},
+                    {%- endif %}
+                {%- endfor %}
+                {%- if system.needs_entities %}
+                entities[idx],
+                {%- endif %}
+                {%- for input in system.inputs %}
+                &{{ input.fields }}[idx],
+                {%- endfor %}
+                {%- for output in system.outputs %}
+                &mut {{ output.fields }}[idx],
+                {%- endfor %}
+                {%- if system.emits_commands %}
+                commands
+                {%- endif %}
+            );
+        }
+    }
+
+    /// Like [`apply_all`](Self::apply_all) but iterates only the dirty entities of every
+    /// affected archetype. Receives per-archetype sorted dirty-index slices and dispatches to
+    /// [`apply_many_dirty`](Self::apply_many_dirty).
+    #[allow(unused_mut)]
+    #[inline]
+    fn apply_all_dirty(
+        &mut self,
+        {%- if system.needs_context %}
+        context: &::sillyecs::FrameContext,
+        {%- endif %}
+        {%- for state in system.states %}
+            {%- set access = state.system | default(value="none") %}
+            {%- if access == "none" %}
+                {# skip #}
+            {%- elif access == "read" %}
+                {{ state.use.field }}: &{{ state.use.type }},
+            {%- elif access == "write" %}
+                {{ state.use.field }}: &mut {{ state.use.type }},
+            {%- else %}
+                todo!("Invalid state use in ECS construction"),
+            {%- endif %}
+        {%- endfor %}
+        dirty_indices: [&[usize]; {{ system.affected_archetype_count }}],
+        {%- if system.needs_entities %}
+        entities: [&[::sillyecs::EntityId]; {{ system.affected_archetype_count }}],
+        {%- endif %}
+        {%- for input in system.inputs %}
+        {{ input.fields }}: [&[{{ input.type }}]; {{ system.affected_archetype_count }}],
+        {%- endfor %}
+        {%- for output in system.outputs %}
+        mut {{ output.fields }}: [&mut [{{ output.type }}]; {{ system.affected_archetype_count }}],
+        {%- endfor %}
+        {%- if system.emits_commands %}
+        commands: &impl WorldCommandSender
+        {%- endif %}
+    ) {
+        let zipped_iter = {{ system.component_iter_code_dirty }};
+        for {{ system.component_untuple_code_dirty }} in zipped_iter {
+            Apply{{ system.name.type }}::apply_many_dirty(
+                self,
+                {%- if system.needs_context %}
+                context,
+                {%- endif %}
+                {%- for state in system.states %}
+                    {%- set access = state.system | default(value="none") %}
+                    {%- if access == "none" %}
+                        {# skip #}
+                    {%- else %}
+                        {{ state.use.field }},
+                    {%- endif %}
+                {%- endfor %}
+                dirty,
+                {%- if system.needs_entities %}
+                entity,
+                {%- endif %}
+                {%- for input in system.inputs %}
+                {{ input.field }},
+                {%- endfor %}
+                {%- for output in system.outputs %}
+                {{ output.field }},
+                {%- endfor %}
+                {%- if system.emits_commands %}
+                commands
+                {%- endif %}
+            );
+        }
+    }
+    {%- endif %}
 }
 
 #[allow(dead_code)]
@@ -840,6 +977,71 @@ impl {{ system.name.type }} {
             );
         }
     }
+    {%- if system.iteration_dirty %}
+
+    /// Dirty-iteration counterpart of [`apply_all`](Self::apply_all). Delegates to the
+    /// [`Apply{{ system.name.type }}::apply_all_dirty`] trait method via an explicit call so
+    /// the trait impl is forced for `{{ system.name.type }}`.
+    #[allow(unused_mut)]
+    #[inline]
+    fn apply_all_dirty(
+        &mut self,
+        {%- if system.needs_context %}
+        context: &::sillyecs::FrameContext,
+        {%- endif %}
+        {%- for state in system.states %}
+            {%- set access = state.system | default(value="none") %}
+            {%- if access == "none" %}{# skip #}
+            {%- elif access == "read" %}
+        {{ state.use.field }}: &{{ state.use.type }},
+            {%- elif access == "write" %}
+        {{ state.use.field }}: &mut {{ state.use.type }},
+            {%- else %}
+                todo!("Invalid state use in ECS construction"),
+            {%- endif %}
+        {%- endfor %}
+        dirty_indices: [&[usize]; {{ system.affected_archetype_count }}],
+        {%- if system.needs_entities %}
+        entities: [&[::sillyecs::EntityId]; {{ system.affected_archetype_count }}],
+        {%- endif %}
+        {%- for input in system.inputs %}
+        {{ input.fields }}: [&[{{ input.type }}]; {{ system.affected_archetype_count }}],
+        {%- endfor %}
+        {%- for output in system.outputs %}
+        mut {{ output.fields }}: [&mut [{{ output.type }}]; {{ system.affected_archetype_count }}],
+        {%- endfor %}
+        {%- if system.emits_commands %}
+        commands: &impl WorldCommandSender
+        {%- endif %}
+    ) {
+        Apply{{ system.name.type }}::apply_all_dirty(
+            self,
+            {%- if system.needs_context %}
+            context,
+            {%- endif %}
+            {%- for state in system.states %}
+                {%- set access = state.system | default(value="none") %}
+                {%- if access == "none" %}{# skip #}
+                {%- else %}
+            {{ state.use.field }},
+                {%- endif %}
+            {%- endfor %}
+            dirty_indices,
+            {%- if system.needs_entities %}
+            entities,
+            {%- endif %}
+            {%- for input in system.inputs %}
+            {{ input.fields }},
+            {%- endfor %}
+            {%- for output in system.outputs %}
+            {{ output.fields }},
+            {%- endfor %}
+            {%- if system.emits_commands %}
+            commands
+            {%- endif %}
+        );
+    }
+    {%- endif %}
 }
 
 #[automatically_derived]

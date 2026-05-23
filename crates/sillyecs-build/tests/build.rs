@@ -506,6 +506,181 @@ systems:
     }
 }
 
+/// Issue #2: a system with `iteration: dirty` triggers dirty-tracking codegen for every
+/// archetype it touches. The archetype emits a `dirty_indices` field plus `mark_dirty` /
+/// `clear_dirty` / `collect_dirty_sorted` helpers; the system trait gains `apply_many_dirty`
+/// (default forwards each dirty index to `apply_single`) and `apply_all_dirty`; the world
+/// emits `mark_<archetype>_dirty*` helpers and clears the dirty set at the end of every
+/// phase that contains a dirty-iteration system.
+#[test]
+fn dirty_iteration_system_emits_full_codegen() {
+    const YAML: &str = r#"
+components:
+  - name: Position
+  - name: Velocity
+archetypes:
+  - name: Particle
+    components: [Position, Velocity]
+worlds:
+  - name: Main
+    archetypes: [Particle]
+phases:
+  - name: Update
+systems:
+  - name: Move
+    phase: Update
+    iteration: dirty
+    inputs: [Velocity]
+    outputs: [Position]
+"#;
+
+    let code = EcsCode::generate(BufReader::new(YAML.as_bytes())).expect("Failed to build ECS");
+
+    // Archetype gains dirty storage + helpers.
+    assert!(
+        code.archetypes
+            .contains("pub dirty_indices: ::std::collections::HashSet<usize>"),
+        "ParticleArchetype must declare a dirty_indices HashSet"
+    );
+    assert!(
+        code.archetypes.contains("pub fn mark_dirty("),
+        "ParticleArchetype must expose mark_dirty"
+    );
+    assert!(
+        code.archetypes.contains("pub fn clear_dirty("),
+        "ParticleArchetype must expose clear_dirty"
+    );
+    assert!(
+        code.archetypes.contains("pub fn collect_dirty_sorted("),
+        "ParticleArchetype must expose collect_dirty_sorted for world dispatch"
+    );
+
+    // System trait + newtype gain dirty entry points.
+    assert!(
+        code.systems.contains("fn apply_many_dirty("),
+        "ApplyMoveSystem trait must declare apply_many_dirty"
+    );
+    assert!(
+        code.systems.contains("fn apply_all_dirty("),
+        "Dirty systems must emit apply_all_dirty"
+    );
+    assert!(
+        code.systems.contains("for &idx in dirty {"),
+        "Default apply_many_dirty must iterate the dirty index slice"
+    );
+
+    // World dispatches via apply_all_dirty + clears at end of phase + offers mark helpers.
+    assert!(
+        code.world.contains(".apply_all_dirty("),
+        "World must dispatch dirty-iteration systems via apply_all_dirty"
+    );
+    assert!(
+        code.world
+            .contains("self.archetypes.collection.particle.clear_dirty();"),
+        "World must clear the dirty set of every touched archetype at end of phase"
+    );
+    assert!(
+        code.world.contains("pub fn mark_particle_dirty("),
+        "World must emit mark_<archetype>_dirty helper for dirty archetypes"
+    );
+    assert!(
+        code.world.contains("pub fn mark_particle_dirty_by_id("),
+        "World must emit mark_<archetype>_dirty_by_id helper for dirty archetypes"
+    );
+    assert!(
+        code.world.contains("pub fn clear_particles_dirty("),
+        "World must emit clear_<archetypes>_dirty helper for dirty archetypes"
+    );
+}
+
+/// An archetype not referenced by any dirty system must not pay the dirty-tracking codegen
+/// tax (no `dirty_indices` field, no `mark_dirty` method, no clear at end of phase).
+#[test]
+fn non_dirty_archetype_emits_no_dirty_codegen() {
+    const YAML: &str = r#"
+components:
+  - name: Position
+archetypes:
+  - name: Static
+    components: [Position]
+worlds:
+  - name: Main
+    archetypes: [Static]
+phases:
+  - name: Update
+systems:
+  - name: Tick
+    phase: Update
+    outputs: [Position]
+"#;
+
+    let code = EcsCode::generate(BufReader::new(YAML.as_bytes())).expect("Failed to build ECS");
+
+    assert!(
+        !code.archetypes.contains("dirty_indices"),
+        "Non-dirty archetypes must not carry dirty_indices storage"
+    );
+    assert!(
+        !code.systems.contains("apply_many_dirty"),
+        "Non-dirty systems must not emit apply_many_dirty"
+    );
+    assert!(
+        !code.world.contains("apply_all_dirty"),
+        "World must not call apply_all_dirty when no system opts in"
+    );
+    assert!(
+        !code.world.contains("clear_dirty"),
+        "World must not emit clear_dirty calls when no dirty system runs"
+    );
+    assert!(
+        !code.world.contains("mark_static_dirty"),
+        "World must not emit mark_<archetype>_dirty for non-dirty archetypes"
+    );
+}
+
+/// An explicit `dirty: true` on an archetype is honored even if no system uses dirty
+/// iteration. This lets users mark archetypes dirty-aware ahead of wiring up the systems.
+#[test]
+fn explicit_archetype_dirty_flag_is_honored() {
+    const YAML: &str = r#"
+components:
+  - name: Position
+archetypes:
+  - name: Particle
+    components: [Position]
+    dirty: true
+worlds:
+  - name: Main
+    archetypes: [Particle]
+phases:
+  - name: Update
+systems:
+  - name: Tick
+    phase: Update
+    outputs: [Position]
+"#;
+
+    let code = EcsCode::generate(BufReader::new(YAML.as_bytes())).expect("Failed to build ECS");
+
+    assert!(
+        code.archetypes
+            .contains("pub dirty_indices: ::std::collections::HashSet<usize>"),
+        "Explicit dirty: true must emit dirty_indices storage even without a dirty system"
+    );
+    assert!(
+        code.world.contains("pub fn mark_particle_dirty("),
+        "Explicit dirty: true must still emit world-side helpers"
+    );
+    // No system opted into dirty iteration, so the world must not emit the end-of-phase
+    // clear block (the per-archetype helper that *the user* may call still exists).
+    assert!(
+        !code.world.contains(
+            "// Clear the dirty sets of archetypes touched by any dirty-iteration system"
+        ),
+        "Without a dirty system, the world must not auto-clear the archetype's dirty set at end of phase"
+    );
+}
+
 /// The scheduler's name-based tie-break is only total if system names are unique. Two systems
 /// declared with the same name in YAML must therefore be rejected at validation time, not
 /// silently collapsed by the internal `name -> phase` HashMap.
