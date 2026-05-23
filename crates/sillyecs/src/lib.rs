@@ -16,7 +16,3 @@ pub use flatten_slices_mut::FlattenSlicesMut;
 pub use frame_context::FrameContext;
 pub use world::World;
 pub use world_id::WorldId;
-
-// `izip!` is defined in the `izip` module with `#[macro_export]`, which
-// already places it at the crate root for downstream users (`sillyecs::izip!`).
-// The module itself stays private; the macro definition carries its own docs.
