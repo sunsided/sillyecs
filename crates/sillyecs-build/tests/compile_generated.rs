@@ -1,8 +1,9 @@
-//! Integration test for issue #39: render generated code into a tempdir crate
-//! and run `cargo check` to make sure the templates produce code that actually
-//! compiles. The existing `build.rs` tests only string-grep the rendered
-//! output, so bugs like #36 (invalid Rust in parameter lists) and #37 (missing
-//! trait bound on `handle_commands`) sneak past them.
+//! Integration test for issue #39: render generated code into a synthetic
+//! fixture crate under the workspace `target/` directory and run `cargo check`
+//! to make sure the templates produce code that actually compiles. The
+//! existing `build.rs` tests only string-grep the rendered output, so bugs
+//! like #36 (invalid Rust in parameter lists) and #37 (missing trait bound on
+//! `handle_commands`) sneak past them.
 //!
 //! Each fixture under `tests/fixtures/<name>/` is a pair of files:
 //! - `ecs.yaml` - the YAML input to `EcsCode::generate`
@@ -10,10 +11,11 @@
 //!   `Apply<X>System` impls, `WorldCommandQueue` impl, `EntityLocationMap`
 //!   alias).
 //!
-//! The test renders the four template outputs into a synthetic library crate
-//! that `include!`s them and the fixture's `user.rs`, then shells out to
-//! `cargo check` against that crate. A non-zero exit prints the captured
-//! stderr and leaks the fixture directory so it can be inspected.
+//! The test renders the four template outputs into the fixture crate at
+//! `target/sillyecs-compile-fixtures/<name>/` (a stable workspace path, not a
+//! system tempdir, so cargo's incremental cache survives across runs), then
+//! shells out to `cargo check` against that crate. A non-zero exit prints the
+//! captured stderr and leaves the fixture directory on disk for inspection.
 
 use sillyecs_build::EcsCode;
 use std::fs;
@@ -55,8 +57,13 @@ fn run_fixture(fixture_name: &str) {
     let src_dir = crate_dir.join("src");
     let generated_dir = src_dir.join("generated");
 
+    // Wipe the fixture crate before writing it. Silently ignoring a failed
+    // deletion would let stale files from a previous run survive into the
+    // next `cargo check`, which could mask a regression by compiling the old
+    // state. Propagate the error so the test fails loudly instead.
     if crate_dir.exists() {
-        let _ = fs::remove_dir_all(&crate_dir);
+        fs::remove_dir_all(&crate_dir)
+            .unwrap_or_else(|e| panic!("clear fixture dir {}: {e}", crate_dir.display()));
     }
     fs::create_dir_all(&generated_dir).expect("create fixture crate dir");
 
