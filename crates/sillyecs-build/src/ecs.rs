@@ -1,7 +1,7 @@
 use crate::archetype::{Archetype, ArchetypeId};
 use crate::component::{Component, ComponentId};
 use crate::state::State;
-use crate::system::{System, SystemId, SystemPhase};
+use crate::system::{System, SystemId, SystemIteration, SystemPhase};
 use crate::view::View;
 use crate::world::{World, WorldId};
 use serde::{Deserialize, Serialize};
@@ -47,6 +47,22 @@ impl Ecs {
 
         for system in &mut self.systems {
             system.finish(&self.archetypes);
+        }
+
+        // Infer dirty-tracking archetypes from systems that opted into dirty iteration. An
+        // explicit `dirty: true` on the archetype is preserved; inference only flips additional
+        // archetypes from `false` to `true`. Must run after `System::finish` populates
+        // `affected_archetype_ids` and before `World::finish` clones archetypes into worlds.
+        let dirty_archetype_ids: HashSet<ArchetypeId> = self
+            .systems
+            .iter()
+            .filter(|s| matches!(s.iteration, SystemIteration::Dirty))
+            .flat_map(|s| s.affected_archetype_ids.iter().copied())
+            .collect();
+        for archetype in &mut self.archetypes {
+            if dirty_archetype_ids.contains(&archetype.id) {
+                archetype.dirty = true;
+            }
         }
 
         for component in &mut self.components {

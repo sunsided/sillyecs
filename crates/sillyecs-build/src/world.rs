@@ -38,6 +38,11 @@ pub struct World {
     /// and archetype name so that codegen output is deterministic between runs.
     #[serde(default, skip_deserializing)]
     pub components: BTreeMap<ComponentRef, BTreeSet<ArchetypeRef>>,
+    /// For each phase, the world-local archetypes whose dirty set must be cleared at the end of
+    /// that phase. Populated only for phases containing at least one `iteration: dirty` system.
+    /// Ordered so that codegen is deterministic.
+    #[serde(default, skip_deserializing)]
+    pub dirty_archetypes_per_phase: BTreeMap<SystemPhaseRef, BTreeSet<ArchetypeRef>>,
 }
 
 impl World {
@@ -101,6 +106,30 @@ impl World {
                 0,
                 "Some systems should be scheduled"
             );
+        }
+
+        // Compute which archetypes need their dirty set cleared at the end of each phase. A
+        // phase contributes an archetype if it contains a dirty-iteration system that affects
+        // that archetype AND the world owns the archetype.
+        let world_archetype_set: HashSet<&ArchetypeRef> = self.archetypes_refs.iter().collect();
+        for (phase, groups) in &self.scheduled_systems {
+            let mut touched: BTreeSet<ArchetypeRef> = BTreeSet::new();
+            for group in groups {
+                for system in group {
+                    if !system.iteration_dirty {
+                        continue;
+                    }
+                    for archetype in &system.affected_archetypes {
+                        if world_archetype_set.contains(archetype) {
+                            touched.insert(archetype.clone());
+                        }
+                    }
+                }
+            }
+            if !touched.is_empty() {
+                self.dirty_archetypes_per_phase
+                    .insert(phase.clone(), touched);
+            }
         }
 
         let world_archetypes: HashSet<&ArchetypeRef> = self.archetypes_refs.iter().collect();
