@@ -226,4 +226,12 @@ pub fn smoke() {
     world.apply_system_phase_render();
     world.par_apply_system_phase_render();
     world.request_update_phase();
+
+    // Force monomorphization of the view accessors.
+    let id = world.spawn_particle(ParticleEntityComponents {
+        position: PositionComponent::new(PositionData::default()),
+        velocity: VelocityComponent::new(VelocityData::default()),
+    });
+    let _view: Option<MovableView<'_>> = world.get_movable_view(id);
+    let _view_mut: Option<MovableViewMut<'_>> = world.get_movable_view_mut(id);
 }

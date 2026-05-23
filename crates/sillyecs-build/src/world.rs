@@ -5,6 +5,7 @@ use crate::ecs::EcsError;
 use crate::state::State;
 use crate::system::{System, SystemPhase, SystemPhaseRef};
 use crate::system_scheduler::schedule_systems;
+use crate::view::View;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::ops::Deref;
@@ -24,6 +25,10 @@ pub struct World {
     pub systems: Vec<System>,
     #[serde(skip_deserializing)]
     pub states: Vec<State>,
+    /// Views whose matching archetypes are all present in this world. Each entry is the view
+    /// restricted to the world's own archetypes.
+    #[serde(default, skip_deserializing)]
+    pub views: Vec<View>,
 
     /// The systems in scheduling order (based on this world's systems). Ordered by phase name so
     /// that codegen output is deterministic between runs.
@@ -42,6 +47,7 @@ impl World {
         systems: &[System],
         states: &[State],
         phases: &[SystemPhase],
+        views: &[View],
     ) -> Result<(), EcsError> {
         let mut used_systems = HashSet::new();
         let mut used_states = HashSet::new();
@@ -95,6 +101,32 @@ impl World {
                 0,
                 "Some systems should be scheduled"
             );
+        }
+
+        let world_archetypes: HashSet<&ArchetypeRef> = self.archetypes_refs.iter().collect();
+        for view in views {
+            let mut narrowed = view.clone();
+            let mut kept_archetypes = Vec::new();
+            let mut kept_ids = Vec::new();
+            for (archetype_name, archetype_id) in view
+                .archetypes
+                .iter()
+                .zip(view.archetype_ids.iter().copied())
+            {
+                if world_archetypes.contains(archetype_name) {
+                    kept_archetypes.push(archetype_name.clone());
+                    kept_ids.push(archetype_id);
+                }
+            }
+
+            if kept_archetypes.is_empty() {
+                continue;
+            }
+
+            narrowed.archetype_count = kept_archetypes.len();
+            narrowed.archetypes = kept_archetypes;
+            narrowed.archetype_ids = kept_ids;
+            self.views.push(narrowed);
         }
 
         Ok(())
