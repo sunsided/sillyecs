@@ -36,15 +36,18 @@ into your project.
   `Vec<C>` per component, so systems iterate over contiguous component slices and stay
   cache-friendly.
 - **Automatic system scheduling.** Per phase, the build crate analyzes each system's component
-  reads/writes, user-state reads/writes, frame-context use, and explicit `run_after` edges,
-  resolves bidirectional conflicts via forced-edge reachability, and emits layered groups
-  (Kahn's algorithm) that can run in parallel. When two systems have a bidirectional resource
-  conflict that no `run_after` chain resolves, the alphabetically-earlier system name runs first;
-  the same name comparison breaks any surviving cycle, with the alphabetically-latest source
-  losing its outgoing edge. Within-layer order is also sorted by name. Scheduling is therefore
-  independent of the order in which systems appear in YAML; only renaming a system affects it.
-  Cross-phase `run_after` edges are rejected at build time with a descriptive error. Dependency
-  cycles are detected iteratively and reported as the full offending path.
+  reads/writes, user-state reads/writes, frame-context use, and explicit `run_after` edges, and
+  emits groups of systems that can run in parallel (Kahn's algorithm). Every `run_after` edge is
+  honored, and two systems that conflict on a resource (at least one of them writes it) never
+  share a group. A writer runs before its readers unless a `run_after` chain says otherwise; when
+  data dependencies form a cycle, the edge out of the alphabetically-greatest writer gives way:
+  its reader runs first and sees the previous tick's data, and the build emits a
+  `cargo:warning`. Two writers of the same
+  resource run in alphabetical name order. Systems with `lookup` count as reading every
+  component. Within-group order is also sorted by name, so scheduling is independent of the order
+  in which systems appear in YAML; only renaming a system affects it. Contradictory `run_after`
+  edges (a cycle) and cross-phase `run_after` edges are rejected at build time, the former with
+  the full offending path.
 - **Sequential and Rayon-parallel execution paths.** Every phase gets both
   `apply_system_phase_X()` and `par_apply_system_phase_X()` variants.
 - **Rich phase lifecycle.** Each system exposes `is_ready` → `on_begin_phase` → optional
@@ -162,6 +165,8 @@ phases:
     fixed: 60 Hz  # or "0.01666 s"
   - name: Update
   - name: Render
+    manual: true        # Require manual call to world.apply_system_phase_render()
+    # on_request: true  # call world.request_render_phase() to allow execution (resets atomically)
     states:
       - use: WgpuRender    # Use state in phase begin/end hooks
         begin_phase: write # optional: none|read|write, defaults to read
@@ -175,7 +180,7 @@ systems:
     preflight: true  # optional, extra scan before system run
     postflight: true # optional, extra scan after system run
     lookup: # optional
-      - Particle     # request random access to particles in pre- or postflight
+      - Position     # read Position of other entities by ID in pre- or postflight
     inputs:
       - Velocity
     outputs:
@@ -183,8 +188,6 @@ systems:
 
   - name: Render
     phase: Render
-    manual: true        # Require manual call to world.apply_system_phase_render()
-    # on_request: true  # call world.request_render_phase() to allow execution (resets atomically)
     states:
       - use: WgpuRender
         default: none      # The default for the below values; optional: none|read|write, defaults to read
