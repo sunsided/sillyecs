@@ -53,6 +53,12 @@ pub struct HealSystemData;
 #[derive(Debug, Default)]
 pub struct DrawSystemData;
 
+#[derive(Debug, Default)]
+pub struct SpinSystemData;
+
+#[derive(Debug, Default)]
+pub struct TintSystemData;
+
 impl Default for StepSystem {
     fn default() -> Self {
         Self(StepSystemData)
@@ -68,6 +74,18 @@ impl Default for HealSystem {
 impl Default for DrawSystem {
     fn default() -> Self {
         Self(DrawSystemData)
+    }
+}
+
+impl Default for SpinSystem {
+    fn default() -> Self {
+        Self(SpinSystemData)
+    }
+}
+
+impl Default for TintSystem {
+    fn default() -> Self {
+        Self(TintSystemData)
     }
 }
 
@@ -90,6 +108,18 @@ impl CreateSystem<HealSystem> for SystemFactory {
 impl CreateSystem<DrawSystem> for SystemFactory {
     fn create(&self) -> DrawSystem {
         DrawSystem::default()
+    }
+}
+
+impl CreateSystem<SpinSystem> for SystemFactory {
+    fn create(&self) -> SpinSystem {
+        SpinSystem::default()
+    }
+}
+
+impl CreateSystem<TintSystem> for SystemFactory {
+    fn create(&self) -> TintSystem {
+        TintSystem::default()
     }
 }
 
@@ -125,6 +155,14 @@ impl ApplyHealSystem for HealSystem {
 }
 
 impl ApplyDrawSystem for DrawSystem {
+    type Error = Infallible;
+}
+
+impl ApplySpinSystem for SpinSystem {
+    type Error = Infallible;
+}
+
+impl ApplyTintSystem for TintSystem {
     type Error = Infallible;
 }
 

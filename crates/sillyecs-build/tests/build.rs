@@ -552,3 +552,81 @@ fn create_system_bounds_are_joined() {
     assert!(code.world.contains("+ CreateSystem<"));
     assert!(!code.world.contains(">CreateSystem<"));
 }
+
+/// `par_apply_system_phase_*` used to check the number of *groups* to decide whether a phase has
+/// a single system, so a phase whose systems all fit into one parallel group ran them
+/// sequentially. Only a phase with exactly one system may skip spawning.
+#[test]
+fn single_group_with_several_systems_runs_in_parallel() {
+    const YAML: &str = r#"
+components:
+  - name: Position
+  - name: Velocity
+archetypes:
+  - name: Particle
+    components: [Position, Velocity]
+worlds:
+  - name: Main
+    archetypes: [Particle]
+phases:
+  - name: Update
+systems:
+  - name: Move
+    phase: Update
+    outputs: [Position]
+  - name: Push
+    phase: Update
+    outputs: [Velocity]
+"#;
+
+    let code = EcsCode::generate(BufReader::new(YAML.as_bytes())).expect("Failed to build ECS");
+
+    let start = code
+        .world
+        .find("fn par_apply_system_phase_update(")
+        .expect("par_apply_system_phase_update missing");
+    let body = &code.world[start..];
+    let end = body[1..].find("\n    fn ").map_or(body.len(), |i| i + 1);
+    let body = &body[..end];
+    assert!(
+        body.contains("rayon::scope"),
+        "two independent systems in one group must be spawned in parallel"
+    );
+    assert!(!body.contains("Only one system in this phase"));
+}
+
+/// A `lookup` system is handed the world's entire archetype storage, so it must not share a
+/// parallel group with a system writing any component, even one it never looks up.
+#[test]
+fn lookup_system_does_not_share_a_group_with_writers() {
+    const YAML: &str = r#"
+components:
+  - name: Position
+  - name: Sprite
+archetypes:
+  - name: Particle
+    components: [Position]
+  - name: Decoration
+    components: [Position, Sprite]
+worlds:
+  - name: Main
+    archetypes: [Particle, Decoration]
+phases:
+  - name: Update
+systems:
+  - name: Follow
+    phase: Update
+    inputs: [Position]
+    lookup: [Position]
+    preflight: true
+  - name: Spin
+    phase: Update
+    outputs: [Sprite]
+"#;
+
+    let code = EcsCode::generate(BufReader::new(YAML.as_bytes())).expect("Failed to build ECS");
+    assert!(
+        code.world.contains("// System group 2"),
+        "Follow and Spin must be scheduled into separate groups"
+    );
+}
