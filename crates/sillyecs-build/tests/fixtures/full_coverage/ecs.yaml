@@ -6,6 +6,8 @@
 #   - frontload (generated unconditionally, exercised by archetype shape)
 #   - system with `lookup`
 #   - at least one fixed-step phase (`FixedUpdate`)
+#   - parallel phases: `FixedUpdate` splits a `lookup` system and a writer into two
+#     groups, `Update` schedules one group of two systems, one of them emitting commands
 
 allow_unsafe: false
 
@@ -61,6 +63,10 @@ systems:
     preflight: true
     postflight: true
 
+  - name: Spin
+    phase: FixedUpdate
+    outputs: [Sprite]
+
   - name: Heal
     phase: Update
     commands: true
@@ -75,3 +81,7 @@ systems:
     states:
       - use: Renderer
         system: write
+
+  - name: Tint
+    phase: Update
+    outputs: [Sprite]

@@ -965,7 +965,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
 
         {%- if world.scheduled_systems[phase.name] | length == 0 %}
         // no systems in this phase
-        {%- elif world.scheduled_systems[phase.name] | length == 1 %}
+        {%- elif world.scheduled_systems[phase.name] | length == 1 and world.scheduled_systems[phase.name][0] | length == 1 %}
         // Only one system in this phase; skip spawning thread.
         self.apply_system_phase_{{ phase.name.field }}_without_events();
         {%- else %}
