@@ -1,5 +1,6 @@
 //! # Utility functions for `sillyecs`.
 
+mod dirty_set;
 mod entity_id;
 mod flatten_copy_slices;
 mod flatten_slices;
@@ -8,6 +9,7 @@ mod frame_context;
 mod world;
 mod world_id;
 
+pub use dirty_set::DirtySet;
 pub use entity_id::EntityId;
 pub use flatten_copy_slices::FlattenCopySlices;
 pub use flatten_slices::FlattenSlices;

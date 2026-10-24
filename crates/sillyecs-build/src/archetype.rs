@@ -1,5 +1,6 @@
 use crate::Name;
 use crate::component::{Component, ComponentId, ComponentRef};
+use crate::system::SystemName;
 use core::ops::Deref;
 use serde::{Deserialize, Deserializer, Serialize};
 
@@ -25,6 +26,17 @@ pub struct Archetype {
     /// The number of components. Available after a call to [`Archetype::finish`](Archetype::finish).
     #[serde(skip_deserializing, default)]
     pub component_count: usize,
+
+    /// Whether this archetype tracks dirty entities. Can be set explicitly via YAML
+    /// (`dirty: true`) or inferred during [`Ecs::finish`](crate::ecs::Ecs::finish) when any
+    /// system with `iteration: dirty` targets this archetype.
+    #[serde(default)]
+    pub dirty: bool,
+
+    /// The `iteration: dirty` systems affecting this archetype, ordered by name. The archetype
+    /// keeps one dirty set per consumer. Available after [`Ecs::finish`](crate::ecs::Ecs::finish).
+    #[serde(skip_deserializing, default)]
+    pub dirty_consumers: Vec<SystemName>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -32,6 +44,12 @@ pub struct PromotionInfo {
     pub target: ArchetypeName,
     pub components_to_pass: Vec<ComponentRef>,
     pub components_to_add: Vec<ComponentRef>,
+    /// Dirty consumers of both archetypes, whose dirty sets carry over unchanged. Available
+    /// after [`Ecs::finish`](crate::ecs::Ecs::finish).
+    pub dirty_to_pass: Vec<SystemName>,
+    /// Dirty consumers of the target only, whose dirty sets start out empty. Available after
+    /// [`Ecs::finish`](crate::ecs::Ecs::finish).
+    pub dirty_to_reset: Vec<SystemName>,
 }
 
 pub type ArchetypeRef = ArchetypeName;
@@ -75,6 +93,8 @@ impl Archetype {
                 target: target.name.clone(),
                 components_to_pass,
                 components_to_add,
+                dirty_to_pass: Vec::new(),
+                dirty_to_reset: Vec::new(),
             });
         }
     }

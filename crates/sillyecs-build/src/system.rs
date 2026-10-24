@@ -17,6 +17,19 @@ pub enum AccessType {
     Write,
 }
 
+/// How a system iterates the entities of its affected archetypes.
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum SystemIteration {
+    /// Iterate every entity of every affected archetype.
+    #[default]
+    All,
+    /// Iterate only the entities marked dirty since this system last ran. Each affected
+    /// archetype keeps one dirty set per such system; marking an entity adds it to all of them,
+    /// and a system clears only its own set, right after it ran.
+    Dirty,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct System {
     /// The ID of the system. Automatically generatedd.
@@ -60,6 +73,14 @@ pub struct System {
     pub postflight: bool,
     /// The phase in which to run the system.
     pub phase: SystemPhaseRef,
+    /// How the system iterates its affected archetypes' entities.
+    #[serde(default)]
+    pub iteration: SystemIteration,
+    /// Convenience flag mirroring `iteration == SystemIteration::Dirty`. Available after a call
+    /// to [`System::finish`](System::finish); exposed to templates so they can branch without
+    /// learning the enum representation.
+    #[serde(default, skip_deserializing)]
+    pub iteration_dirty: bool,
     /// The optional input components to the system.
     #[serde(default)]
     pub inputs: Vec<ComponentName>,
@@ -81,6 +102,14 @@ pub struct System {
     /// The code to untuple component values. Available after a call to [`System::finish`](System::finish).
     #[serde(skip_deserializing, default)]
     pub component_untuple_code: String,
+    /// The dirty-variant iteration code (prepends `dirty_indices` to the zip chain). Available
+    /// after a call to [`System::finish`](System::finish), populated only when
+    /// [`iteration`](Self::iteration) is [`SystemIteration::Dirty`].
+    #[serde(skip_deserializing, default)]
+    pub component_iter_code_dirty: String,
+    /// The dirty-variant untuple code matching [`component_iter_code_dirty`](Self::component_iter_code_dirty).
+    #[serde(skip_deserializing, default)]
+    pub component_untuple_code_dirty: String,
     /// The dependencies. Available after a call to [`System::finish_dependencies`](System::finish_dependencies) (e.g. via [`System::finish`](System::finish)).
     #[serde(skip)]
     pub dependencies: Vec<Dependency>,
@@ -195,6 +224,7 @@ impl System {
         // Set dependencies after default states
         self.apply_state_defaults();
         self.finish_dependencies();
+        self.iteration_dirty = matches!(self.iteration, SystemIteration::Dirty);
 
         // `lookup` systems are handed the world's entire archetype storage, which borrows every
         // component column. Model that as a read of every component so the scheduler never puts
@@ -261,64 +291,80 @@ impl System {
                 unreachable!();
             }
         } else {
-            // Multi-component case: emit a `.zip(...)`-chained iterator with a
-            // trailing `.map(...)` that flattens the right-nested tuple into a
-            // flat `(a, b, c, ...)`. The destructuring pattern in the template
-            // is then a flat tuple, which is easier to read and gives `rustc`
-            // a uniform shape regardless of arity. This keeps the runtime
-            // crate dependency-free: no `izip!` macro is needed, the
-            // expansion that `itertools::izip!` would produce is materialized
-            // here at codegen time as a plain expression.
-            //
-            // The argument order (entity, inputs..., outputs...) must match
-            // the order in which the surrounding templates feed the bindings
-            // to `apply_single` / `apply_many`.
-            let mut iters: Vec<String> = Vec::with_capacity(num_components);
-            let mut names: Vec<String> = Vec::with_capacity(num_components);
+            let (iters, names) = self.component_iterators();
+            (self.component_iter_code, self.component_untuple_code) = zip_flattened(&iters, &names);
+        }
 
-            if self.entities {
-                iters.push("entities.iter()".to_string());
-                names.push("entity".to_string());
-            }
-            for input in &self.inputs {
-                iters.push(format!("{name}.iter()", name = input.field_name_plural));
-                names.push(input.field_name.to_string());
-            }
-            for output in &self.outputs {
-                iters.push(format!(
-                    "{name}.iter_mut()",
-                    name = output.field_name_plural
-                ));
-                names.push(output.field_name.to_string());
-            }
-
-            // Build the zip chain: `iters[0].zip(iters[1]).zip(iters[2])...`.
-            let mut iter_expr = iters[0].clone();
-            for next in &iters[1..] {
-                iter_expr = format!("{iter_expr}.zip({next})");
-            }
-
-            // For N >= 3, the chained `.zip(...)` yields a right-nested tuple
-            // `((a, b), c)` etc. Add a `.map(...)` that destructures the
-            // nesting back into a flat tuple. For N == 2 the zip output is
-            // already a flat 2-tuple, so we skip the map to keep the emitted
-            // code minimal.
-            if iters.len() >= 3 {
-                // Closure input pattern: walk from the innermost zip outward
-                // so the pattern matches the right-nested zip output.
-                // Example for 4 iters: `(((a, b), c), d)`.
-                let mut closure_pat = format!("({}, {})", names[0], names[1]);
-                for name in &names[2..] {
-                    closure_pat = format!("({closure_pat}, {name})");
-                }
-                let flat_tuple = format!("({})", names.join(", "));
-                iter_expr = format!("{iter_expr}.map(|{closure_pat}| {flat_tuple})");
-            }
-
-            self.component_iter_code = iter_expr;
-            self.component_untuple_code = format!("({})", names.join(", "));
+        if self.iteration_dirty {
+            // The dirty variant leads the zip chain with the per-archetype dirty index slice, so
+            // `apply_all_dirty` destructures `(dirty, entity, inputs..., outputs...)`.
+            let (mut iters, mut names) = self.component_iterators();
+            iters.insert(0, "dirty_indices.iter()".to_string());
+            names.insert(0, "dirty".to_string());
+            (
+                self.component_iter_code_dirty,
+                self.component_untuple_code_dirty,
+            ) = zip_flattened(&iters, &names);
         }
     }
+
+    /// The per-archetype iterators and their binding names, in the order (entity, inputs...,
+    /// outputs...) in which the surrounding templates feed the bindings to `apply_single` /
+    /// `apply_many`.
+    fn component_iterators(&self) -> (Vec<String>, Vec<String>) {
+        let mut iters = Vec::new();
+        let mut names = Vec::new();
+        if self.entities {
+            iters.push("entities.iter()".to_string());
+            names.push("entity".to_string());
+        }
+        for input in &self.inputs {
+            iters.push(format!("{name}.iter()", name = input.field_name_plural));
+            names.push(input.field_name.to_string());
+        }
+        for output in &self.outputs {
+            iters.push(format!(
+                "{name}.iter_mut()",
+                name = output.field_name_plural
+            ));
+            names.push(output.field_name.to_string());
+        }
+        (iters, names)
+    }
+}
+
+/// Emits a `.zip(...)`-chained iterator over at least two `iters`, with a trailing `.map(...)`
+/// that flattens the right-nested tuple into a flat `(a, b, c, ...)`, plus the matching flat
+/// destructuring pattern. The template's pattern is then a flat tuple, which is easier to read
+/// and gives `rustc` a uniform shape regardless of arity. This keeps the runtime crate
+/// dependency-free: the expansion `itertools::izip!` would produce is materialized here at
+/// codegen time as a plain expression.
+fn zip_flattened(iters: &[String], names: &[String]) -> (String, String) {
+    debug_assert!(iters.len() >= 2);
+    debug_assert_eq!(iters.len(), names.len());
+
+    // Build the zip chain: `iters[0].zip(iters[1]).zip(iters[2])...`.
+    let mut iter_expr = iters[0].clone();
+    for next in &iters[1..] {
+        iter_expr = format!("{iter_expr}.zip({next})");
+    }
+
+    let flat_tuple = format!("({})", names.join(", "));
+
+    // For N >= 3, the chained `.zip(...)` yields a right-nested tuple `((a, b), c)` etc. Add a
+    // `.map(...)` that destructures the nesting back into a flat tuple. For N == 2 the zip output
+    // is already a flat 2-tuple, so we skip the map to keep the emitted code minimal.
+    if iters.len() >= 3 {
+        // Closure input pattern: walk from the innermost zip outward so the pattern matches the
+        // right-nested zip output. Example for 4 iters: `(((a, b), c), d)`.
+        let mut closure_pat = format!("({}, {})", names[0], names[1]);
+        for name in &names[2..] {
+            closure_pat = format!("({closure_pat}, {name})");
+        }
+        iter_expr = format!("{iter_expr}.map(|{closure_pat}| {flat_tuple})");
+    }
+
+    (iter_expr, flat_tuple)
 }
 
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
