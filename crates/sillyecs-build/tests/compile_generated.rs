@@ -1,5 +1,5 @@
 //! Integration test for issue #39: render generated code into a synthetic
-//! fixture crate under the workspace `target/` directory and run `cargo check`
+//! fixture crate under the workspace `target/` directory and run `cargo test`
 //! to make sure the templates produce code that actually compiles. The
 //! existing `build.rs` tests only string-grep the rendered output, so bugs
 //! like #36 (invalid Rust in parameter lists) and #37 (missing trait bound on
@@ -10,11 +10,13 @@
 //! - `user.rs`  - hand-written user-side stubs (component data, system data,
 //!   `Apply<X>System` impls, `WorldCommandQueue` impl, `EntityLocationMap`
 //!   alias).
+//! - `runtime.rs` (optional) - `#[test]`s against the generated world, compiled
+//!   as a `#[cfg(test)]` module so they exercise behavior, not just types.
 //!
 //! The test renders the four template outputs into the fixture crate at
 //! `target/sillyecs-compile-fixtures/<name>/` (a stable workspace path, not a
 //! system tempdir, so cargo's incremental cache survives across runs), then
-//! shells out to `cargo check` against that crate. A non-zero exit prints the
+//! shells out to `cargo test` against that crate. A non-zero exit prints the
 //! captured stderr and leaves the fixture directory on disk for inspection.
 
 use sillyecs_build::EcsCode;
@@ -43,6 +45,7 @@ fn run_fixture(fixture_name: &str) {
     let yaml = fs::read(&yaml_path).unwrap_or_else(|e| panic!("read {}: {e}", yaml_path.display()));
     let user_rs = fs::read_to_string(&user_path)
         .unwrap_or_else(|e| panic!("read {}: {e}", user_path.display()));
+    let runtime_rs = fs::read_to_string(fixture_dir.join("runtime.rs")).unwrap_or_default();
 
     let code = EcsCode::generate(BufReader::new(&yaml[..]))
         .unwrap_or_else(|e| panic!("EcsCode::generate failed for {fixture_name}: {e:?}"));
@@ -59,7 +62,7 @@ fn run_fixture(fixture_name: &str) {
 
     // Wipe the fixture crate before writing it. Silently ignoring a failed
     // deletion would let stale files from a previous run survive into the
-    // next `cargo check`, which could mask a regression by compiling the old
+    // next `cargo test`, which could mask a regression by compiling the old
     // state. Propagate the error so the test fails loudly instead.
     if crate_dir.exists() {
         fs::remove_dir_all(&crate_dir)
@@ -73,13 +76,14 @@ fn run_fixture(fixture_name: &str) {
     fs::write(generated_dir.join("world_gen.rs"), &code.world).unwrap();
 
     fs::write(src_dir.join("user.rs"), &user_rs).unwrap();
+    fs::write(src_dir.join("runtime.rs"), &runtime_rs).unwrap();
     fs::write(src_dir.join("lib.rs"), LIB_RS).unwrap();
     fs::write(crate_dir.join("Cargo.toml"), cargo_toml(fixture_name)).unwrap();
 
     let target_dir = workspace_target.join("sillyecs-compile-fixtures-target");
 
     let output = Command::new(env!("CARGO"))
-        .arg("check")
+        .arg("test")
         .arg("--quiet")
         .arg("--manifest-path")
         .arg(crate_dir.join("Cargo.toml"))
@@ -87,11 +91,11 @@ fn run_fixture(fixture_name: &str) {
         // Inherit RUSTFLAGS / RUSTC etc. from the parent so the fixture builds
         // with the same toolchain the test runner is using.
         .output()
-        .expect("spawn cargo check");
+        .expect("spawn cargo test");
 
     if !output.status.success() {
         panic!(
-            "generated code from fixture `{fixture_name}` failed to compile.\n\
+            "generated code from fixture `{fixture_name}` failed to compile or its runtime tests failed.\n\
              crate at: {}\n\
              --- stdout ---\n{}\n--- stderr ---\n{}",
             crate_dir.display(),
@@ -148,4 +152,7 @@ include!("generated/archetypes_gen.rs");
 include!("generated/systems_gen.rs");
 include!("generated/world_gen.rs");
 include!("user.rs");
+
+#[cfg(test)]
+mod runtime;
 "#;
