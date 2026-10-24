@@ -541,3 +541,14 @@ systems:
         other => panic!("expected DuplicateSystem, got {other:?}"),
     }
 }
+
+/// The `CreateSystem<..>` bounds of `new_with_events` must be joined with `+` once a world
+/// has more than one system; otherwise the generated world does not parse.
+#[test]
+fn create_system_bounds_are_joined() {
+    let file = include_str!("ecs.yaml");
+    let reader = BufReader::new(file.as_bytes());
+    let code = EcsCode::generate(reader).expect("Failed to build ECS");
+    assert!(code.world.contains("+ CreateSystem<"));
+    assert!(!code.world.contains(">CreateSystem<"));
+}
