@@ -196,6 +196,23 @@ impl System {
         self.apply_state_defaults();
         self.finish_dependencies();
 
+        // `lookup` systems are handed the world's entire archetype storage, which borrows every
+        // component column. Model that as a read of every component so the scheduler never puts
+        // them in a parallel group next to a writer.
+        if !self.lookup.is_empty() {
+            let mut components: Vec<&ComponentRef> = archetypes
+                .iter()
+                .flat_map(|archetype| &archetype.components)
+                .collect();
+            components.sort_by(|a, b| a.type_name_raw.cmp(&b.type_name_raw));
+            components.dedup();
+            self.dependencies
+                .extend(components.into_iter().map(|component| Dependency {
+                    resource: Resource::Component(component.clone()),
+                    access: Access::Read,
+                }));
+        }
+
         let mut ids_and_names = Vec::new();
         'archetype: for archetype in archetypes {
             // All inputs must exist in the component.

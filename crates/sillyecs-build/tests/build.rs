@@ -552,3 +552,39 @@ fn create_system_bounds_are_joined() {
     assert!(code.world.contains("+ CreateSystem<"));
     assert!(!code.world.contains(">CreateSystem<"));
 }
+
+/// A `lookup` system is handed the world's entire archetype storage, so it must not share a
+/// parallel group with a system writing any component, even one it never looks up.
+#[test]
+fn lookup_system_does_not_share_a_group_with_writers() {
+    const YAML: &str = r#"
+components:
+  - name: Position
+  - name: Sprite
+archetypes:
+  - name: Particle
+    components: [Position]
+  - name: Decoration
+    components: [Position, Sprite]
+worlds:
+  - name: Main
+    archetypes: [Particle, Decoration]
+phases:
+  - name: Update
+systems:
+  - name: Follow
+    phase: Update
+    inputs: [Position]
+    lookup: [Position]
+    preflight: true
+  - name: Spin
+    phase: Update
+    outputs: [Sprite]
+"#;
+
+    let code = EcsCode::generate(BufReader::new(YAML.as_bytes())).expect("Failed to build ECS");
+    assert!(
+        code.world.contains("// System group 2"),
+        "Follow and Spin must be scheduled into separate groups"
+    );
+}
