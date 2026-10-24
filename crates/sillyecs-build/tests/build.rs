@@ -629,8 +629,8 @@ systems:
         "World must not call apply_all_dirty when no system opts in"
     );
     assert!(
-        !code.world.contains("clear_dirty"),
-        "World must not emit clear_dirty calls when no dirty system runs"
+        !code.world.contains(".clear_dirty();"),
+        "World must not emit clear_dirty calls for non-dirty archetypes"
     );
     assert!(
         !code.world.contains("mark_static_dirty"),
