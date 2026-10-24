@@ -204,7 +204,7 @@ impl System {
                 .iter()
                 .flat_map(|archetype| &archetype.components)
                 .collect();
-            components.sort_by(|a, b| a.type_name_raw.cmp(&b.type_name_raw));
+            components.sort();
             components.dedup();
             self.dependencies
                 .extend(components.into_iter().map(|component| Dependency {
