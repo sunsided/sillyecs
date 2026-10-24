@@ -254,8 +254,8 @@ pub fn schedule_systems(systems: &[System]) -> Result<Vec<Vec<SystemId>>, EcsErr
     // preference gets overruled when the preferences form a cycle.
     let name_key = |&(u, v): &(SystemId, SystemId)| {
         (
-            name_by_id[&u].type_name_raw.clone(),
-            name_by_id[&v].type_name_raw.clone(),
+            name_by_id[&u].type_name_raw.as_str(),
+            name_by_id[&v].type_name_raw.as_str(),
         )
     };
     write_read.sort_by_key(name_key);
