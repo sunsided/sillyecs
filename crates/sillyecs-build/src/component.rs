@@ -79,9 +79,9 @@ impl Component {
         // Scan systems
         let mut ids_and_names = Vec::new();
         for system in systems {
-            if system.inputs.iter().any(|c| c.eq(&self.name)) {
-                ids_and_names.push((system.id, system.name.clone()));
-            } else if system.outputs.iter().any(|c| c.eq(&self.name)) {
+            if system.inputs.iter().any(|c| c.eq(&self.name))
+                || system.outputs.iter().any(|c| c.eq(&self.name))
+            {
                 ids_and_names.push((system.id, system.name.clone()));
             }
         }

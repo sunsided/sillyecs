@@ -252,11 +252,11 @@ impl System {
                 self.component_iter_code = "entities".to_string();
                 self.component_untuple_code = "entity".to_string();
             } else if let Some(output) = self.outputs.first() {
-                self.component_iter_code = format!("{name}", name = output.field_name_plural);
-                self.component_untuple_code = format!("{name}", name = output.field_name);
+                self.component_iter_code = output.field_name_plural.to_string();
+                self.component_untuple_code = output.field_name.to_string();
             } else if let Some(input) = self.inputs.first() {
-                self.component_iter_code = format!("{name}", name = input.field_name_plural);
-                self.component_untuple_code = format!("{name}", name = input.field_name);
+                self.component_iter_code = input.field_name_plural.to_string();
+                self.component_untuple_code = input.field_name.to_string();
             } else {
                 unreachable!();
             }

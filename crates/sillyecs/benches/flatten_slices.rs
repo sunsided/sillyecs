@@ -1,5 +1,6 @@
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
-use rand::Rng;
+use criterion::{Criterion, criterion_group, criterion_main};
+use rand::RngExt;
+use std::hint::black_box;
 
 const NUM_ARCHETYPES: usize = 7;
 const COMPONENTS_PER_ARCHETYPE: usize = 1024;

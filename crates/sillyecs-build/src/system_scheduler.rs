@@ -177,7 +177,7 @@ pub fn schedule_systems(systems: &[System]) -> Result<Vec<Vec<SystemId>>, EcsErr
     for sys in systems {
         graph.entry(sys.id).or_default();
         for pred in &sys.run_after {
-            let p = id_by_name[&pred];
+            let p = id_by_name[pred];
             graph.entry(p).or_default().insert(sys.id);
         }
     }
@@ -399,14 +399,12 @@ mod tests {
 
         let sorted = schedule_systems(&systems).unwrap();
 
-        let mut counter = 0;
         let mut ordered: Vec<(usize, &str)> = vec![];
-        for group in sorted {
+        for (counter, group) in sorted.into_iter().enumerate() {
             for sys in group {
                 let sys = systems.iter().find(|s| s.id == sys).unwrap();
                 ordered.push((counter, &sys.name.type_name_raw));
             }
-            counter += 1;
         }
 
         assert_eq!(
@@ -434,14 +432,12 @@ mod tests {
 
         let sorted = schedule_systems(&systems).unwrap();
 
-        let mut counter = 0;
         let mut ordered: Vec<(usize, &str)> = vec![];
-        for group in sorted {
+        for (counter, group) in sorted.into_iter().enumerate() {
             for sys in group {
                 let sys = systems.iter().find(|s| s.id == sys).unwrap();
                 ordered.push((counter, &sys.name.type_name_raw));
             }
-            counter += 1;
         }
 
         assert_eq!(

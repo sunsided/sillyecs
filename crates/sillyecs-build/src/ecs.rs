@@ -354,7 +354,7 @@ impl Ecs {
                 ));
             }
             for archetype in &world.archetypes_refs {
-                if !self.archetypes.iter().any(|a| a.name.eq(&archetype)) {
+                if !self.archetypes.iter().any(|a| a.name.eq(archetype)) {
                     return Err(EcsError::MissingArchetypeInWorld(
                         archetype.type_name_raw.clone(),
                         world.name.type_name_raw.clone(),

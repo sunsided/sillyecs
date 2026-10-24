@@ -15,6 +15,8 @@ impl EntityId {
     /// # Implementation
     /// This function uses a thread-safe counter with sequential consistency ordering
     /// to ensure unique IDs even under concurrent access.
+    // No `Default`: each call hands out a fresh ID, which a default value should not do.
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         static ENTITY_IDS: AtomicU64 = AtomicU64::new(1);
         let id = ENTITY_IDS.fetch_add(1, core::sync::atomic::Ordering::SeqCst);
