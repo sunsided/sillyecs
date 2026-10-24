@@ -566,7 +566,8 @@ impl {{ archetype.name.type }} {
 
     /// Drop an entity at the specified index. Called by the world upon de-spawning entities.
     ///
-    /// Returns the ID of the entity that was moved into the hole, or [`None`] if the archetype is now empty.
+    /// Returns the ID of the entity that was moved into the hole, or [`None`] if the dropped
+    /// entity was the last one and nothing moved.
     #[doc(hidden)]
     pub fn drop_at_index(&mut self, index: usize) -> Result<Option<::sillyecs::EntityId>, usize> {
         if index >= self.entities.len() {
@@ -582,12 +583,7 @@ impl {{ archetype.name.type }} {
         {%- for consumer in archetype.dirty_consumers %}
         self.dirty_{{ consumer.field }}.swap_remove(index, old_len);
         {%- endfor %}
-        if self.entities.is_empty() {
-            Ok(None)
-        }
-        else {
-            Ok(Some(self.entities[index]))
-        }
+        Ok(self.entities.get(index).copied())
     }
     {%- if archetype.dirty %}
 
