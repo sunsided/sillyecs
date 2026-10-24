@@ -468,14 +468,14 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
     /// different archetype.
     #[allow(dead_code)]
     pub fn mark_{{ archetype.name.field }}_dirty_by_id(&mut self, entity_id: ::sillyecs::EntityId) -> bool {
-        let loc = match self.archetypes.entity_locations.get(&entity_id) {
-            Some(loc) => loc.clone(),
+        let (archetype, index) = match self.archetypes.entity_locations.get(&entity_id) {
+            Some(loc) => (loc.archetype, loc.index),
             None => return false,
         };
-        if loc.archetype != {{ archetype.name.type }}::ID {
+        if archetype != {{ archetype.name.type }}::ID {
             return false;
         }
-        self.archetypes.collection.{{ archetype.name.field }}.mark_dirty(loc.index)
+        self.archetypes.collection.{{ archetype.name.field }}.mark_dirty(index)
     }
 
     /// Marks every entity in the [`{{ archetype.name.type }}`] archetype as dirty.
