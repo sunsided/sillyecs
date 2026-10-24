@@ -573,7 +573,8 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
     pub fn par_apply_system_phases(&mut self)
     where
         E: SystemPhaseEvents,
-        Q: WorldCommandSender + WorldCommandReceiver,
+        // Systems spawned onto the Rayon pool share `&self.command_queue`.
+        Q: WorldCommandSender + WorldCommandReceiver + Sync,
         Self: WorldUserCommandHandler<UserCommand = <Q as WorldUserCommand>::UserCommand>,
     {
         self.on_begin_frame();
@@ -938,7 +939,8 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
     fn par_apply_system_phase_{{ phase.name.field }}(&mut self)
     where
         E: SystemPhaseEvents,
-        Q: WorldCommandSender + WorldCommandReceiver,
+        // Systems spawned onto the Rayon pool share `&self.command_queue`.
+        Q: WorldCommandSender + WorldCommandReceiver + Sync,
         Self: WorldUserCommandHandler<UserCommand = <Q as WorldUserCommand>::UserCommand>,
     {
         self.on_begin_{{ phase.name.field }}_phase();
