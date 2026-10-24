@@ -59,11 +59,10 @@ where
 
     let field_name = field_name.as_ref();
 
-    if field_name.ends_with('y') {
-        if field_name.len() >= 2 {
-            let before_y = field_name.chars().nth_back(1).unwrap();
+    if let Some(stem) = field_name.strip_suffix('y') {
+        if let Some(before_y) = stem.chars().last() {
             if !"aeiou".contains(before_y) {
-                return format!("{}ies", &field_name[..field_name.len() - 1]);
+                return format!("{stem}ies");
             }
         }
         return format!("{field_name}s");
@@ -101,7 +100,7 @@ pub(crate) fn doc_lines_filter(value: String) -> String {
 }
 
 fn pascal_to_snake(type_name: &str) -> String {
-    let field_name = type_name
+    type_name
         .chars()
         .flat_map(|c| {
             if c.is_uppercase() {
@@ -111,8 +110,7 @@ fn pascal_to_snake(type_name: &str) -> String {
             }
         })
         .skip_while(|&c| c == '_')
-        .collect::<String>();
-    field_name
+        .collect::<String>()
 }
 
 #[cfg(test)]
@@ -132,7 +130,7 @@ mod tests {
         ];
 
         for (input, expected) in cases {
-            assert_eq!(pascal_to_snake(&input.to_string()), expected);
+            assert_eq!(pascal_to_snake(input), expected);
         }
     }
 

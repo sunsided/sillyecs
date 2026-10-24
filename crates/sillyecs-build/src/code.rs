@@ -73,7 +73,6 @@ impl EcsCode {
             archetypes: archetype_code,
             world: world_code,
             systems: system_code,
-            ..EcsCode::default()
         })
     }
 
