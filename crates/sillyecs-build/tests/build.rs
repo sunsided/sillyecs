@@ -507,11 +507,10 @@ systems:
 }
 
 /// Issue #2: a system with `iteration: dirty` triggers dirty-tracking codegen for every
-/// archetype it touches. The archetype emits a `dirty_indices` field plus `mark_dirty` /
-/// `clear_dirty` / `collect_dirty_sorted` helpers; the system trait gains `apply_many_dirty`
-/// (default forwards each dirty index to `apply_single`) and `apply_all_dirty`; the world
-/// emits `mark_<archetype>_dirty*` helpers and clears the dirty set at the end of every
-/// phase that contains a dirty-iteration system.
+/// archetype it touches. The archetype emits one dirty set per consuming system plus
+/// `mark_dirty` / `clear_dirty` helpers; the system trait gains `apply_many_dirty` (default
+/// forwards each dirty index to `apply_single`) and `apply_all_dirty`; the world emits
+/// `mark_<archetype>_dirty*` helpers and clears a system's own set right after it ran.
 #[test]
 fn dirty_iteration_system_emits_full_codegen() {
     const YAML: &str = r#"
@@ -539,8 +538,8 @@ systems:
     // Archetype gains dirty storage + helpers.
     assert!(
         code.archetypes
-            .contains("pub dirty_indices: ::std::collections::HashSet<usize>"),
-        "ParticleArchetype must declare a dirty_indices HashSet"
+            .contains("pub dirty_move: ::sillyecs::DirtySet,"),
+        "ParticleArchetype must declare a dirty set for MoveSystem"
     );
     assert!(
         code.archetypes.contains("pub fn mark_dirty("),
@@ -549,10 +548,6 @@ systems:
     assert!(
         code.archetypes.contains("pub fn clear_dirty("),
         "ParticleArchetype must expose clear_dirty"
-    );
-    assert!(
-        code.archetypes.contains("pub fn collect_dirty_sorted("),
-        "ParticleArchetype must expose collect_dirty_sorted for world dispatch"
     );
 
     // System trait + newtype gain dirty entry points.
@@ -569,15 +564,20 @@ systems:
         "Default apply_many_dirty must iterate the dirty index slice"
     );
 
-    // World dispatches via apply_all_dirty + clears at end of phase + offers mark helpers.
+    // World dispatches via apply_all_dirty, clears the system's own set, offers mark helpers.
     assert!(
         code.world.contains(".apply_all_dirty("),
         "World must dispatch dirty-iteration systems via apply_all_dirty"
     );
     assert!(
         code.world
-            .contains("self.archetypes.collection.particle.clear_dirty();"),
-        "World must clear the dirty set of every touched archetype at end of phase"
+            .contains("self.archetypes.collection.particle.dirty_move.sorted(),"),
+        "World must hand MoveSystem its own sorted dirty set"
+    );
+    assert!(
+        code.world
+            .contains("self.archetypes.collection.particle.dirty_move.clear();"),
+        "World must clear MoveSystem's dirty set after it ran"
     );
     assert!(
         code.world.contains("pub fn mark_particle_dirty("),
@@ -594,7 +594,7 @@ systems:
 }
 
 /// An archetype not referenced by any dirty system must not pay the dirty-tracking codegen
-/// tax (no `dirty_indices` field, no `mark_dirty` method, no clear at end of phase).
+/// tax (no dirty set, no `mark_dirty` method, no clear after the system ran).
 #[test]
 fn non_dirty_archetype_emits_no_dirty_codegen() {
     const YAML: &str = r#"
@@ -617,8 +617,8 @@ systems:
     let code = EcsCode::generate(BufReader::new(YAML.as_bytes())).expect("Failed to build ECS");
 
     assert!(
-        !code.archetypes.contains("dirty_indices"),
-        "Non-dirty archetypes must not carry dirty_indices storage"
+        !code.archetypes.contains("DirtySet"),
+        "Non-dirty archetypes must not carry dirty storage"
     );
     assert!(
         !code.systems.contains("apply_many_dirty"),
@@ -663,21 +663,20 @@ systems:
     let code = EcsCode::generate(BufReader::new(YAML.as_bytes())).expect("Failed to build ECS");
 
     assert!(
-        code.archetypes
-            .contains("pub dirty_indices: ::std::collections::HashSet<usize>"),
-        "Explicit dirty: true must emit dirty_indices storage even without a dirty system"
+        code.archetypes.contains("pub fn mark_dirty("),
+        "Explicit dirty: true must emit the archetype's dirty API even without a dirty system"
+    );
+    assert!(
+        !code.archetypes.contains("DirtySet"),
+        "Without a dirty system there is no consumer, so no dirty set is stored"
     );
     assert!(
         code.world.contains("pub fn mark_particle_dirty("),
         "Explicit dirty: true must still emit world-side helpers"
     );
-    // No system opted into dirty iteration, so the world must not emit the end-of-phase
-    // clear block (the per-archetype helper that *the user* may call still exists).
     assert!(
-        !code.world.contains(
-            "// Clear the dirty sets of archetypes touched by any dirty-iteration system"
-        ),
-        "Without a dirty system, the world must not auto-clear the archetype's dirty set at end of phase"
+        !code.world.contains("apply_all_dirty"),
+        "Without a dirty system, the world must not dispatch dirty iteration"
     );
 }
 
@@ -804,4 +803,72 @@ systems:
         code.world.contains("// System group 2"),
         "Follow and Spin must be scheduled into separate groups"
     );
+}
+
+/// Every dirty consumer owns a dirty set per archetype and clears only that set, right after its
+/// own `apply_all_dirty` call inside the "system ran" branch. Previously one shared set per
+/// archetype was cleared at the end of every phase containing a dirty system: a skipped system
+/// lost its marks, a later consumer of the same archetype never saw them, and archetypes outside
+/// the world were dispatched but never cleared.
+#[test]
+fn dirty_sets_are_consumed_per_system() {
+    const YAML: &str = r#"
+components:
+  - name: Position
+  - name: Health
+archetypes:
+  - name: Particle
+    components: [Position]
+  - name: Debris
+    components: [Position, Health]
+worlds:
+  - name: Main
+    archetypes: [Particle]
+phases:
+  - name: Early
+  - name: Late
+systems:
+  - name: Track
+    phase: Early
+    iteration: dirty
+    inputs: [Position]
+  - name: Settle
+    phase: Late
+    iteration: dirty
+    inputs: [Position]
+"#;
+
+    let code = EcsCode::generate(BufReader::new(YAML.as_bytes())).expect("Failed to build ECS");
+
+    for field in ["dirty_settle", "dirty_track"] {
+        assert!(
+            code.archetypes
+                .contains(&format!("pub {field}: ::sillyecs::DirtySet,")),
+            "each consumer must own a dirty set: {field}"
+        );
+    }
+
+    for (system, archetype) in [
+        ("Track", "particle"),
+        ("Track", "debris"),
+        ("Settle", "particle"),
+    ] {
+        let field = format!("dirty_{}", system.to_lowercase());
+        let clear = format!("self.archetypes.collection.{archetype}.{field}.clear();");
+        let apply = format!("// Apply {system}System to all archetypes");
+        let mut found = 0;
+        for (at, _) in code.world.match_indices(&clear) {
+            let before = &code.world[..at];
+            let apply_at = before
+                .rfind(&apply)
+                .unwrap_or_else(|| panic!("{clear} must follow {system}'s dispatch"));
+            let between = &before[apply_at..];
+            assert!(
+                !between.contains("on_end_phase(") && !between.contains("// System group"),
+                "{clear} must sit right after {system}'s own dispatch, not at phase end"
+            );
+            found += 1;
+        }
+        assert!(found > 0, "missing {clear}");
+    }
 }

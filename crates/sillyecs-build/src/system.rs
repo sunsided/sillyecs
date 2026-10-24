@@ -24,9 +24,9 @@ pub enum SystemIteration {
     /// Iterate every entity of every affected archetype.
     #[default]
     All,
-    /// Iterate only the dirty entities tracked by each affected archetype. Archetypes touched
-    /// by a `Dirty` system are automatically marked as dirty-tracking during ECS finalization,
-    /// and the dirty set is cleared at the end of each phase that contains a dirty system.
+    /// Iterate only the entities marked dirty since this system last ran. Each affected
+    /// archetype keeps one dirty set per such system; marking an entity adds it to all of them,
+    /// and a system clears only its own set, right after it ran.
     Dirty,
 }
 
@@ -76,8 +76,8 @@ pub struct System {
     /// How the system iterates its affected archetypes' entities.
     #[serde(default)]
     pub iteration: SystemIteration,
-    /// Convenience flag mirroring `iteration == SystemIteration::Dirty`. Computed during
-    /// deserialization-time defaulting; exposed to templates so they can branch without
+    /// Convenience flag mirroring `iteration == SystemIteration::Dirty`. Available after a call
+    /// to [`System::finish`](System::finish); exposed to templates so they can branch without
     /// learning the enum representation.
     #[serde(default, skip_deserializing)]
     pub iteration_dirty: bool,

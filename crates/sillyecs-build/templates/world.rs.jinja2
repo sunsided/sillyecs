@@ -839,15 +839,10 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
             // Systems
             {
                 {%- if system.iteration_dirty %}
-                // Materialize the dirty-index slice per archetype. Allocation lives on the
-                // stack frame above the borrows so the `&[usize]` references remain valid for
-                // the duration of the `apply_all_dirty` call.
-                {%- for archetype in system.affected_archetypes %}
-                let dirty_{{ loop.index0 }} = self.archetypes.collection.{{ archetype.field }}.collect_dirty_sorted();
-                {%- endfor %}
+                // Each dirty system owns its dirty set, so this borrows only that field.
                 let dirty_indices: [&[usize]; {{ system.affected_archetypes | length }}] = [
                     {%- for archetype in system.affected_archetypes %}
-                    dirty_{{ loop.index0 }}.as_slice(),
+                    self.archetypes.collection.{{ archetype.field }}.dirty_{{ system.name.field }}.sorted(),
                     {%- endfor %}
                 ];
                 {%- endif %}
@@ -911,6 +906,13 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                     {%- endif %}
                 );
             }
+            {%- if system.iteration_dirty %}
+
+            // {{ system.name.type }} consumed its dirty entities.
+            {%- for archetype in system.affected_archetypes %}
+            self.archetypes.collection.{{ archetype.field }}.dirty_{{ system.name.field }}.clear();
+            {%- endfor %}
+            {%- endif %}
 
             // Postflight
             {
@@ -976,13 +978,6 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
             .ok();
         }
         {%- endfor %}
-        {%- endfor %}
-        {%- endif %}
-        {%- if world.dirty_archetypes_per_phase[phase.name] %}
-
-        // Clear the dirty sets of archetypes touched by any dirty-iteration system in this phase.
-        {%- for archetype in world.dirty_archetypes_per_phase[phase.name] %}
-        self.archetypes.collection.{{ archetype.field }}.clear_dirty();
         {%- endfor %}
         {%- endif %}
 
@@ -1134,12 +1129,10 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                         // Systems
                         {
                             {%- if system.iteration_dirty %}
-                            {%- for archetype in system.affected_archetypes %}
-                            let dirty_{{ loop.index0 }} = self.archetypes.collection.{{ archetype.field }}.collect_dirty_sorted();
-                            {%- endfor %}
+                            // Each dirty system owns its dirty set, so this borrows only that field.
                             let dirty_indices: [&[usize]; {{ system.affected_archetypes | length }}] = [
                                 {%- for archetype in system.affected_archetypes %}
-                                dirty_{{ loop.index0 }}.as_slice(),
+                                self.archetypes.collection.{{ archetype.field }}.dirty_{{ system.name.field }}.sorted(),
                                 {%- endfor %}
                             ];
                             {%- endif %}
@@ -1203,6 +1196,13 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                                 {%- endif %}
                             );
                         }
+                        {%- if system.iteration_dirty %}
+
+                        // {{ system.name.type }} consumed its dirty entities.
+                        {%- for archetype in system.affected_archetypes %}
+                        self.archetypes.collection.{{ archetype.field }}.dirty_{{ system.name.field }}.clear();
+                        {%- endfor %}
+                        {%- endif %}
 
                         // Postflight
                         {
@@ -1296,13 +1296,6 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
         )
         .inspect_err(|error| tracing::error!(%error, "Failed to handle phase end events"))
         .ok();
-        {%- if world.dirty_archetypes_per_phase[phase.name] %}
-
-        // Clear the dirty sets of archetypes touched by any dirty-iteration system in this phase.
-        {%- for archetype in world.dirty_archetypes_per_phase[phase.name] %}
-        self.archetypes.collection.{{ archetype.field }}.clear_dirty();
-        {%- endfor %}
-        {%- endif %}
 
         // Process all commands.
         self.handle_commands();

@@ -1,7 +1,7 @@
-use crate::archetype::{Archetype, ArchetypeId};
+use crate::archetype::{Archetype, ArchetypeId, ArchetypeName};
 use crate::component::{Component, ComponentId};
 use crate::state::State;
-use crate::system::{System, SystemId, SystemIteration, SystemPhase};
+use crate::system::{System, SystemId, SystemName, SystemPhase};
 use crate::view::View;
 use crate::world::{World, WorldId};
 use serde::{Deserialize, Serialize};
@@ -49,19 +49,38 @@ impl Ecs {
             system.finish(&self.archetypes);
         }
 
-        // Infer dirty-tracking archetypes from systems that opted into dirty iteration. An
-        // explicit `dirty: true` on the archetype is preserved; inference only flips additional
-        // archetypes from `false` to `true`. Must run after `System::finish` populates
-        // `affected_archetype_ids` and before `World::finish` clones archetypes into worlds.
-        let dirty_archetype_ids: HashSet<ArchetypeId> = self
-            .systems
+        // Collect the dirty consumers of every archetype; an archetype with at least one is
+        // dirty-tracking. An explicit `dirty: true` is preserved. Must run after `System::finish`
+        // populates `affected_archetype_ids` and before `World::finish` clones archetypes into
+        // worlds.
+        let mut dirty_systems: Vec<&System> =
+            self.systems.iter().filter(|s| s.iteration_dirty).collect();
+        dirty_systems.sort_by(|a, b| a.name.cmp(&b.name));
+        for archetype in &mut self.archetypes {
+            archetype.dirty_consumers = dirty_systems
+                .iter()
+                .filter(|s| s.affected_archetype_ids.contains(&archetype.id))
+                .map(|s| s.name.clone())
+                .collect();
+            archetype.dirty |= !archetype.dirty_consumers.is_empty();
+        }
+
+        // An in-place promotion keeps entity indices, so a dirty set carries over whenever the
+        // same system consumes both archetypes; the target's other sets start out empty.
+        let consumers_by_name: HashMap<ArchetypeName, Vec<SystemName>> = self
+            .archetypes
             .iter()
-            .filter(|s| matches!(s.iteration, SystemIteration::Dirty))
-            .flat_map(|s| s.affected_archetype_ids.iter().copied())
+            .map(|a| (a.name.clone(), a.dirty_consumers.clone()))
             .collect();
         for archetype in &mut self.archetypes {
-            if dirty_archetype_ids.contains(&archetype.id) {
-                archetype.dirty = true;
+            let source = &archetype.dirty_consumers;
+            for promotion in &mut archetype.promotion_infos {
+                let (pass, reset) = consumers_by_name[&promotion.target]
+                    .iter()
+                    .cloned()
+                    .partition(|name| source.contains(name));
+                promotion.dirty_to_pass = pass;
+                promotion.dirty_to_reset = reset;
             }
         }
 

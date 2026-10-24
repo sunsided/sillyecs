@@ -204,12 +204,11 @@ pub struct {{ archetype.name.type }} {
     {%- for component_name in archetype.components %}
     pub {{ component_name.fields }}: Vec<{{ component_name.type }}>,
     {%- endfor %}
-    {%- if archetype.dirty %}
-    /// Indices of dirty entities. Membership is rewired automatically on swap/drop. The set is
-    /// cleared at the end of any phase that runs a system with `iteration: dirty` against this
-    /// archetype.
-    pub dirty_indices: ::std::collections::HashSet<usize>,
-    {%- endif %}
+    {%- for consumer in archetype.dirty_consumers %}
+    /// Entities marked dirty since [`{{ consumer.type }}`] last ran. Membership is rewired
+    /// automatically on swap/drop; the system clears the set right after it ran.
+    pub dirty_{{ consumer.field }}: ::sillyecs::DirtySet,
+    {%- endfor %}
 }
 
 /// An entity of the [`{{ archetype.name.type }}`].
@@ -570,27 +569,19 @@ impl {{ archetype.name.type }} {
     /// Returns the ID of the entity that was moved into the hole, or [`None`] if the archetype is now empty.
     #[doc(hidden)]
     pub fn drop_at_index(&mut self, index: usize) -> Result<Option<::sillyecs::EntityId>, usize> {
-        if index > self.entities.len() {
+        if index >= self.entities.len() {
             return Err(index);
         }
-        {%- if archetype.dirty %}
+        {%- if archetype.dirty_consumers %}
         let old_len = self.entities.len();
         {%- endif %}
         self.entities.swap_remove(index);
         {%- for component_name in archetype.components %}
         self.{{ component_name.fields }}.swap_remove(index);
         {%- endfor %}
-        {%- if archetype.dirty %}
-        // Rewire dirty membership: the entry at `index` is gone; if the previous last entry was
-        // dirty and got swapped into `index`, transfer its dirty bit.
-        self.dirty_indices.remove(&index);
-        if old_len > 1 {
-            let last = old_len - 1;
-            if last != index && self.dirty_indices.remove(&last) {
-                self.dirty_indices.insert(index);
-            }
-        }
-        {%- endif %}
+        {%- for consumer in archetype.dirty_consumers %}
+        self.dirty_{{ consumer.field }}.swap_remove(index, old_len);
+        {%- endfor %}
         if self.entities.is_empty() {
             Ok(None)
         }
@@ -600,54 +591,52 @@ impl {{ archetype.name.type }} {
     }
     {%- if archetype.dirty %}
 
-    /// Marks the entity at `index` as dirty. No-op if `index` is out of bounds.
+    /// Marks the entity at `index` as dirty for every `iteration: dirty` system affecting this
+    /// archetype. Returns `false` if `index` is out of bounds.
+    {%- if not archetype.dirty_consumers %}
+    ///
+    /// No system consumes dirty entities of this archetype yet, so the mark is not recorded.
+    {%- endif %}
     #[allow(dead_code)]
     pub fn mark_dirty(&mut self, index: usize) -> bool {
         if index >= self.entities.len() {
             return false;
         }
-        self.dirty_indices.insert(index);
+        {%- for consumer in archetype.dirty_consumers %}
+        self.dirty_{{ consumer.field }}.mark(index);
+        {%- endfor %}
         true
     }
 
     /// Marks every entity in this archetype as dirty.
     #[allow(dead_code)]
     pub fn mark_all_dirty(&mut self) {
-        self.dirty_indices.clear();
-        self.dirty_indices.reserve(self.entities.len());
-        for idx in 0..self.entities.len() {
-            self.dirty_indices.insert(idx);
-        }
+        {%- for consumer in archetype.dirty_consumers %}
+        self.dirty_{{ consumer.field }}.mark_all(self.entities.len());
+        {%- endfor %}
     }
 
-    /// Clears the dirty set without touching any entity data.
+    /// Clears every dirty set without touching any entity data.
     #[allow(dead_code)]
     #[inline]
     pub fn clear_dirty(&mut self) {
-        self.dirty_indices.clear();
+        {%- for consumer in archetype.dirty_consumers %}
+        self.dirty_{{ consumer.field }}.clear();
+        {%- endfor %}
     }
 
-    /// Whether the entity at `index` is currently flagged dirty.
+    /// Whether the entity at `index` is still pending for any `iteration: dirty` system.
     #[allow(dead_code)]
     #[inline]
     pub fn is_dirty(&self, index: usize) -> bool {
-        self.dirty_indices.contains(&index)
-    }
-
-    /// The number of dirty entities currently tracked.
-    #[allow(dead_code)]
-    #[inline]
-    pub fn dirty_count(&self) -> usize {
-        self.dirty_indices.len()
-    }
-
-    /// Collects the dirty indices into a sorted `Vec`. Allocates per call; intended for
-    /// the per-phase dispatch the world emits for dirty systems.
-    #[doc(hidden)]
-    pub fn collect_dirty_sorted(&self) -> Vec<usize> {
-        let mut out: Vec<usize> = self.dirty_indices.iter().copied().collect();
-        out.sort_unstable();
-        out
+        {%- if archetype.dirty_consumers %}
+        {%- for consumer in archetype.dirty_consumers %}
+        {% if not loop.first %}|| {% endif %}self.dirty_{{ consumer.field }}.contains(index)
+        {%- endfor %}
+        {%- else %}
+        let _ = index;
+        false
+        {%- endif %}
     }
     {%- endif %}
     {%- for promotion in archetype.promotion_infos %}
@@ -672,6 +661,12 @@ impl {{ archetype.name.type }} {
             {%- endfor %}
             {%- for field in promotion.components_to_pass %}
             {{ field.fields }}: self.{{ field.fields }},
+            {%- endfor %}
+            {%- for consumer in promotion.dirty_to_pass %}
+            dirty_{{ consumer.field }}: self.dirty_{{ consumer.field }},
+            {%- endfor %}
+            {%- for consumer in promotion.dirty_to_reset %}
+            dirty_{{ consumer.field }}: ::sillyecs::DirtySet::default(),
             {%- endfor %}
         }
     }
@@ -949,21 +944,9 @@ impl FrontloadEntities for {{ archetype.name.type }} {
         {%- for component in archetype.components %}
         self.{{ component.fields }}.swap(first, second);
         {%- endfor %}
-        {%- if archetype.dirty %}
-        if first != second {
-            let first_dirty = self.dirty_indices.contains(&first);
-            let second_dirty = self.dirty_indices.contains(&second);
-            if first_dirty != second_dirty {
-                if first_dirty {
-                    self.dirty_indices.remove(&first);
-                    self.dirty_indices.insert(second);
-                } else {
-                    self.dirty_indices.remove(&second);
-                    self.dirty_indices.insert(first);
-                }
-            }
-        }
-        {%- endif %}
+        {%- for consumer in archetype.dirty_consumers %}
+        self.dirty_{{ consumer.field }}.swap(first, second);
+        {%- endfor %}
     }
 }
 

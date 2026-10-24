@@ -8,6 +8,9 @@
 #   - at least one fixed-step phase (`FixedUpdate`)
 #   - parallel phases: `FixedUpdate` splits a `lookup` system and a writer into two
 #     groups, `Update` schedules one group of two systems, one of them emitting commands
+#   - dirty iteration: `Survey` shares a parallel group with `Tint` on `Decoration`, and
+#     the `Particle -> LivingParticle` promotion carries `Survey`'s dirty set and starts
+#     `Recover`'s empty
 
 allow_unsafe: false
 
@@ -94,3 +97,13 @@ systems:
     entities: true
     iteration: dirty
     outputs: [Sprite]
+
+  - name: Survey
+    phase: Update
+    iteration: dirty
+    inputs: [Position]
+
+  - name: Recover
+    phase: Update
+    iteration: dirty
+    inputs: [Health]

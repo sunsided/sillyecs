@@ -62,6 +62,12 @@ pub struct TintSystemData;
 #[derive(Debug, Default)]
 pub struct TouchDecorationsSystemData;
 
+#[derive(Debug, Default)]
+pub struct SurveySystemData;
+
+#[derive(Debug, Default)]
+pub struct RecoverSystemData;
+
 impl Default for StepSystem {
     fn default() -> Self {
         Self(StepSystemData)
@@ -95,6 +101,18 @@ impl Default for TintSystem {
 impl Default for TouchDecorationsSystem {
     fn default() -> Self {
         Self(TouchDecorationsSystemData)
+    }
+}
+
+impl Default for SurveySystem {
+    fn default() -> Self {
+        Self(SurveySystemData)
+    }
+}
+
+impl Default for RecoverSystem {
+    fn default() -> Self {
+        Self(RecoverSystemData)
     }
 }
 
@@ -135,6 +153,18 @@ impl CreateSystem<TintSystem> for SystemFactory {
 impl CreateSystem<TouchDecorationsSystem> for SystemFactory {
     fn create(&self) -> TouchDecorationsSystem {
         TouchDecorationsSystem::default()
+    }
+}
+
+impl CreateSystem<SurveySystem> for SystemFactory {
+    fn create(&self) -> SurveySystem {
+        SurveySystem::default()
+    }
+}
+
+impl CreateSystem<RecoverSystem> for SystemFactory {
+    fn create(&self) -> RecoverSystem {
+        RecoverSystem::default()
     }
 }
 
@@ -185,6 +215,14 @@ impl ApplyTintSystem for TintSystem {
 // implementations of `apply_single`, `apply_many_dirty`, and `apply_all_dirty`. The default
 // `apply_many_dirty` walks the dirty index slice and forwards each entry to `apply_single`.
 impl ApplyTouchDecorationsSystem for TouchDecorationsSystem {
+    type Error = Infallible;
+}
+
+impl ApplySurveySystem for SurveySystem {
+    type Error = Infallible;
+}
+
+impl ApplyRecoverSystem for RecoverSystem {
     type Error = Infallible;
 }
 
