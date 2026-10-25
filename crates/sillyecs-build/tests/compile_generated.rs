@@ -32,6 +32,9 @@ const FIXTURE_ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures"
 /// manifest dir so the test works no matter where `cargo` is invoked from.
 const SILLYECS_RUNTIME_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../sillyecs");
 
+/// Path to this build crate, a `build-dependencies` entry of the [`Layout::Macro`] fixture crate.
+const SILLYECS_BUILD_PATH: &str = env!("CARGO_MANIFEST_DIR");
+
 /// Marks the start of a fixture's `paths:` block; [`Layout::BareNames`] drops everything from here.
 const PATHS_MARKER: &str = "# --- paths";
 
@@ -47,6 +50,9 @@ enum Layout {
     /// names, and the generated module glob-imports them (the setup before `paths` existed). The
     /// module is private, so `dead_code` sees every generated item the fixture leaves unused.
     BareNames,
+    /// The fixture crate generates its code in a `build.rs`, like a game, and includes it with
+    /// `sillyecs::include_ecs!()` (a public `ecs` module), using the YAML's `paths` block.
+    Macro,
 }
 
 #[test]
@@ -57,6 +63,11 @@ fn full_coverage_fixture_compiles() {
 #[test]
 fn full_coverage_fixture_compiles_with_bare_names() {
     run_fixture("full_coverage", Layout::BareNames);
+}
+
+#[test]
+fn full_coverage_fixture_compiles_with_include_macro() {
+    run_fixture("full_coverage", Layout::Macro);
 }
 
 fn run_fixture(fixture_name: &str, layout: Layout) {
@@ -73,7 +84,12 @@ fn run_fixture(fixture_name: &str, layout: Layout) {
         Layout::Paths => (
             &yaml[..],
             fixture_name.to_string(),
-            "/// The generated ECS.\npub mod ecs {\n",
+            format!("/// The generated ECS.\npub mod ecs {{\n{INCLUDES}}}"),
+        ),
+        Layout::Macro => (
+            &yaml[..],
+            format!("{fixture_name}_include_macro"),
+            "sillyecs::include_ecs!();".to_string(),
         ),
         Layout::BareNames => {
             let text = std::str::from_utf8(&yaml).expect("fixture YAML is UTF-8");
@@ -83,7 +99,9 @@ fn run_fixture(fixture_name: &str, layout: Layout) {
             (
                 &yaml[..end],
                 format!("{fixture_name}_bare_names"),
-                "mod ecs {\n    #[allow(clippy::wildcard_imports)]\n    use crate::user::*;\n",
+                format!(
+                    "mod ecs {{\n    #[allow(clippy::wildcard_imports)]\n    use crate::user::*;\n{INCLUDES}}}"
+                ),
             )
         }
     };
@@ -111,19 +129,29 @@ fn run_fixture(fixture_name: &str, layout: Layout) {
     }
     fs::create_dir_all(&generated_dir).expect("create fixture crate dir");
 
-    fs::write(generated_dir.join("components_gen.rs"), &code.components).unwrap();
-    fs::write(generated_dir.join("archetypes_gen.rs"), &code.archetypes).unwrap();
-    fs::write(generated_dir.join("systems_gen.rs"), &code.systems).unwrap();
-    fs::write(generated_dir.join("world_gen.rs"), &code.world).unwrap();
+    if let Layout::Macro = layout {
+        // Leave generation to the fixture's own `build.rs`, so `include_ecs!` reads `OUT_DIR`.
+        fs::write(crate_dir.join("ecs.yaml"), yaml).unwrap();
+        fs::write(crate_dir.join("build.rs"), BUILD_RS).unwrap();
+    } else {
+        fs::write(generated_dir.join("components_gen.rs"), &code.components).unwrap();
+        fs::write(generated_dir.join("archetypes_gen.rs"), &code.archetypes).unwrap();
+        fs::write(generated_dir.join("systems_gen.rs"), &code.systems).unwrap();
+        fs::write(generated_dir.join("world_gen.rs"), &code.world).unwrap();
+    }
 
     fs::write(src_dir.join("user.rs"), &user_rs).unwrap();
     fs::write(src_dir.join("runtime.rs"), &runtime_rs).unwrap();
     fs::write(
         src_dir.join("lib.rs"),
-        LIB_RS.replace("mod ecs {\n", ecs_module),
+        LIB_RS.replace("// ECS_MODULE\n", &format!("{ecs_module}\n")),
     )
     .unwrap();
-    fs::write(crate_dir.join("Cargo.toml"), cargo_toml(&crate_name)).unwrap();
+    fs::write(
+        crate_dir.join("Cargo.toml"),
+        cargo_toml(&crate_name, matches!(layout, Layout::Macro)),
+    )
+    .unwrap();
 
     let target_dir = workspace_target.join("sillyecs-compile-fixtures-target");
 
@@ -174,7 +202,15 @@ fn workspace_target_dir() -> PathBuf {
         .join("target")
 }
 
-fn cargo_toml(fixture_name: &str) -> String {
+fn cargo_toml(fixture_name: &str, with_build_script: bool) -> String {
+    let build_dependencies = if with_build_script {
+        format!(
+            "\n[build-dependencies]\nsillyecs-build = {{ path = \"{}\" }}\n",
+            SILLYECS_BUILD_PATH.replace('\\', "/")
+        )
+    } else {
+        String::new()
+    };
     format!(
         r#"[package]
 name = "sillyecs-compile-fixture-{fixture_name}"
@@ -187,13 +223,34 @@ path = "src/lib.rs"
 
 [dependencies]
 sillyecs = {{ path = "{path}" }}
-
+{build_dependencies}
 [workspace]
 "#,
         fixture_name = fixture_name,
         path = SILLYECS_RUNTIME_PATH.replace('\\', "/"),
     )
 }
+
+/// The `include!`s of the four-file layouts.
+const INCLUDES: &str = r#"    include!("generated/components_gen.rs");
+    include!("generated/archetypes_gen.rs");
+    include!("generated/systems_gen.rs");
+    include!("generated/world_gen.rs");
+"#;
+
+/// The [`Layout::Macro`] fixture crate's build script, as a game would write it.
+const BUILD_RS: &str = r#"use std::fs::File;
+use std::io::BufReader;
+
+fn main() {
+    println!("cargo:rerun-if-changed=ecs.yaml");
+    let file = File::open("ecs.yaml").expect("open ecs.yaml");
+    sillyecs_build::EcsCode::generate(BufReader::new(file))
+        .expect("generate ECS")
+        .write_files()
+        .expect("write ECS files");
+}
+"#;
 
 const LIB_RS: &str = r#"//! Auto-generated fixture crate. See `compile_generated.rs` in `sillyecs-build`.
 //!
@@ -209,12 +266,7 @@ const LIB_RS: &str = r#"//! Auto-generated fixture crate. See `compile_generated
     clippy::pedantic
 )]
 
-mod ecs {
-    include!("generated/components_gen.rs");
-    include!("generated/archetypes_gen.rs");
-    include!("generated/systems_gen.rs");
-    include!("generated/world_gen.rs");
-}
+// ECS_MODULE
 
 #[allow(
     dead_code,

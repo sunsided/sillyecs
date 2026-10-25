@@ -35,3 +35,35 @@ pub use tracing;
 pub use std::time::Instant;
 #[cfg(feature = "wasm")]
 pub use web_time::Instant;
+
+/// Includes the ECS that `sillyecs-build` generated into `OUT_DIR` as a module.
+///
+/// Without arguments, this declares `pub mod ecs`. Pass a module declaration to choose the name,
+/// the visibility and attributes such as docs:
+///
+/// ```ignore
+/// sillyecs::include_ecs!();
+///
+/// sillyecs::include_ecs!(
+///     /// The game's ECS.
+///     pub(crate) mod engine
+/// );
+/// ```
+///
+/// The generated items carry their own lint allows, so the module needs none. User types without
+/// a `paths` entry in `ecs.yaml` are looked up in the parent module of the include site.
+#[macro_export]
+macro_rules! include_ecs {
+    () => {
+        $crate::include_ecs!(
+            /// The generated ECS.
+            pub mod ecs
+        );
+    };
+    ($(#[$attr:meta])* $vis:vis mod $name:ident) => {
+        $(#[$attr])*
+        $vis mod $name {
+            include!(concat!(env!("OUT_DIR"), "/ecs_gen.rs"));
+        }
+    };
+}

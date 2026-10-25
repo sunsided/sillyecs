@@ -244,21 +244,40 @@ paths:
   entity_location_map: fxhash::FxHashMap  # defaults to ::std::collections::HashMap
 ```
 
-Include the compile-time generated files into a module of their own:
+Include the generated code as a module:
 
 ```rust
-// src/ecs.rs
-include!(concat!(env!("OUT_DIR"), "/components_gen.rs"));
-include!(concat!(env!("OUT_DIR"), "/archetypes_gen.rs"));
-include!(concat!(env!("OUT_DIR"), "/systems_gen.rs"));
-include!(concat!(env!("OUT_DIR"), "/world_gen.rs"));
+// src/main.rs or src/lib.rs
+sillyecs::include_ecs!(); // declares `pub mod ecs`
+
+// or choose the name, visibility and docs:
+sillyecs::include_ecs!(
+    /// The game's ECS.
+    pub(crate) mod engine
+);
 ```
 
 The generated code refers to your component data, states and system data. With `paths` set, it
 uses those module paths (`crate::game::PositionData`), so the generated module needs no imports and
 your code can live anywhere in the crate. Your types must be visible from the generated module,
 and at least as visible as the generated items exposing them. Without `paths`, it uses the bare
-names, so bring the types into scope where you include the files (e.g. `use crate::game::*;`).
+names and looks them up in the parent of the generated module, i.e. where you invoke the macro.
+
+<details>
+<summary>Including the four files by hand</summary>
+
+`build.rs` also writes the generated code as four files, for setups that include them directly:
+
+```rust
+include!(concat!(env!("OUT_DIR"), "/components_gen.rs"));
+include!(concat!(env!("OUT_DIR"), "/archetypes_gen.rs"));
+include!(concat!(env!("OUT_DIR"), "/systems_gen.rs"));
+include!(concat!(env!("OUT_DIR"), "/world_gen.rs"));
+```
+
+Without `paths`, bring the user types into scope at the include site (e.g. `use crate::game::*;`).
+
+</details>
 
 Your code only needs the generated items' public API: build systems with
 `PhysicsSystem::from(PhysicsSystemData { .. })` and components with `PositionComponent::new(..)`,

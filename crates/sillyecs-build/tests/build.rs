@@ -706,3 +706,43 @@ systems:
     assert!(!code.systems.contains("pub struct SteeringSystemData"));
     assert!(!code.systems.contains("CreateSystem<SteeringSystem> for F"));
 }
+
+/// `ecs_gen.rs` (for `sillyecs::include_ecs!`) holds all generated code. It glob-imports the
+/// include site's parent only while some user types are referred to by their bare names.
+#[test]
+fn module_file_imports_parent_only_for_bare_names() {
+    const YAML: &str = r#"
+components:
+  - name: Position
+archetypes:
+  - name: Car
+    components: [Position]
+worlds:
+  - name: Main
+    archetypes: [Car]
+phases:
+  - name: Update
+systems:
+  - name: Driving
+    phase: Update
+    outputs: [Position]
+"#;
+
+    let bare = EcsCode::generate(BufReader::new(YAML.as_bytes())).expect("Failed to build ECS");
+    assert!(bare.module.contains("use super::*;"));
+    for part in [
+        &bare.components,
+        &bare.archetypes,
+        &bare.systems,
+        &bare.world,
+    ] {
+        assert!(bare.module.contains(part.as_str()));
+    }
+
+    let with_paths = format!(
+        "{YAML}paths:\n  components: crate::game\n  states: crate::game\n  systems: crate::game\n"
+    );
+    let qualified =
+        EcsCode::generate(BufReader::new(with_paths.as_bytes())).expect("Failed to build ECS");
+    assert!(!qualified.module.contains("use super::*;"));
+}
