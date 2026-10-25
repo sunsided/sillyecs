@@ -671,3 +671,38 @@ systems:
         "error should name the unknown key: {error}"
     );
 }
+
+/// Issue #64: `stateless: true` systems get a generated unit data struct and a blanket
+/// `CreateSystem` impl; stateful systems keep both on the user side.
+#[test]
+fn stateless_systems_generate_data_and_factory_impl() {
+    const YAML: &str = r#"
+components:
+  - name: Position
+archetypes:
+  - name: Car
+    components: [Position]
+worlds:
+  - name: Main
+    archetypes: [Car]
+phases:
+  - name: Update
+systems:
+  - name: Driving
+    phase: Update
+    stateless: true
+    outputs: [Position]
+  - name: Steering
+    phase: Update
+    outputs: [Position]
+"#;
+
+    let code = EcsCode::generate(BufReader::new(YAML.as_bytes())).expect("Failed to build ECS");
+    assert!(code.systems.contains("pub struct DrivingSystemData;"));
+    assert!(
+        code.systems
+            .contains("impl<F: ?Sized> CreateSystem<DrivingSystem> for F")
+    );
+    assert!(!code.systems.contains("pub struct SteeringSystemData"));
+    assert!(!code.systems.contains("CreateSystem<SteeringSystem> for F"));
+}

@@ -14,6 +14,7 @@ Started as a silly little ECS implementation, strives to be more.
 - [Features](#features)
 - [Installation](#installation)
 - [Usage](#usage)
+  - [Stateless Systems](#stateless-systems)
   - [Archetype Component Views](#archetype-component-views)
   - [Command Queue and Application-Specific Commands](#command-queue-and-application-specific-commands)
 - [Examples](#examples)
@@ -217,6 +218,12 @@ systems:
     inputs:
       - Position
 
+  - name: Spin
+    phase: Update
+    stateless: true    # optional: generate the system data and factory impl
+    outputs:
+      - Velocity
+
 worlds:
   - name: Main
     archetypes:
@@ -239,6 +246,29 @@ include!(concat!(env!("OUT_DIR"), "/world_gen.rs"));
 ```
 
 The compiler will tell you which traits and functions to implement.
+
+### Stateless Systems
+
+Every system wraps a `<Name>SystemData` struct, and `World::new` takes a factory implementing
+`CreateSystem<<Name>System>` for each system. For systems that keep no state of their own, set
+`stateless: true` and the generator emits both: a unit `SpinSystemData` struct and a blanket
+`CreateSystem<SpinSystem>` impl for every type. Your factory then only covers the stateful systems:
+
+```rust
+pub struct SystemFactory;
+
+impl CreateSystem<PhysicsSystem> for SystemFactory {
+    fn create(&self) -> PhysicsSystem {
+        PhysicsSystem::from(PhysicsSystemData::default())
+    }
+}
+
+// ... likewise for `RenderSystem`.
+// `Spin` needs no factory impl; writing one is a conflicting-impl error.
+let world = MainWorld::new(&SystemFactory, states, queue);
+```
+
+If every system of a world is stateless, any value works as the factory, e.g. `MainWorld::new(&(), states, queue)`.
 
 ### Archetype Component Views
 

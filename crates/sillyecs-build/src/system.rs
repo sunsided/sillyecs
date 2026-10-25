@@ -59,6 +59,10 @@ pub struct System {
     /// Whether the system uses a postflight phase.
     #[serde(default)]
     pub postflight: bool,
+    /// Whether the system keeps no state of its own. Stateless systems get a generated unit
+    /// `*SystemData` struct and a blanket `CreateSystem` impl, so no user factory needs to cover them.
+    #[serde(default)]
+    pub stateless: bool,
     /// The phase in which to run the system.
     pub phase: SystemPhaseRef,
     /// The optional input components to the system.

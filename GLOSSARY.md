@@ -62,6 +62,11 @@ A unit of behaviour that runs over every entity whose archetype has all of the s
 outputs.
 _Avoid_: job, processor, script
 
+**Stateless system**:
+A system that keeps no data of its own between runs, so the generator can construct it without the
+application's help.
+_Avoid_: unit system, data-less system
+
 **Input**:
 A component a system reads.
 _Avoid_: dependency, read

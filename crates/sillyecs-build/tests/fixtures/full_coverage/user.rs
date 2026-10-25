@@ -53,12 +53,6 @@ pub struct HealSystemData;
 #[derive(Debug, Default)]
 pub struct DrawSystemData;
 
-#[derive(Debug, Default)]
-pub struct SpinSystemData;
-
-#[derive(Debug, Default)]
-pub struct TintSystemData;
-
 impl Default for StepSystem {
     fn default() -> Self {
         Self(StepSystemData)
@@ -77,19 +71,10 @@ impl Default for DrawSystem {
     }
 }
 
-impl Default for SpinSystem {
-    fn default() -> Self {
-        Self(SpinSystemData)
-    }
-}
-
-impl Default for TintSystem {
-    fn default() -> Self {
-        Self(TintSystemData)
-    }
-}
-
 // --- System factory + CreateSystem impls --------------------------------------
+//
+// `Spin` and `Tint` are `stateless: true`: their data structs and `CreateSystem` impls are
+// generated, so the factory only covers the stateful systems.
 
 pub struct SystemFactory;
 
@@ -108,18 +93,6 @@ impl CreateSystem<HealSystem> for SystemFactory {
 impl CreateSystem<DrawSystem> for SystemFactory {
     fn create(&self) -> DrawSystem {
         DrawSystem::default()
-    }
-}
-
-impl CreateSystem<SpinSystem> for SystemFactory {
-    fn create(&self) -> SpinSystem {
-        SpinSystem::default()
-    }
-}
-
-impl CreateSystem<TintSystem> for SystemFactory {
-    fn create(&self) -> TintSystem {
-        TintSystem::default()
     }
 }
 
@@ -259,6 +232,9 @@ pub fn smoke() {
     let queue = CommandQueue::new();
     let mut world: MainWorld<NoOpPhaseEvents, CommandQueue> =
         MainWorld::new(&factory, states, queue);
+
+    // Stateless systems can be created by any factory, even `()`.
+    let _spin: SpinSystem = CreateSystem::<SpinSystem>::create(&());
     world.apply_system_phases();
     world.par_apply_system_phases();
     world.apply_system_phase_render();
