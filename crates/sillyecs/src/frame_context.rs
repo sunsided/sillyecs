@@ -13,9 +13,9 @@ pub struct FrameContext {
     /// The fixed time for fixed-time systems. Defaults to 60 Hz (~16.66 ms).
     pub fixed_time_secs: f32,
     /// The start time of the current frame.
-    pub current_frame_start: std::time::Instant,
+    pub current_frame_start: crate::Instant,
     /// The start time of the last frame.
-    pub last_frame_start: std::time::Instant,
+    pub last_frame_start: crate::Instant,
 }
 
 #[allow(dead_code)]
@@ -28,15 +28,15 @@ impl FrameContext {
             frame_number: 0,
             delta_time_secs: 0.0,
             fixed_time_secs: 1.0 / 60.0,
-            current_frame_start: std::time::Instant::now(),
-            last_frame_start: std::time::Instant::now(),
+            current_frame_start: crate::Instant::now(),
+            last_frame_start: crate::Instant::now(),
         }
     }
 
     /// Resets the frame context, e.g. after the application came back to foreground.
     #[doc(hidden)]
     pub fn reset(&mut self) {
-        self.current_frame_start = std::time::Instant::now();
-        self.last_frame_start = std::time::Instant::now();
+        self.current_frame_start = crate::Instant::now();
+        self.last_frame_start = crate::Instant::now();
     }
 }

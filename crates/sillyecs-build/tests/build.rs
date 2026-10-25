@@ -630,3 +630,44 @@ systems:
         "Follow and Spin must be scheduled into separate groups"
     );
 }
+
+/// Regression for issue #60: unknown keys used to be dropped silently, so an outdated state use
+/// such as `write: true` (pre-0.0.7 spelling of `default: write`) generated read-only access and
+/// only surfaced as a trait signature mismatch in user code. Deserialization must now reject it
+/// and name the offending key.
+#[test]
+fn unknown_keys_are_rejected() {
+    const YAML: &str = r#"
+states:
+  - name: Race
+components:
+  - name: Position
+archetypes:
+  - name: Car
+    components: [Position]
+worlds:
+  - name: Main
+    archetypes: [Car]
+phases:
+  - name: Update
+systems:
+  - name: Driving
+    phase: Update
+    outputs: [Position]
+    states:
+      - use: Race
+        write: true
+"#;
+
+    let Err(error) = EcsCode::generate(BufReader::new(YAML.as_bytes())) else {
+        panic!("unknown key `write` must be rejected");
+    };
+    assert!(
+        matches!(error, EcsError::InvalidDefinition(_)),
+        "expected InvalidDefinition, got {error:?}"
+    );
+    assert!(
+        error.to_string().contains("unknown field `write`"),
+        "error should name the unknown key: {error}"
+    );
+}

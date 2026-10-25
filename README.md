@@ -94,6 +94,25 @@ sillyecs = "0.0.7"
 sillyecs-build = "0.0.7"
 ```
 
+The generated code is `include!`d into your crate and refers to `::sillyecs` by path, so `sillyecs`
+must be a direct dependency of the crate that includes it. Besides the runtime types
+(`::sillyecs::EntityId`, `::sillyecs::FrameContext`, …), it re-exports `rayon` (for the parallel
+phase runners, `par_apply_system_phases` and friends) and `tracing` (for logging in command handling
+and phase hooks), so neither needs to be added separately. Install a `tracing` subscriber in your
+application to see the generated code's log output.
+
+For browser builds (`wasm32-unknown-unknown`), enable the `wasm` feature. Frame timing uses
+`sillyecs::Instant`, which is `std::time::Instant` by default; `std::time::Instant::now()` panics in the
+browser, so the feature swaps in [`web-time`](https://crates.io/crates/web-time). It also enables Rayon's
+`web_spin_lock`, which is needed when running multithreaded via
+[`wasm-bindgen-rayon`](https://github.com/RReverser/wasm-bindgen-rayon). Without that setup, Rayon
+runs the parallel phase runners on the current thread.
+
+```toml
+[dependencies]
+sillyecs = { version = "0.0.7", features = ["wasm"] }
+```
+
 ## Usage
 
 Use `sillyecs` in your `build.rs`:

@@ -5,6 +5,7 @@ use std::hash::Hash;
 use std::ops::Deref;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct State {
     pub name: StateName,
     #[serde(default)]

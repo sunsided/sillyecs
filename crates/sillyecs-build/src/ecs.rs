@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Ecs {
     /// The components.
     pub components: Vec<Component>,
@@ -120,6 +121,8 @@ fn check_u32_capacity(kind: &'static str, count: usize) -> Result<(), EcsError> 
 
 #[derive(thiserror::Error, Debug)]
 pub enum EcsError {
+    #[error("Failed to parse the ECS definition: {0}")]
+    InvalidDefinition(#[from] serde_yaml::Error),
     #[error("Component '{0}' is defined more than once.")]
     DuplicateComponentDefinition(String),
     #[error("Component '{0}' in archetype '{1}' is not defined in the ECS components.")]
