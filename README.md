@@ -90,10 +90,10 @@ To use them, add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-sillyecs = "0.2.0"
+sillyecs = "0.2.1"
 
 [build-dependencies]
-sillyecs-build = "0.2.0"
+sillyecs-build = "0.2.1"
 ```
 
 The generated code is `include!`d into your crate and refers to `::sillyecs` by path, so `sillyecs`
@@ -112,7 +112,7 @@ runs the parallel phase runners on the current thread.
 
 ```toml
 [dependencies]
-sillyecs = { version = "0.2.0", features = ["wasm"] }
+sillyecs = { version = "0.2.1", features = ["wasm"] }
 ```
 
 ## Usage
