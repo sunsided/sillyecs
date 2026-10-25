@@ -1,12 +1,13 @@
 /// The ID of an [`Archetype`].
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 #[repr(u32)]
+{{ lint_allows }}
 pub enum ArchetypeId {
     {%- for archetype in ecs.archetypes %}
     {%- if archetype.description %}
     /// {{ archetype.description }}
     ///
-    /// For details, see the [`{{ archetype.name.type }}`]({{ archetype.name.type }}) Struct.
+    /// For details, see the [`{{ archetype.name.type }}`] Struct.
     {%- else %}
     /// The [`{{ archetype.name.raw }}`]({{ archetype.name.type }}) archetype.
     {%- endif %}
@@ -14,14 +15,16 @@ pub enum ArchetypeId {
     {%- endfor %}
 }
 
+{{ lint_allows }}
 impl ArchetypeId {
     {%- for archetype in ecs.archetypes %}
-    /// A [`NonZeroU64`](core::num::NonZeroU64) representation of [`ArchetypeId::{{ archetype.name.raw }}`](ArchetypeId::{{ archetype.name.raw }}) archetype.
+    /// A [`NonZeroU64`](core::num::NonZeroU64) representation of [`ArchetypeId::{{ archetype.name.raw }}`] archetype.
     pub const {{ archetype.name.field | upper }}_ID_VALUE: core::num::NonZeroU64 = core::num::NonZeroU64::new({{ archetype.id }}).expect("Error at ECS construction time");
     {%- endfor %}
 }
 
 #[allow(dead_code)]
+{{ lint_allows }}
 impl ArchetypeId {
     /// Returns this ID as a [`NonZeroU64`](core::num::NonZeroU64) value.
     pub const fn as_nonzero_u64(&self) -> core::num::NonZeroU64 {
@@ -38,24 +41,28 @@ impl ArchetypeId {
     }
 }
 
+{{ lint_allows }}
 impl core::hash::Hash for ArchetypeId {
     fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
         self.as_u64().hash(state);
     }
 }
 
+{{ lint_allows }}
 impl From<ArchetypeId> for core::num::NonZeroU64 {
     fn from(value: ArchetypeId) -> core::num::NonZeroU64 {
         value.as_nonzero_u64()
     }
 }
 
+{{ lint_allows }}
 impl From<ArchetypeId> for u64 {
     fn from(value: ArchetypeId) -> u64 {
         value.as_u64()
     }
 }
 
+{{ lint_allows }}
 impl core::fmt::Display for ArchetypeId {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> Result<(), core::fmt::Error> {
         match self {
@@ -68,6 +75,7 @@ impl core::fmt::Display for ArchetypeId {
 
 /// A locator for an entity across archetypes.
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+{{ lint_allows }}
 pub struct EntityArchetypeRef {
     /// The ID of the archetype the entity is in.
     pub archetype: ArchetypeId,
@@ -78,6 +86,7 @@ pub struct EntityArchetypeRef {
 
 /// Spawns an entity into the world.
 #[allow(dead_code)]
+{{ lint_allows }}
 pub trait Spawn<E> {
     /// Spawn a new entity into the world.
     fn spawn(&mut self, data: E) -> ::sillyecs::EntityId;
@@ -85,6 +94,7 @@ pub trait Spawn<E> {
 
 /// Marker trait for archetypes.
 #[allow(dead_code)]
+{{ lint_allows }}
 pub trait Archetype: 'static + Send + Sync {
     /// The ID of this archetype.
     const ID: ArchetypeId;
@@ -108,6 +118,7 @@ pub trait Archetype: 'static + Send + Sync {
 
 /// Trait for archetypes containing the specified `Component`.
 #[allow(dead_code)]
+{{ lint_allows }}
 pub trait HasComponents<T: Component> {
     /// Returns a slice of all component values.
     fn get(&self) -> &[T];
@@ -118,6 +129,7 @@ pub trait HasComponents<T: Component> {
 
 /// Trait for entities containing the specified `Component`.
 #[allow(dead_code)]
+{{ lint_allows }}
 pub trait HasComponent<T: Component> {
     /// Returns the component value.
     fn get(&self) -> &T;
@@ -129,6 +141,7 @@ pub trait HasComponent<T: Component> {
 /// An enumeration holding variants for entities.
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
+{{ lint_allows }}
 pub enum ArchetypeEntity {
     {%- for archetype in ecs.archetypes %}
     {%- if archetype.description %}
@@ -143,6 +156,7 @@ pub enum ArchetypeEntity {
 /// An enumeration holding variants for entity data, e.g. when spawning entities.
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
+{{ lint_allows }}
 pub enum ArchetypeEntityData {
     {%- for archetype in ecs.archetypes %}
     {%- if archetype.description %}
@@ -155,6 +169,7 @@ pub enum ArchetypeEntityData {
 }
 
 #[allow(dead_code)]
+{{ lint_allows }}
 impl ArchetypeEntity {
     /// Determines the [`ArchetypeId`] of this [`ArchetypeEntity`] variant.
     pub const fn archetype_id(&self) -> ArchetypeId {
@@ -167,6 +182,7 @@ impl ArchetypeEntity {
 }
 
 #[allow(dead_code)]
+{{ lint_allows }}
 impl ArchetypeEntityData {
     /// Determines the [`ArchetypeId`] of this [`ArchetypeEntityData`] variant.
     pub const fn archetype_id(&self) -> ArchetypeId {
@@ -181,12 +197,14 @@ impl ArchetypeEntityData {
 /// A container for an entity with its associated data.
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
+{{ lint_allows }}
 pub struct EntityWithIdAndData<Data: EntityData> {
     pub id: ::sillyecs::EntityId,
     pub data: Data,
 }
 
 /// Marker trait for entity data.
+{{ lint_allows }}
 pub trait EntityData {
     #[allow(dead_code)]
     const ARCHETYPE_ID: ArchetypeId;
@@ -199,6 +217,7 @@ pub trait EntityData {
 /// An archetype grouping entities with identical components.
 {%- endif %}
 #[derive(Debug, Default, Clone)]
+{{ lint_allows }}
 pub struct {{ archetype.name.type }} {
     pub entities: Vec<::sillyecs::EntityId>,
     {%- for component_name in archetype.components %}
@@ -207,11 +226,13 @@ pub struct {{ archetype.name.type }} {
 }
 
 /// An entity of the [`{{ archetype.name.type }}`].
+{{ lint_allows }}
 pub type {{ archetype.name.raw }}Entity = EntityWithIdAndData<{{ archetype.name.raw }}EntityComponents>;
 
 /// The data of an entity of the [`{{ archetype.name.type }}`].
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
+{{ lint_allows }}
 pub struct {{ archetype.name.raw }}EntityData {
     {%- for component_name in archetype.components %}
     pub {{ component_name.field }}: {{ component_name.raw }}Data,
@@ -221,12 +242,14 @@ pub struct {{ archetype.name.raw }}EntityData {
 /// An entity of the [`{{ archetype.name.type }}`].
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
+{{ lint_allows }}
 pub struct {{ archetype.name.raw }}EntityComponents {
     {%- for component_name in archetype.components %}
     pub {{ component_name.field }}: {{ component_name.type }},
     {%- endfor %}
 }
 
+{{ lint_allows }}
 impl From<{{ archetype.name.raw }}EntityData> for {{ archetype.name.raw }}EntityComponents {
     fn from(value: {{ archetype.name.raw }}EntityData) -> Self {
         Self {
@@ -237,10 +260,12 @@ impl From<{{ archetype.name.raw }}EntityData> for {{ archetype.name.raw }}Entity
     }
 }
 
+{{ lint_allows }}
 impl EntityData for {{ archetype.name.raw }}EntityData {
     const ARCHETYPE_ID: ArchetypeId = {{archetype.name.type}}::ID;
 }
 
+{{ lint_allows }}
 impl EntityData for {{ archetype.name.raw }}EntityComponents {
     const ARCHETYPE_ID: ArchetypeId = {{archetype.name.type}}::ID;
 }
@@ -248,6 +273,7 @@ impl EntityData for {{ archetype.name.raw }}EntityComponents {
 /// A reference to an entity of the [`{{ archetype.name.type }}`].
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
+{{ lint_allows }}
 pub struct {{ archetype.name.raw }}EntityRef<'archetype> {
     pub entity_id: ::sillyecs::EntityId,
     {%- for component_name in archetype.components %}
@@ -258,6 +284,7 @@ pub struct {{ archetype.name.raw }}EntityRef<'archetype> {
 /// A mutable reference to an entity of the [`{{ archetype.name.type }}`].
 #[derive(Debug)]
 #[allow(dead_code)]
+{{ lint_allows }}
 pub struct {{ archetype.name.raw }}EntityMut<'archetype> {
     pub entity_id: ::sillyecs::EntityId,
     {%- for component_name in archetype.components %}
@@ -266,12 +293,14 @@ pub struct {{ archetype.name.raw }}EntityMut<'archetype> {
 }
 
 /// An iterator for entities in the [`{{ archetype.name.type }}`].
+{{ lint_allows }}
 pub struct {{ archetype.name.raw }}EntityIterator<'archetype> {
     archetype: &'archetype {{ archetype.name.type }},
     current: usize,
     length: usize,
 }
 
+{{ lint_allows }}
 impl<'archetype> {{ archetype.name.raw }}EntityIterator<'archetype> {
     fn new(archetype: &'archetype {{ archetype.name.type }}) -> Self {
         Self {
@@ -282,6 +311,7 @@ impl<'archetype> {{ archetype.name.raw }}EntityIterator<'archetype> {
     }
 }
 
+{{ lint_allows }}
 impl<'archetype> Iterator for {{ archetype.name.raw }}EntityIterator<'archetype> {
     type Item = {{ archetype.name.raw }}EntityRef<'archetype>;
 
@@ -307,6 +337,7 @@ impl<'archetype> Iterator for {{ archetype.name.raw }}EntityIterator<'archetype>
     }
 }
 
+{{ lint_allows }}
 impl {{ archetype.name.type }} {
     /// Iterates all entities in this archetype.
     #[inline]
@@ -347,17 +378,25 @@ impl {{ archetype.name.type }} {
     }
 
     /// Gets the `{{component.raw}}` component at the specified index.
+    ///
+    /// # Safety
+    /// `index` must be less than [`len`](Self::len).
     #[allow(dead_code)]
     #[inline]
     pub unsafe fn get_{{component.field}}_component_at_unchecked(&self, index: usize) -> &{{component.type}} {
-        self.{{ component.fields }}.get_unchecked(index)
+        // SAFETY: The caller guarantees `index < self.len()`, and every component column has `len()` entries.
+        unsafe { self.{{ component.fields }}.get_unchecked(index) }
     }
 
-    /// Gets the `{{component.raw}}` component at the specified index.
+    /// Mutably gets the `{{component.raw}}` component at the specified index.
+    ///
+    /// # Safety
+    /// `index` must be less than [`len`](Self::len).
     #[allow(dead_code)]
     #[inline]
     pub unsafe fn get_{{component.field}}_component_at_unchecked_mut(&mut self, index: usize) -> &mut {{component.type}} {
-        self.{{ component.fields }}.get_unchecked_mut(index)
+        // SAFETY: The caller guarantees `index < self.len()`, and every component column has `len()` entries.
+        unsafe { self.{{ component.fields }}.get_unchecked_mut(index) }
     }
 
     {%- endfor %}
@@ -401,30 +440,45 @@ impl {{ archetype.name.type }} {
     }
 
     /// Gets the entity at the specified index.
+    ///
+    /// # Safety
+    /// `index` must be less than [`len`](Self::len).
     #[allow(dead_code)]
     pub unsafe fn get_entity_at_unchecked(&self, index: usize) -> {{ archetype.name.raw }}EntityRef<'_> {
-        {{ archetype.name.raw }}EntityRef {
-            entity_id: *self.entities.get_unchecked(index),
-            {%- for component_name in archetype.components %}
-            {{ component_name.field }}: self.{{ component_name.fields }}.get_unchecked(index),
-            {%- endfor %}
+        // SAFETY: The caller guarantees `index < self.len()`, and the entity list and every
+        // component column have `len()` entries.
+        unsafe {
+            {{ archetype.name.raw }}EntityRef {
+                entity_id: *self.entities.get_unchecked(index),
+                {%- for component_name in archetype.components %}
+                {{ component_name.field }}: self.{{ component_name.fields }}.get_unchecked(index),
+                {%- endfor %}
+            }
         }
     }
 
-    /// Gets the entity at the specified index.
+    /// Mutably gets the entity at the specified index.
+    ///
+    /// # Safety
+    /// `index` must be less than [`len`](Self::len).
     #[allow(dead_code)]
     pub unsafe fn get_entity_at_unchecked_mut(&mut self, index: usize) -> {{ archetype.name.raw }}EntityMut<'_> {
-        {{ archetype.name.raw }}EntityMut {
-            entity_id: *self.entities.get_unchecked(index),
-            {%- for component_name in archetype.components %}
-            {{ component_name.field }}: self.{{ component_name.fields }}.get_unchecked_mut(index),
-            {%- endfor %}
+        // SAFETY: The caller guarantees `index < self.len()`, and the entity list and every
+        // component column have `len()` entries.
+        unsafe {
+            {{ archetype.name.raw }}EntityMut {
+                entity_id: *self.entities.get_unchecked(index),
+                {%- for component_name in archetype.components %}
+                {{ component_name.field }}: self.{{ component_name.fields }}.get_unchecked_mut(index),
+                {%- endfor %}
+            }
         }
     }
 }
 {%- for component_name in archetype.components %}
 
 #[allow(dead_code)]
+{{ lint_allows }}
 impl HasComponent<{{ component_name.type }}> for {{ archetype.name.raw }}Entity {
     #[inline]
     fn get(&self) -> &{{ component_name.type }} {
@@ -438,6 +492,7 @@ impl HasComponent<{{ component_name.type }}> for {{ archetype.name.raw }}Entity 
 }
 
 #[allow(dead_code)]
+{{ lint_allows }}
 impl HasComponent<{{ component_name.type }}> for {{ archetype.name.raw }}EntityComponents {
     #[inline]
     fn get(&self) -> &{{ component_name.type }} {
@@ -450,6 +505,7 @@ impl HasComponent<{{ component_name.type }}> for {{ archetype.name.raw }}EntityC
     }
 }
 {%- endfor %}
+{{ lint_allows }}
 impl {{ archetype.name.raw }}EntityData {
     /// Spawn this entity into the given world.
     #[inline]
@@ -462,6 +518,7 @@ impl {{ archetype.name.raw }}EntityData {
     }
 }
 
+{{ lint_allows }}
 impl {{ archetype.name.raw }}EntityComponents {
     /// Spawn this entity into the given world.
     #[inline]
@@ -474,6 +531,7 @@ impl {{ archetype.name.raw }}EntityComponents {
     }
 }
 
+{{ lint_allows }}
 impl core::ops::Deref for {{ archetype.name.raw }}Entity {
     type Target = {{ archetype.name.raw }}EntityComponents;
 
@@ -482,6 +540,7 @@ impl core::ops::Deref for {{ archetype.name.raw }}Entity {
     }
 }
 
+{{ lint_allows }}
 impl core::ops::DerefMut for {{ archetype.name.raw }}Entity {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.data
@@ -489,6 +548,7 @@ impl core::ops::DerefMut for {{ archetype.name.raw }}Entity {
 }
 
 #[allow(dead_code)]
+{{ lint_allows }}
 impl {{ archetype.name.type }} {
     /// The IDs of the components used by this archetype, in ascending order.
     pub const COMPONENTS: [ComponentId; {{ archetype.component_count }}] = [
@@ -604,6 +664,7 @@ impl {{ archetype.name.type }} {
 
 {% for component_name in archetype.components %}
 #[automatically_derived]
+{{ lint_allows }}
 impl HasComponents<{{ component_name.type }}> for {{ archetype.name.type }} {
     /// Returns a slice of all [`{{ component_name.type }}`] component values.
     fn get(&self) -> &[{{ component_name.type }}] {
@@ -619,6 +680,7 @@ impl HasComponents<{{ component_name.type }}> for {{ archetype.name.type }} {
 
 #[automatically_derived]
 #[allow(dead_code)]
+{{ lint_allows }}
 impl Archetype for {{ archetype.name.type }} {
     const ID: ArchetypeId = ArchetypeId::{{ archetype.name.raw }};
 
@@ -631,6 +693,7 @@ impl Archetype for {{ archetype.name.type }} {
     }
 }
 
+{{ lint_allows }}
 impl PartialEq<ArchetypeId> for {{ archetype.name.type }} {
     fn eq(&self, other: &ArchetypeId) -> bool {
         Self::ID.eq(other)
@@ -638,6 +701,7 @@ impl PartialEq<ArchetypeId> for {{ archetype.name.type }} {
 }
 {%- endfor %}
 
+{{ lint_allows }}
 pub trait GetEntityRef {
     type EntityRef<'archetype>
     where
@@ -654,6 +718,7 @@ pub trait GetEntityRef {
 }
 {%- for archetype in ecs.archetypes %}
 
+{{ lint_allows }}
 impl core::ops::Index<usize> for {{ archetype.name.type }} {
     type Output = ::sillyecs::EntityId;
 
@@ -664,6 +729,7 @@ impl core::ops::Index<usize> for {{ archetype.name.type }} {
 {%- endfor %}
 
 #[allow(dead_code)]
+{{ lint_allows }}
 pub trait FrontloadEntities:
     Archetype
     + core::ops::Index<usize, Output = ::sillyecs::EntityId>
@@ -755,6 +821,7 @@ pub trait FrontloadEntities:
 }
 
 #[allow(dead_code)]
+{{ lint_allows }}
 pub trait FrontloadEntitiesScan:
     Archetype
     + FrontloadEntities
@@ -840,6 +907,7 @@ pub trait FrontloadEntitiesScan:
 }
 {%- for archetype in ecs.archetypes %}
 
+{{ lint_allows }}
 impl GetEntityRef for {{ archetype.name.type }} {
     type EntityRef<'archetype> = {{ archetype.name.raw }}EntityRef<'archetype>;
 
@@ -848,14 +916,14 @@ impl GetEntityRef for {{ archetype.name.type }} {
        self.is_empty()
     }
 
-    /// See [`{{ archetype.name.type }}::get_at`]({{ archetype.name.type }}::get_at).
+    /// See [`{{ archetype.name.type }}::get_at`].
     #[inline(always)]
     #[allow(clippy::needless_lifetimes, dead_code)]
     fn get_at<'archetype>(&'archetype self, index: usize) -> Option<Self::EntityRef<'archetype>> {
         self.get_entity_at(index)
     }
 
-    /// See [`{{ archetype.name.type }}::get_at_unchecked`]({{ archetype.name.type }}::get_at_unchecked).
+    /// See [`{{ archetype.name.type }}::get_at_unchecked`].
     #[inline(always)]
     #[allow(clippy::needless_lifetimes, dead_code)]
     unsafe fn get_at_unchecked<'archetype>(&'archetype self, index: usize) -> Self::EntityRef<'archetype> {
@@ -865,6 +933,7 @@ impl GetEntityRef for {{ archetype.name.type }} {
 {%- endfor %}
 {%- for archetype in ecs.archetypes %}
 
+{{ lint_allows }}
 impl FrontloadEntities for {{ archetype.name.type }} {
     #[inline(always)]
     #[doc(hidden)]
@@ -876,5 +945,6 @@ impl FrontloadEntities for {{ archetype.name.type }} {
     }
 }
 
+{{ lint_allows }}
 impl FrontloadEntitiesScan for {{ archetype.name.type }} { }
 {%- endfor %}

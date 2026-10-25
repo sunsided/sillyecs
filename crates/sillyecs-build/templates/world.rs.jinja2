@@ -1,5 +1,6 @@
-/// A command in the [`World`].
+/// A command in the [`World`](::sillyecs::World).
 #[allow(dead_code)]
+{{ lint_allows }}
 pub enum WorldCommand<UserCommand> {
     /// Spawn an entity.
     ///
@@ -12,12 +13,14 @@ pub enum WorldCommand<UserCommand> {
     User(UserCommand)
 }
 
+{{ lint_allows }}
 pub trait WorldUserCommand {
     type UserCommand: core::marker::Send + core::fmt::Debug;
 }
 
 /// Sender of [`WorldCommand`] instances.
 #[allow(dead_code)]
+{{ lint_allows }}
 pub trait WorldCommandSender: WorldUserCommand {
     type Error: core::error::Error;
 
@@ -27,16 +30,18 @@ pub trait WorldCommandSender: WorldUserCommand {
 
 /// Sender of [`WorldCommand`] instances.
 #[allow(dead_code)]
+{{ lint_allows }}
 pub trait WorldCommandReceiver: WorldUserCommand {
     type Error: core::error::Error;
 
     /// Attempts to receive a message from the channel without blocking.
-    /// Returns [`Ok(None)`] if no command was queued.
+    /// Returns `Ok(None)` if no command was queued.
     fn recv(&self) -> Result<Option<WorldCommand<Self::UserCommand>>, Self::Error>;
 }
 
 /// Handler of a [`WorldCommand`]'s user command.
 #[allow(dead_code)]
+{{ lint_allows }}
 pub trait WorldUserCommandHandler: WorldUserCommand {
     /// Handles a user command.
     fn handle_user_command(&mut self, command: Self::UserCommand);
@@ -44,8 +49,10 @@ pub trait WorldUserCommandHandler: WorldUserCommand {
 
 /// A sender and receiver of [`WorldCommand`] instances.
 #[allow(dead_code)]
+{{ lint_allows }}
 pub trait WorldCommandQueue: WorldCommandSender + WorldCommandReceiver { }
 
+{{ lint_allows }}
 impl<T, U> WorldCommandQueue for T
 where
     T: WorldCommandSender<UserCommand = U> + WorldCommandReceiver<UserCommand = U>
@@ -70,20 +77,22 @@ where
 ///   on the same `apply_system_phases` call is *not* serviced this call; it
 ///   remains set and fires on the next one.
 #[derive(Debug, Default)]
+{{ lint_allows }}
 struct ConditionalPhaseFlags {
     {%- for phase in ecs.phases %}
     {%- if phase.on_request %}
-    /// Whether the [`{{ phase.name.raw }}`]({{ phase.name.type }}) phase is requested.
+    /// Whether the [`{{ phase.name.raw }}`](SystemPhase::{{ phase.name.raw }}) phase is requested.
     pub {{ phase.name.field }}_requested: core::sync::atomic::AtomicBool,
     {%- endif %}
     {%- endfor %}
 }
 
+{{ lint_allows }}
 impl ConditionalPhaseFlags {
     {%- for phase in ecs.phases %}
     {%- if phase.on_request %}
     /// Reads and clears the request flag for the
-    /// [`{{ phase.name.raw }}`]({{ phase.name.type }}) phase via
+    /// [`{{ phase.name.raw }}`](SystemPhase::{{ phase.name.raw }}) phase via
     /// `swap(false, AcqRel)`. Returns `true` if a request was pending.
     ///
     /// See [`ConditionalPhaseFlags`] for the consumer contract.
@@ -92,7 +101,7 @@ impl ConditionalPhaseFlags {
         self.{{ phase.name.field }}_requested.swap(false, core::sync::atomic::Ordering::AcqRel)
     }
 
-    /// Sets the request flag for the [`{{ phase.name.raw }}`]({{ phase.name.type }}) phase
+    /// Sets the request flag for the [`{{ phase.name.raw }}`](SystemPhase::{{ phase.name.raw }}) phase
     /// via `store(true, Release)`.
     ///
     /// See [`ConditionalPhaseFlags`] for the consumer contract.
@@ -105,6 +114,7 @@ impl ConditionalPhaseFlags {
     {%- endfor %}
 }
 
+{{ lint_allows }}
 impl Clone for ConditionalPhaseFlags {
     fn clone(&self) -> Self {
         Self {
@@ -123,6 +133,7 @@ impl Clone for ConditionalPhaseFlags {
 
 /// A world containing all archetypes.
 #[derive(Debug)]
+{{ lint_allows }}
 pub struct {{ world.name.type }}<E, Q> {
     /// The archetypes.
     archetypes: {{ world.name.type }}Archetypes,
@@ -149,6 +160,7 @@ pub struct {{ world.name.type }}<E, Q> {
     command_queue: Q
 }
 
+{{ lint_allows }}
 impl<E, Q> ::sillyecs::World for {{ world.name.type }}<E, Q> {
     const ID: ::sillyecs::WorldId = ::sillyecs::WorldId::new_from(core::num::NonZeroU64::new({{ world.id }}).expect("Invalid ID on ECS construction time"));
 }
@@ -158,8 +170,9 @@ impl<E, Q> ::sillyecs::World for {{ world.name.type }}<E, Q> {
 ///
 /// It encapsulates ownership of and access to the following state types:
 /// {% for state in world.states %}
-/// - [{{ state.name.type }}]({{ state.name.type }}){%- endfor %}
+/// - [`{{ state.name.type }}`]{%- endfor %}
 #[derive(Debug, Default)]
+{{ lint_allows }}
 pub struct {{ world.name.type }}States {
     {%- for state in world.states %}
     {%- if state.description %}
@@ -177,6 +190,7 @@ pub struct {{ world.name.type }}States {
 }
 
 #[allow(dead_code)]
+{{ lint_allows }}
 impl {{ world.name.type }}States {
     pub const fn new(
         {%- for state in world.states %}
@@ -196,6 +210,7 @@ impl {{ world.name.type }}States {
 
 /// The archetypes used in the world.
 #[derive(Debug, Clone, Default)]
+{{ lint_allows }}
 struct {{ world.name.type }}Archetypes {
     /// The entity locator.
     //
@@ -210,6 +225,7 @@ struct {{ world.name.type }}Archetypes {
 
 /// The archetypes used in the world.
 #[derive(Debug, Clone, Default)]
+{{ lint_allows }}
 struct {{ world.name.type }}ArchetypeCollection {
     {%- for archetype in ecs.archetypes %}
     pub {{ archetype.name.field | snake_case }}: {{ archetype.name.type }},
@@ -218,12 +234,14 @@ struct {{ world.name.type }}ArchetypeCollection {
 
 /// The systems.
 #[derive(Debug)]
+{{ lint_allows }}
 pub struct {{ world.name.type }}Systems {
     {%- for system in world.systems %}
     {{ system.name.field }}: {{ system.name.type }},
     {%- endfor %}
 }
 
+{{ lint_allows }}
 impl {{ world.name.type }}Systems {
     {%- for system in world.systems %}
 
@@ -244,6 +262,7 @@ impl {{ world.name.type }}Systems {
 }
 {%- for system in world.systems %}
 
+{{ lint_allows }}
 impl AsRef<{{ system.name.type }}Data> for {{ world.name.type }}Systems {
     #[inline]
     fn as_ref(&self) -> &{{ system.name.type }}Data {
@@ -251,6 +270,7 @@ impl AsRef<{{ system.name.type }}Data> for {{ world.name.type }}Systems {
     }
 }
 
+{{ lint_allows }}
 impl AsMut<{{ system.name.type }}Data> for {{ world.name.type }}Systems {
     #[inline]
     fn as_mut(&mut self) -> &mut {{ system.name.type }}Data {
@@ -261,6 +281,7 @@ impl AsMut<{{ system.name.type }}Data> for {{ world.name.type }}Systems {
 {%- for archetype in world.archetypes %}
 
 /// Spawns an entity into the world.
+{{ lint_allows }}
 impl<E, Q> Spawn<{{ archetype.name.raw }}EntityData> for {{ world.name.type }}<E, Q> {
     /// Spawn a new entity into the world.
     #[inline]
@@ -270,6 +291,7 @@ impl<E, Q> Spawn<{{ archetype.name.raw }}EntityData> for {{ world.name.type }}<E
 }
 
 /// Spawns an entity into the world.
+{{ lint_allows }}
 impl<E, Q> Spawn<{{ archetype.name.raw }}EntityComponents> for {{ world.name.type }}<E, Q> {
     /// Spawn a new entity into the world.
     #[inline]
@@ -280,12 +302,14 @@ impl<E, Q> Spawn<{{ archetype.name.raw }}EntityComponents> for {{ world.name.typ
 {%- endfor %}
 
 /// Helper trait to prevent accidental abuse of the Archetype's spawning function.
+{{ lint_allows }}
 pub trait WorldEntityRegistry {
     /// Registers an entity with the world.
     fn register(&mut self, id: ::sillyecs::EntityId, archetype: EntityArchetypeRef) -> ::sillyecs::EntityId;
 }
 
 #[allow(dead_code)]
+{{ lint_allows }}
 impl<Q> {{ world.name.type }}<NoOpPhaseEvents, Q> {
     /// Creates a new [`{{ world.name.type }}`].
     pub fn new<S>(
@@ -310,6 +334,7 @@ impl<Q> {{ world.name.type }}<NoOpPhaseEvents, Q> {
 }
 
 #[allow(dead_code)]
+{{ lint_allows }}
 impl<E, Q> {{ world.name.type }}<E, Q> {
     /// Creates a new [`{{ world.name.type }}`].
     pub fn new_with_events<S>(
@@ -371,7 +396,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
     {%- for phase in ecs.phases %}
     {%- if phase.on_request %}
 
-    /// Requests execution of the [`{{ phase.name.raw }}`]({{ phase.name.type }}) phase.
+    /// Requests execution of the [`{{ phase.name.raw }}`](SystemPhase::{{ phase.name.raw }}) phase.
     ///
     /// # Semantics
     ///
@@ -1314,6 +1339,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
 
 /// Time accumulators for fixed-time phases.
 #[derive(Debug, Clone, Default)]
+{{ lint_allows }}
 struct FixedAccumulators {
     {%- for phase in ecs.phases %}
     {%- if phase.fixed %}
@@ -1325,15 +1351,17 @@ struct FixedAccumulators {
 {%- endif %}
 /// Delta time trackers for all phases.
 #[derive(Debug, Clone)]
+{{ lint_allows }}
 struct DeltaTimers {
     {%- for phase in ecs.phases %}
-    /// The current start time for the [`{{ phase.name.raw }}`]({{ phase.name.type }}) phase.
+    /// The current start time for the [`{{ phase.name.raw }}`](SystemPhase::{{ phase.name.raw }}) phase.
     current_{{ phase.name.field }}_start: ::sillyecs::Instant,
-    /// The previous start time for the [`{{ phase.name.raw }}`]({{ phase.name.type }}) phase.
+    /// The previous start time for the [`{{ phase.name.raw }}`](SystemPhase::{{ phase.name.raw }}) phase.
     previous_{{ phase.name.field }}_start: ::sillyecs::Instant,
     {%- endfor %}
 }
 
+{{ lint_allows }}
 impl Default for DeltaTimers {
     fn default() -> Self {
         let now = ::sillyecs::Instant::now();
@@ -1347,11 +1375,13 @@ impl Default for DeltaTimers {
 }
 
 #[derive(Debug)]
+{{ lint_allows }}
 pub enum DespawnError {
     EntityNotFound(::sillyecs::EntityId),
     InvalidIndexInArchetype(usize, ArchetypeId)
 }
 
+{{ lint_allows }}
 impl core::fmt::Display for DespawnError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> Result<(), core::fmt::Error> {
         match self {
@@ -1364,9 +1394,11 @@ impl core::fmt::Display for DespawnError {
         }
     }
 }
+{{ lint_allows }}
 impl core::error::Error for DespawnError { }
 {%- for world in ecs.worlds %}
 
+{{ lint_allows }}
 impl<E, Q> {{ world.name.type }}<E, Q> {
     /// Frontloads entities provided by their archetype IDs and indexes (e.g., from quadtree results,
     /// followed by entity location lookups). Performs best when the indices are presorted in ascending order.
@@ -1465,6 +1497,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
 }
 {%- endfor %}
 
+{{ lint_allows }}
 pub trait ComponentAccess {
     {%- for component in ecs.components %}
 
@@ -1477,6 +1510,7 @@ pub trait ComponentAccess {
     {%- endfor %}
 }
 
+{{ lint_allows }}
 pub trait ComponentAccessMut: ComponentAccess {
     {%- for component in ecs.components %}
 
@@ -1489,6 +1523,7 @@ pub trait ComponentAccessMut: ComponentAccess {
     {%- endfor %}
 }
 
+{{ lint_allows }}
 pub trait EntityAccess {
     {%- for archetype in ecs.archetypes %}
 
@@ -1505,6 +1540,7 @@ pub trait EntityAccess {
     {%- endfor %}
 }
 
+{{ lint_allows }}
 pub trait EntityAccessMut: EntityAccess {
     {%- for archetype in ecs.archetypes %}
 
@@ -1523,6 +1559,7 @@ pub trait EntityAccessMut: EntityAccess {
 {%- for world in ecs.worlds %}
 
 //noinspection RsSortImplTraitMembers
+{{ lint_allows }}
 impl<E, Q> EntityAccess for {{ world.name.type }}<E, Q> {
     {%- for archetype in world.archetypes %}
 
@@ -1542,6 +1579,7 @@ impl<E, Q> EntityAccess for {{ world.name.type }}<E, Q> {
 {%- for world in ecs.worlds %}
 
 //noinspection RsSortImplTraitMembers
+{{ lint_allows }}
 impl<E, Q> EntityAccessMut for {{ world.name.type }}<E, Q> {
     {%- for archetype in world.archetypes %}
 
@@ -1561,6 +1599,7 @@ impl<E, Q> EntityAccessMut for {{ world.name.type }}<E, Q> {
 {%- for world in ecs.worlds %}
 
 //noinspection RsSortImplTraitMembers
+{{ lint_allows }}
 impl<E, Q> ComponentAccess for {{ world.name.type }}<E, Q> {
     {%- for component in world.components %}
 
@@ -1576,6 +1615,7 @@ impl<E, Q> ComponentAccess for {{ world.name.type }}<E, Q> {
 {%- for world in ecs.worlds %}
 
 //noinspection RsSortImplTraitMembers
+{{ lint_allows }}
 impl<E, Q> ComponentAccessMut for {{ world.name.type }}<E, Q> {
     {%- for component in world.components %}
 
@@ -1591,6 +1631,7 @@ impl<E, Q> ComponentAccessMut for {{ world.name.type }}<E, Q> {
 {%- for world in ecs.worlds %}
 
 //noinspection RsSortImplTraitMembers
+{{ lint_allows }}
 impl EntityAccess for {{ world.name.type }}Archetypes {
     {%- for archetype in world.archetypes %}
 
@@ -1615,6 +1656,7 @@ impl EntityAccess for {{ world.name.type }}Archetypes {
 {%- for world in ecs.worlds %}
 
 //noinspection RsSortImplTraitMembers
+{{ lint_allows }}
 impl EntityAccessMut for {{ world.name.type }}Archetypes {
     {%- for archetype in world.archetypes %}
 
@@ -1639,6 +1681,7 @@ impl EntityAccessMut for {{ world.name.type }}Archetypes {
 {%- for world in ecs.worlds %}
 
 //noinspection RsSortImplTraitMembers
+{{ lint_allows }}
 impl ComponentAccess for {{ world.name.type }}Archetypes {
     {%- for component, archetypes in world.components|items %}
 
@@ -1660,6 +1703,7 @@ impl ComponentAccess for {{ world.name.type }}Archetypes {
 {%- for world in ecs.worlds %}
 
 //noinspection RsSortImplTraitMembers
+{{ lint_allows }}
 impl ComponentAccessMut for {{ world.name.type }}Archetypes {
     {%- for component, archetypes in world.components|items %}
 
@@ -1680,6 +1724,7 @@ impl ComponentAccessMut for {{ world.name.type }}Archetypes {
 {%- endfor %}
 {%- for world in ecs.worlds %}
 
+{{ lint_allows }}
 impl<E, Q, U> WorldUserCommand for {{ world.name.type }}<E, Q>
 where
     Q: WorldUserCommand<UserCommand = U>,
@@ -1691,21 +1736,25 @@ where
 
 /// An iterator over [`EntityId`](::sillyecs::EntityId) values.
 #[allow(dead_code)]
+{{ lint_allows }}
 pub type EntityIdIter<'a> = ::sillyecs::FlattenCopySlices<'a, ::sillyecs::EntityId>;
 {%- for component in ecs.components %}
 
 /// An iterator over all [`{{ component.name.raw }}`]({{ component.name.type }}) components, regardless of archetype.
 #[allow(dead_code)]
 // TODO: Simplify to ::core::slice::Iter<> if only one archetype has this component.
+{{ lint_allows }}
 pub type {{ component.name.raw }}ComponentIter<'a> = ::sillyecs::FlattenSlices<'a, {{ component.name.type }}>;
 
 /// A mutable iterator over all [`{{ component.name.raw }}`]({{ component.name.type }}) components, regardless of archetype.
 #[allow(dead_code)]
 // TODO: Simplify to ::core::slice::IterMut<> if only one archetype has this component.
+{{ lint_allows }}
 pub type {{ component.name.raw }}ComponentIterMut<'a> = ::sillyecs::FlattenSlicesMut<'a, {{ component.name.type }}>;
 
 /// A trait for types allowing to iterate all [`{{ component.name.raw }}`]({{ component.name.type }}) components, regardless of archetype.
 #[allow(dead_code)]
+{{ lint_allows }}
 pub trait Iter{{ component.name.raw }}Components<'a> {
     type Iterator: core::iter::Iterator<Item = &'a {{ component.name.type }}>;
 
@@ -1716,6 +1765,7 @@ pub trait Iter{{ component.name.raw }}Components<'a> {
 /// A trait for types allowing to iterate the [`EntityId`](::sillyecs::EntityId) values
 /// of all [`{{ component.name.raw }}`]({{ component.name.type }}) components, regardless of archetype.
 #[allow(dead_code)]
+{{ lint_allows }}
 pub trait Iter{{ component.name.raw }}Entities<'a> {
     type Iterator: core::iter::Iterator<Item = ::sillyecs::EntityId>;
 
@@ -1725,6 +1775,7 @@ pub trait Iter{{ component.name.raw }}Entities<'a> {
 
 /// A trait for types allowing to iterate all [`{{ component.name.raw }}`]({{ component.name.type }}) components, regardless of archetype.
 #[allow(dead_code)]
+{{ lint_allows }}
 pub trait IterMut{{ component.name.raw }}Components<'a> {
     type IteratorMut: core::iter::Iterator<Item = &'a mut {{ component.name.type }}>;
 
@@ -1736,6 +1787,7 @@ pub trait IterMut{{ component.name.raw }}Components<'a> {
 {%- for component in world.components %}
 
 #[allow(dead_code)]
+{{ lint_allows }}
 impl<'a, E, Q> Iter{{ component.raw }}Components<'a> for {{ world.name.type }}<E, Q>
 {
     type Iterator = {{ component.raw }}ComponentIter<'a>;
@@ -1758,6 +1810,7 @@ impl<'a, E, Q> Iter{{ component.raw }}Components<'a> for {{ world.name.type }}<E
 }
 
 #[allow(dead_code)]
+{{ lint_allows }}
 impl<'a, E, Q> Iter{{ component.raw }}Entities<'a> for {{ world.name.type }}<E, Q>
 {
     type Iterator = EntityIdIter<'a>;
@@ -1778,6 +1831,7 @@ impl<'a, E, Q> Iter{{ component.raw }}Entities<'a> for {{ world.name.type }}<E, 
 }
 
 #[allow(dead_code)]
+{{ lint_allows }}
 impl<'a, E, Q> IterMut{{ component.raw }}Components<'a> for {{ world.name.type }}<E, Q>
 {
     type IteratorMut = {{ component.raw }}ComponentIterMut<'a>;
@@ -1814,6 +1868,7 @@ impl<'a, E, Q> IterMut{{ component.raw }}Components<'a> for {{ world.name.type }
 /// for an entity with a single archetype match.
 #[derive(Debug)]
 #[allow(dead_code)]
+{{ lint_allows }}
 pub struct {{ view.name.type }}<'archetype> {
     pub entity_id: ::sillyecs::EntityId,
     {%- for component in view.components %}
@@ -1833,6 +1888,7 @@ pub struct {{ view.name.type }}<'archetype> {
 /// view for an entity with a single archetype match.
 #[derive(Debug)]
 #[allow(dead_code)]
+{{ lint_allows }}
 pub struct {{ view.name.type }}Mut<'archetype> {
     pub entity_id: ::sillyecs::EntityId,
     {%- for component in view.components %}
@@ -1844,6 +1900,7 @@ pub struct {{ view.name.type }}Mut<'archetype> {
 
 /// Read-only access to component views by [`::sillyecs::EntityId`].
 #[allow(dead_code)]
+{{ lint_allows }}
 pub trait ViewAccess {
     {%- for view in ecs.views %}
 
@@ -1859,6 +1916,7 @@ pub trait ViewAccess {
 
 /// Mutable access to component views by [`::sillyecs::EntityId`].
 #[allow(dead_code)]
+{{ lint_allows }}
 pub trait ViewAccessMut: ViewAccess {
     {%- for view in ecs.views %}
 
@@ -1876,6 +1934,7 @@ pub trait ViewAccessMut: ViewAccess {
 {%- if (world.views | length) > 0 %}
 
 //noinspection RsSortImplTraitMembers
+{{ lint_allows }}
 impl ViewAccess for {{ world.name.type }}Archetypes {
     {%- for view in world.views %}
 
@@ -1922,6 +1981,7 @@ impl ViewAccess for {{ world.name.type }}Archetypes {
 }
 
 //noinspection RsSortImplTraitMembers
+{{ lint_allows }}
 impl ViewAccessMut for {{ world.name.type }}Archetypes {
     {%- for view in world.views %}
 
@@ -1961,6 +2021,7 @@ impl ViewAccessMut for {{ world.name.type }}Archetypes {
 }
 
 //noinspection RsSortImplTraitMembers
+{{ lint_allows }}
 impl<E, Q> ViewAccess for {{ world.name.type }}<E, Q> {
     {%- for view in world.views %}
 
@@ -1974,6 +2035,7 @@ impl<E, Q> ViewAccess for {{ world.name.type }}<E, Q> {
 }
 
 //noinspection RsSortImplTraitMembers
+{{ lint_allows }}
 impl<E, Q> ViewAccessMut for {{ world.name.type }}<E, Q> {
     {%- for view in world.views %}
 

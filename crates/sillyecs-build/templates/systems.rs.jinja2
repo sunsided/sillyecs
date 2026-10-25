@@ -1,12 +1,13 @@
 /// The ID of a [`System`].
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 #[repr(u32)]
+{{ lint_allows }}
 pub enum SystemId {
     {%- for system in ecs.systems %}
     {%- if system.description %}
     /// {{ system.description }}
     ///
-    /// For details, see the [`{{ system.name.type }}`]({{ system.name.type }}) Struct.
+    /// For details, see the [`{{ system.name.type }}`] Struct.
     {%- else %}
     /// The [`{{ system.name.raw }}`]({{ system.name.type }}) system.
     {%- endif %}
@@ -33,13 +34,15 @@ pub enum SystemId {
     {%- endfor %}
 }
 
+{{ lint_allows }}
 impl SystemId {
     {%- for system in ecs.systems %}
-    /// A [`NonZeroU64`](core::num::NonZeroU64) representation of [`SystemId::{{ system.name.raw }}`](SystemId::{{ system.name.raw }}) system.
+    /// A [`NonZeroU64`](core::num::NonZeroU64) representation of [`SystemId::{{ system.name.raw }}`] system.
     pub const {{ system.name.field | upper }}_ID_VALUE: core::num::NonZeroU64 = core::num::NonZeroU64::new({{ system.id }}).expect("Error at ECS construction time");
     {%- endfor %}
 }
 
+{{ lint_allows }}
 impl SystemId {
     /// Returns this ID as a [`NonZeroU64`](core::num::NonZeroU64) value.
     pub const fn as_nonzero_u64(&self) -> core::num::NonZeroU64 {
@@ -56,24 +59,28 @@ impl SystemId {
     }
 }
 
+{{ lint_allows }}
 impl core::hash::Hash for SystemId {
     fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
         self.as_u64().hash(state);
     }
 }
 
+{{ lint_allows }}
 impl From<SystemId> for core::num::NonZeroU64 {
     fn from(value: SystemId) -> core::num::NonZeroU64 {
         value.as_nonzero_u64()
     }
 }
 
+{{ lint_allows }}
 impl From<SystemId> for u64 {
     fn from(value: SystemId) -> u64 {
         value.as_u64()
     }
 }
 
+{{ lint_allows }}
 impl core::fmt::Display for SystemId {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> Result<(), core::fmt::Error> {
         match self {
@@ -85,6 +92,7 @@ impl core::fmt::Display for SystemId {
 }
 
 /// Marker trait for systems.
+{{ lint_allows }}
 pub trait System: 'static + Send + Sync {
     /// The ID of this system.
     const ID: SystemId;
@@ -100,6 +108,7 @@ pub trait System: 'static + Send + Sync {
 /// The system phases.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[allow(dead_code)]
+{{ lint_allows }}
 pub enum SystemPhase {
 {%- for phase in ecs.phases %}
     {%- if phase.description %}
@@ -119,6 +128,7 @@ pub enum SystemPhase {
 }
 
 #[allow(dead_code)]
+{{ lint_allows }}
 impl SystemPhase {
     /// The number of system phases.
     pub const COUNT: usize = {{ ecs.phases | length }};
@@ -167,18 +177,21 @@ impl SystemPhase {
 }
 
 /// Trait for constructing system instances.
+{{ lint_allows }}
 pub trait CreateSystem<S: System> {
     /// Create an instance of type `S`.
     fn create(&self) -> S;
 }
 
 /// Trait for constructing system instances.
+{{ lint_allows }}
 pub trait CreateSystems:
 {%- for system in ecs.systems %}
 {%- if loop.index > 1 %} +{% endif %} CreateSystem<{{ system.name.type }}>{%- endfor %}
 { }
 
 #[automatically_derived]
+{{ lint_allows }}
 impl<T> CreateSystems for T
 where
     T:
@@ -188,11 +201,13 @@ where
 }
 
 /// Trait for constructing system instances.
+{{ lint_allows }}
 pub trait SystemPhaseEvents: {% for phase in ecs.phases %}{% if loop.index > 1 %} + {% endif %}System{{ phase.name.type }}Events{%- endfor %}
 {
 }
 
 #[automatically_derived]
+{{ lint_allows }}
 impl<T> SystemPhaseEvents for T
 where
     T:
@@ -202,9 +217,11 @@ where
 }
 
 /// A no-op event struct.
+{{ lint_allows }}
 pub struct NoOpPhaseEvents;
 {%- for phase in ecs.phases %}
 
+{{ lint_allows }}
 impl System{{ phase.name.type }}Events for NoOpPhaseEvents {
     type Result = ();
     type Error = core::convert::Infallible;
@@ -251,11 +268,13 @@ impl System{{ phase.name.type }}Events for NoOpPhaseEvents {
     }
 }
 
+{{ lint_allows }}
 pub trait System{{ phase.name.type }}Events {
     type Result;
     type Error: core::error::Error;
 
     /// The name of the phase.
+    #[allow(dead_code)]
     const NAME: &'static str = "{{ phase.name.raw }}";
 
     /// Executed at the beginning of the phase (before all systems).
@@ -308,7 +327,7 @@ pub trait System{{ phase.name.type }}Events {
 {%- endif %}
 ///
 /// The business logic is implemented via the [`Apply{{ system.name.type }}`] trait.
-/// See also [`{{ system.name.raw }}Data`] for the systems-specific data.
+/// See also [`{{ system.name.type }}Data`] for the systems-specific data.
 {%- if (system.inputs | length > 0) %}
 ///
 /// ### Reads
@@ -329,10 +348,12 @@ pub trait System{{ phase.name.type }}Events {
 /// - [`{{archetype.type}}`] ([`ArchetypeId::{{archetype.raw}}`]){%- endfor %}
 {%- endif %}
 #[derive(Debug)]
+{{ lint_allows }}
 pub struct {{ system.name.type }}({{ system.name.type }}Data);
 
 /// Implements the business logic for the [`{{ system.name.type }}`] system.
 #[allow(dead_code)]
+{{ lint_allows }}
 pub trait Apply{{ system.name.type }}: System {
     type Error: core::error::Error;
 
@@ -704,6 +725,7 @@ pub trait Apply{{ system.name.type }}: System {
 }
 
 #[allow(dead_code)]
+{{ lint_allows }}
 impl {{ system.name.type }} {
     /// Applies the system's business logic to the given entity components.
     ///
@@ -843,10 +865,12 @@ impl {{ system.name.type }} {
 }
 
 #[automatically_derived]
+{{ lint_allows }}
 impl System for {{ system.name.type }} {
     const ID: SystemId = SystemId::{{ system.name.raw }};
 }
 
+{{ lint_allows }}
 impl PartialEq<SystemId> for {{ system.name.type }} {
     fn eq(&self, other: &SystemId) -> bool {
         Self::ID.eq(other)
@@ -854,6 +878,7 @@ impl PartialEq<SystemId> for {{ system.name.type }} {
 }
 
 #[automatically_derived]
+{{ lint_allows }}
 impl From<{{ system.name.type }}Data> for {{ system.name.type }} {
     fn from(data: {{ system.name.type }}Data) -> Self {
         Self(data)
@@ -861,6 +886,7 @@ impl From<{{ system.name.type }}Data> for {{ system.name.type }} {
 }
 
 #[automatically_derived]
+{{ lint_allows }}
 impl core::ops::Deref for {{ system.name.type }} {
     type Target = {{ system.name.type }}Data;
 
@@ -870,6 +896,7 @@ impl core::ops::Deref for {{ system.name.type }} {
 }
 
 #[automatically_derived]
+{{ lint_allows }}
 impl core::ops::DerefMut for {{ system.name.type }} {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
@@ -879,6 +906,7 @@ impl core::ops::DerefMut for {{ system.name.type }} {
 {%- for system in ecs.systems %}
 {%- if (system.lookup | count) > 0 %}
 
+{{ lint_allows }}
 pub trait {{ system.name.raw }}ComponentLookup {
     {%- for component in system.lookup %}
     /// Gets the [`{{component.raw}}`]({{component.type}}) component of the specified entity.
@@ -887,6 +915,7 @@ pub trait {{ system.name.raw }}ComponentLookup {
     {%- endfor %}
 }
 
+{{ lint_allows }}
 impl<T> {{ system.name.raw }}ComponentLookup for T
 where
     T: ComponentAccess

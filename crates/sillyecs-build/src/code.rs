@@ -6,6 +6,16 @@ use std::fs::File;
 use std::io::{BufReader, Write};
 use std::{env, io};
 
+/// Allows emitted as an outer attribute on every generated top-level item.
+///
+/// The generated files are pulled in with `include!`, which rejects inner attributes, so the
+/// allows can't go at the top of each file. Attaching them per item keeps them from leaking into
+/// the user's surrounding module. They cover lints that aren't actionable for users: the
+/// `unsafe` accessors exist even with `allow_unsafe: false`, and the opt-in clippy groups flag
+/// style choices of the templates. Default-level clippy lints stay active, so the compile fixture
+/// keeps the templates themselves honest.
+const LINT_ALLOWS: &str = "#[allow(unsafe_code, unused_qualifications, elided_lifetimes_in_paths, missing_docs, clippy::pedantic, clippy::nursery, clippy::restriction)]";
+
 #[derive(Default)]
 pub struct EcsCode {
     pub components: String,
@@ -41,6 +51,7 @@ impl EcsCode {
         let mut env = Environment::new();
         env.add_filter("snake_case", snake_case_filter);
         env.add_filter("doc_lines", doc_lines_filter);
+        env.add_global("lint_allows", LINT_ALLOWS);
 
         env.add_template("world", include_str!("../templates/world.rs.jinja2"))?;
         env.add_template(
