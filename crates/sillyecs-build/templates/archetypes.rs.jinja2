@@ -713,6 +713,10 @@ pub trait GetEntityRef {
     #[allow(clippy::needless_lifetimes, dead_code)]
     fn get_at<'archetype>(&'archetype self, index: usize) -> Option<Self::EntityRef<'archetype>>;
 
+    /// Gets the entity at the specified index without bounds checking.
+    ///
+    /// # Safety
+    /// `index` must be less than the number of entities in the archetype.
     #[allow(clippy::needless_lifetimes, dead_code)]
     unsafe fn get_at_unchecked<'archetype>(&'archetype self, index: usize) -> Self::EntityRef<'archetype>;
 }
