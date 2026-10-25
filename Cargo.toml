@@ -9,4 +9,5 @@ rust-version = "1.85"
 license = "EUPL-1.2"
 homepage = "https://github.com/sunsided/sillyecs"
 repository = "https://github.com/sunsided/sillyecs.git"
+readme = "README.md"
 authors = ["Markus Mayer <widemeadows@gmail.com>"]

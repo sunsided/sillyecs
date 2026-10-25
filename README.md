@@ -4,7 +4,7 @@ A zero-overhead, compile-time-scheduled archetype ECS in Rust.
 Started as a silly little ECS implementation, strives to be more.
 
 [![Crates.io](https://img.shields.io/crates/v/sillyecs)](https://crates.io/crates/sillyecs)
-[![License](https://img.shields.io/badge/license-EUPL--1.2-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-EUPL--1.2-blue.svg)](https://github.com/sunsided/sillyecs/blob/main/LICENSE.md)
 
 ## Table of Contents
 
