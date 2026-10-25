@@ -245,7 +245,9 @@ include!(concat!(env!("OUT_DIR"), "/systems_gen.rs"));
 include!(concat!(env!("OUT_DIR"), "/world_gen.rs"));
 ```
 
-The compiler will tell you which traits and functions to implement.
+The generated items carry their own lint allows, so the files compile without warnings under strict
+lint settings (`unsafe_code`, `unused_qualifications`, `clippy::pedantic`, ...) and need no allow
+list on the surrounding module. The compiler will tell you which traits and functions to implement.
 
 ### Stateless Systems
 

@@ -82,26 +82,36 @@ fn run_fixture(fixture_name: &str) {
 
     let target_dir = workspace_target.join("sillyecs-compile-fixtures-target");
 
-    let output = Command::new(env!("CARGO"))
-        .arg("test")
-        .arg("--quiet")
-        .arg("--manifest-path")
-        .arg(crate_dir.join("Cargo.toml"))
-        .env("CARGO_TARGET_DIR", &target_dir)
-        // Inherit RUSTFLAGS / RUSTC etc. from the parent so the fixture builds
-        // with the same toolchain the test runner is using.
-        .output()
-        .expect("spawn cargo test");
+    // `cargo test` builds and runs the runtime tests, `clippy` and `doc` add their lints. The
+    // fixture's `lib.rs` denies warnings with the stricter lint levels user crates commonly set,
+    // so any of these fails if a lint fires in the generated code (issue #65).
+    let steps: [&[&str]; 3] = [
+        &["test", "--quiet"],
+        &["clippy", "--quiet", "--all-targets"],
+        &["doc", "--quiet", "--no-deps", "--document-private-items"],
+    ];
+    for args in steps {
+        let output = Command::new(env!("CARGO"))
+            .args(args)
+            .arg("--manifest-path")
+            .arg(crate_dir.join("Cargo.toml"))
+            .env("CARGO_TARGET_DIR", &target_dir)
+            // Inherit RUSTFLAGS / RUSTC etc. from the parent so the fixture builds
+            // with the same toolchain the test runner is using.
+            .output()
+            .unwrap_or_else(|e| panic!("spawn cargo {}: {e}", args[0]));
 
-    if !output.status.success() {
-        panic!(
-            "generated code from fixture `{fixture_name}` failed to compile or its runtime tests failed.\n\
-             crate at: {}\n\
-             --- stdout ---\n{}\n--- stderr ---\n{}",
-            crate_dir.display(),
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr),
-        );
+        if !output.status.success() {
+            panic!(
+                "`cargo {}` failed for the generated code from fixture `{fixture_name}`.\n\
+                 crate at: {}\n\
+                 --- stdout ---\n{}\n--- stderr ---\n{}",
+                args.join(" "),
+                crate_dir.display(),
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr),
+            );
+        }
     }
 }
 
@@ -124,7 +134,7 @@ fn cargo_toml(fixture_name: &str) -> String {
         r#"[package]
 name = "sillyecs-compile-fixture-{fixture_name}"
 version = "0.0.0"
-edition = "2021"
+edition = "2024"
 publish = false
 
 [lib]
@@ -140,18 +150,47 @@ sillyecs = {{ path = "{path}" }}
     )
 }
 
-const LIB_RS: &str = r#"//! Auto-generated fixture crate. See compile_generated.rs in sillyecs-build.
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(clippy::all)]
-#![deny(unreachable_patterns)]
+const LIB_RS: &str = r#"//! Auto-generated fixture crate. See `compile_generated.rs` in `sillyecs-build`.
+//!
+//! The generated code must not need any allows from its user, so the lint levels here are
+//! deliberately strict and apply to the generated files unchanged. The user stubs live in a child
+//! module (so they can reach private fields) and opt out on their own.
+#![deny(warnings)]
+#![warn(
+    unsafe_code,
+    unused_qualifications,
+    elided_lifetimes_in_paths,
+    missing_docs,
+    clippy::pedantic
+)]
 
-include!("generated/components_gen.rs");
-include!("generated/archetypes_gen.rs");
-include!("generated/systems_gen.rs");
-include!("generated/world_gen.rs");
-include!("user.rs");
+mod ecs {
+    #[allow(clippy::wildcard_imports)]
+    use user::*;
 
-#[cfg(test)]
-mod runtime;
+    include!("generated/components_gen.rs");
+    include!("generated/archetypes_gen.rs");
+    include!("generated/systems_gen.rs");
+    include!("generated/world_gen.rs");
+
+    #[allow(
+        dead_code,
+        unused_imports,
+        unused_qualifications,
+        missing_docs,
+        clippy::all,
+        clippy::pedantic
+    )]
+    pub mod user {
+        use super::*;
+        include!("user.rs");
+
+        #[cfg(test)]
+        mod runtime {
+            include!("runtime.rs");
+        }
+    }
+}
+
+pub use ecs::user::smoke;
 "#;
