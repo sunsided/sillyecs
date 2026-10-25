@@ -8,6 +8,8 @@
 #   - at least one fixed-step phase (`FixedUpdate`)
 #   - parallel phases: `FixedUpdate` splits a `lookup` system and a writer into two
 #     groups, `Update` schedules one group of two systems, one of them emitting commands
+#   - stateless systems (`Spin`, `Tint`) mixed with stateful ones; the user factory only covers
+#     the stateful systems (issue #64)
 
 allow_unsafe: false
 
@@ -65,6 +67,7 @@ systems:
 
   - name: Spin
     phase: FixedUpdate
+    stateless: true
     outputs: [Sprite]
 
   - name: Heal
@@ -84,4 +87,5 @@ systems:
 
   - name: Tint
     phase: Update
+    stateless: true
     outputs: [Sprite]

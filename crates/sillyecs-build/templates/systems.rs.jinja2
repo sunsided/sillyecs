@@ -859,6 +859,22 @@ impl From<{{ system.name.type }}Data> for {{ system.name.type }} {
         Self(data)
     }
 }
+{%- if system.stateless %}
+
+/// The (empty) data of the stateless [`{{ system.name.type }}`] system.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct {{ system.name.type }}Data;
+
+/// Stateless systems are created by any factory, so a user factory only needs to cover the
+/// stateful ones. This also rules out a second, hand-written impl for this system.
+#[automatically_derived]
+impl<F: ?Sized> CreateSystem<{{ system.name.type }}> for F {
+    #[inline]
+    fn create(&self) -> {{ system.name.type }} {
+        {{ system.name.type }}({{ system.name.type }}Data)
+    }
+}
+{%- endif %}
 
 #[automatically_derived]
 impl core::ops::Deref for {{ system.name.type }} {

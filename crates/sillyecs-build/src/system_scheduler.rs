@@ -381,6 +381,7 @@ mod tests {
             description: None,
             dependencies: Default::default(),
             postflight: false,
+            stateless: false,
         };
         system.finish_dependencies();
         system
