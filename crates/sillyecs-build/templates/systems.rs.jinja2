@@ -235,9 +235,9 @@ impl System{{ phase.name.type }}Events for NoOpPhaseEvents {
             {%- if access == "none" %}
                 {# skip #}
             {%- elif access == "read" %}
-                _{{ state.use.field }}: &{{ state.use.type }},
+                _{{ state.use.field }}: &{{ ecs.paths.states }}{{ state.use.type }},
             {%- elif access == "write" %}
-                _{{ state.use.field }}: &mut {{ state.use.type }},
+                _{{ state.use.field }}: &mut {{ ecs.paths.states }}{{ state.use.type }},
             {%- else %}
                 todo!("Invalid state use in ECS construction"),
             {%- endif %}
@@ -256,9 +256,9 @@ impl System{{ phase.name.type }}Events for NoOpPhaseEvents {
             {%- if access == "none" %}
                 {# skip #}
             {%- elif access == "read" %}
-                _{{ state.use.field }}: &{{ state.use.type }},
+                _{{ state.use.field }}: &{{ ecs.paths.states }}{{ state.use.type }},
             {%- elif access == "write" %}
-                _{{ state.use.field }}: &mut {{ state.use.type }},
+                _{{ state.use.field }}: &mut {{ ecs.paths.states }}{{ state.use.type }},
             {%- else %}
                 todo!("Invalid state use in ECS construction"),
             {%- endif %}
@@ -286,9 +286,9 @@ pub trait System{{ phase.name.type }}Events {
             {%- if access == "none" %}
                 {# skip #}
             {%- elif access == "read" %}
-                {{ state.use.field }}: &{{ state.use.type }},
+                {{ state.use.field }}: &{{ ecs.paths.states }}{{ state.use.type }},
             {%- elif access == "write" %}
-                {{ state.use.field }}: &mut {{ state.use.type }},
+                {{ state.use.field }}: &mut {{ ecs.paths.states }}{{ state.use.type }},
             {%- else %}
                 todo!("Invalid state use in ECS construction"),
             {%- endif %}
@@ -308,9 +308,9 @@ pub trait System{{ phase.name.type }}Events {
             {%- if access == "none" %}
                 {# skip #}
             {%- elif access == "read" %}
-                {{ state.use.field }}: &{{ state.use.type }},
+                {{ state.use.field }}: &{{ ecs.paths.states }}{{ state.use.type }},
             {%- elif access == "write" %}
-                {{ state.use.field }}: &mut {{ state.use.type }},
+                {{ state.use.field }}: &mut {{ ecs.paths.states }}{{ state.use.type }},
             {%- else %}
                 todo!("Invalid state use in ECS construction"),
             {%- endif %}
@@ -327,7 +327,7 @@ pub trait System{{ phase.name.type }}Events {
 {%- endif %}
 ///
 /// The business logic is implemented via the [`Apply{{ system.name.type }}`] trait.
-/// See also [`{{ system.name.type }}Data`] for the systems-specific data.
+/// See also [`{{ system.data_type }}`] for the systems-specific data.
 {%- if (system.inputs | length > 0) %}
 ///
 /// ### Reads
@@ -349,7 +349,7 @@ pub trait System{{ phase.name.type }}Events {
 {%- endif %}
 #[derive(Debug)]
 {{ lint_allows }}
-pub struct {{ system.name.type }}({{ system.name.type }}Data);
+pub struct {{ system.name.type }}({{ system.data_type }});
 
 /// Implements the business logic for the [`{{ system.name.type }}`] system.
 #[allow(dead_code)]
@@ -373,9 +373,9 @@ pub trait Apply{{ system.name.type }}: System {
             {%- if access == "none" %}
                 {# skip #}
             {%- elif access == "read" %}
-                {{ state.use.field }}: &{{ state.use.type }},
+                {{ state.use.field }}: &{{ ecs.paths.states }}{{ state.use.type }},
             {%- elif access == "write" %}
-                {{ state.use.field }}: &mut {{ state.use.type }},
+                {{ state.use.field }}: &mut {{ ecs.paths.states }}{{ state.use.type }},
             {%- else %}
                 todo!("Invalid state use in ECS construction"),
             {%- endif %}
@@ -400,9 +400,9 @@ pub trait Apply{{ system.name.type }}: System {
             {%- if access == "none" %}
                 {# skip #}
             {%- elif access == "read" %}
-                {{ state.use.field }}: &{{ state.use.type }},
+                {{ state.use.field }}: &{{ ecs.paths.states }}{{ state.use.type }},
             {%- elif access == "write" %}
-                {{ state.use.field }}: &mut {{ state.use.type }},
+                {{ state.use.field }}: &mut {{ ecs.paths.states }}{{ state.use.type }},
             {%- else %}
                 todo!("Invalid state use in ECS construction"),
             {%- endif %}
@@ -427,9 +427,9 @@ pub trait Apply{{ system.name.type }}: System {
             {%- if access == "none" %}
                 {# skip #}
             {%- elif access == "read" %}
-                {{ state.use.field }}: &{{ state.use.type }},
+                {{ state.use.field }}: &{{ ecs.paths.states }}{{ state.use.type }},
             {%- elif access == "write" %}
-                {{ state.use.field }}: &mut {{ state.use.type }},
+                {{ state.use.field }}: &mut {{ ecs.paths.states }}{{ state.use.type }},
             {%- else %}
                 todo!("Invalid state use in ECS construction"),
             {%- endif %}
@@ -465,9 +465,9 @@ pub trait Apply{{ system.name.type }}: System {
             {%- if access == "none" %}
                 {# skip #}
             {%- elif access == "read" %}
-                {{ state.use.field }}: &{{ state.use.type }},
+                {{ state.use.field }}: &{{ ecs.paths.states }}{{ state.use.type }},
             {%- elif access == "write" %}
-                {{ state.use.field }}: &mut {{ state.use.type }},
+                {{ state.use.field }}: &mut {{ ecs.paths.states }}{{ state.use.type }},
             {%- else %}
                 todo!("Invalid state use in ECS construction"),
             {%- endif %}
@@ -514,9 +514,9 @@ pub trait Apply{{ system.name.type }}: System {
             {%- if access == "none" %}
                 {# skip #}
             {%- elif access == "read" %}
-                {{ state.use.field }}: &{{ state.use.type }},
+                {{ state.use.field }}: &{{ ecs.paths.states }}{{ state.use.type }},
             {%- elif access == "write" %}
-                {{ state.use.field }}: &mut {{ state.use.type }},
+                {{ state.use.field }}: &mut {{ ecs.paths.states }}{{ state.use.type }},
             {%- else %}
                 todo!("Invalid state use in ECS construction"),
             {%- endif %}
@@ -559,9 +559,9 @@ pub trait Apply{{ system.name.type }}: System {
             {%- if access == "none" %}
                 {# skip #}
             {%- elif access == "read" %}
-                {{ state.use.field }}: &{{ state.use.type }},
+                {{ state.use.field }}: &{{ ecs.paths.states }}{{ state.use.type }},
             {%- elif access == "write" %}
-                {{ state.use.field }}: &mut {{ state.use.type }},
+                {{ state.use.field }}: &mut {{ ecs.paths.states }}{{ state.use.type }},
             {%- else %}
                 todo!("Invalid state use in ECS construction"),
             {%- endif %}
@@ -601,9 +601,9 @@ pub trait Apply{{ system.name.type }}: System {
             {%- if access == "none" %}
                 {# skip #}
             {%- elif access == "read" %}
-                {{ state.use.field }}: &{{ state.use.type }},
+                {{ state.use.field }}: &{{ ecs.paths.states }}{{ state.use.type }},
             {%- elif access == "write" %}
-                {{ state.use.field }}: &mut {{ state.use.type }},
+                {{ state.use.field }}: &mut {{ ecs.paths.states }}{{ state.use.type }},
             {%- else %}
                 todo!("Invalid state use in ECS construction"),
             {%- endif %}
@@ -672,9 +672,9 @@ pub trait Apply{{ system.name.type }}: System {
             {%- if access == "none" %}
                 {# skip #}
             {%- elif access == "read" %}
-                {{ state.use.field }}: &{{ state.use.type }},
+                {{ state.use.field }}: &{{ ecs.paths.states }}{{ state.use.type }},
             {%- elif access == "write" %}
-                {{ state.use.field }}: &mut {{ state.use.type }},
+                {{ state.use.field }}: &mut {{ ecs.paths.states }}{{ state.use.type }},
             {%- else %}
                 todo!("Invalid state use in ECS construction"),
             {%- endif %}
@@ -746,9 +746,9 @@ impl {{ system.name.type }} {
             {%- set access = state.system | default("none") %}
             {%- if access == "none" %}{# skip #}
             {%- elif access == "read" %}
-        {{ state.use.field }}: &{{ state.use.type }},
+        {{ state.use.field }}: &{{ ecs.paths.states }}{{ state.use.type }},
             {%- elif access == "write" %}
-        {{ state.use.field }}: &mut {{ state.use.type }},
+        {{ state.use.field }}: &mut {{ ecs.paths.states }}{{ state.use.type }},
             {%- else %}
                 todo!("Invalid state use in ECS construction"),
             {%- endif %}
@@ -814,9 +814,9 @@ impl {{ system.name.type }} {
             {%- set access = state.system | default("none") %}
             {%- if access == "none" %}{# skip #}
             {%- elif access == "read" %}
-        {{ state.use.field }}: &{{ state.use.type }},
+        {{ state.use.field }}: &{{ ecs.paths.states }}{{ state.use.type }},
             {%- elif access == "write" %}
-        {{ state.use.field }}: &mut {{ state.use.type }},
+        {{ state.use.field }}: &mut {{ ecs.paths.states }}{{ state.use.type }},
             {%- else %}
                 todo!("Invalid state use in ECS construction"),
             {%- endif %}
@@ -879,8 +879,8 @@ impl PartialEq<SystemId> for {{ system.name.type }} {
 
 #[automatically_derived]
 {{ lint_allows }}
-impl From<{{ system.name.type }}Data> for {{ system.name.type }} {
-    fn from(data: {{ system.name.type }}Data) -> Self {
+impl From<{{ system.data_type }}> for {{ system.name.type }} {
+    fn from(data: {{ system.data_type }}) -> Self {
         Self(data)
     }
 }
@@ -896,7 +896,7 @@ pub struct {{ system.name.type }}Data;
 impl<F: ?Sized> CreateSystem<{{ system.name.type }}> for F {
     #[inline]
     fn create(&self) -> {{ system.name.type }} {
-        {{ system.name.type }}({{ system.name.type }}Data)
+        {{ system.name.type }}({{ system.data_type }})
     }
 }
 {%- endif %}
@@ -904,7 +904,7 @@ impl<F: ?Sized> CreateSystem<{{ system.name.type }}> for F {
 #[automatically_derived]
 {{ lint_allows }}
 impl core::ops::Deref for {{ system.name.type }} {
-    type Target = {{ system.name.type }}Data;
+    type Target = {{ system.data_type }};
 
     fn deref(&self) -> &Self::Target {
         &self.0

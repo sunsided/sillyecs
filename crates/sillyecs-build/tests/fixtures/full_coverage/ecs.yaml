@@ -8,6 +8,9 @@
 #   - at least one fixed-step phase (`FixedUpdate`)
 #   - parallel phases: `FixedUpdate` splits a `lookup` system and a writer into two
 #     groups, `Update` schedules one group of two systems, one of them emitting commands
+#   - user types outside the generated module: the generated code is included in a module that
+#     imports nothing, and finds the user types through `paths` (issue #68). The test also runs
+#     the fixture without the `paths` block, with the user types in scope by bare name.
 #   - stateless systems (`Spin`, `Tint`) mixed with stateful ones; the user factory only covers
 #     the stateful systems (issue #64)
 
@@ -89,3 +92,10 @@ systems:
     phase: Update
     stateless: true
     outputs: [Sprite]
+
+# --- paths (the compile test strips everything from this line on for the bare-name variant)
+paths:
+  components: crate::user
+  states: crate::user
+  systems: crate::user
+  entity_location_map: crate::user::LocationMap

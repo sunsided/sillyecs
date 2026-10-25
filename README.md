@@ -77,8 +77,9 @@ into your project.
 - **Entity frontloading.** Archetypes support `frontload`/`frontload_by_indices_sorted`/
   `frontload_scan` to partition entities (e.g. for quadtree-driven culling) without breaking the
   archetype invariants.
-- **Pluggable `EntityLocationMap`.** The entity → archetype/index lookup is left as a type alias
-  so callers can drop in `fxhash`, `ahash`, or anything else.
+- **Pluggable entity location map.** The entity → archetype/index lookup defaults to
+  `std::collections::HashMap`; set `paths.entity_location_map` to drop in `fxhash`, `ahash`, or
+  anything else.
 - **Optional unchecked accessors.** Setting `allow_unsafe: true` enables `get_*_unchecked`
   variants for hot loops; the default safe paths remain available.
 
@@ -234,16 +235,34 @@ worlds:
 
 # Optional, if you're feeling lucky
 allow_unsafe: true
+
+# Optional: where the generated code finds your types (see below)
+paths:
+  components: crate::game   # PositionData, VelocityData, ...
+  states: crate::game       # WgpuRenderState
+  systems: crate::game      # PhysicsSystemData, RenderSystemData
+  entity_location_map: fxhash::FxHashMap  # defaults to ::std::collections::HashMap
 ```
 
-Include the compile-time generated files:
+Include the compile-time generated files into a module of their own:
 
 ```rust
+// src/ecs.rs
 include!(concat!(env!("OUT_DIR"), "/components_gen.rs"));
 include!(concat!(env!("OUT_DIR"), "/archetypes_gen.rs"));
 include!(concat!(env!("OUT_DIR"), "/systems_gen.rs"));
 include!(concat!(env!("OUT_DIR"), "/world_gen.rs"));
 ```
+
+The generated code refers to your component data, states and system data. With `paths` set, it
+uses those module paths (`crate::game::PositionData`), so the generated module needs no imports and
+your code can live anywhere in the crate. Your types must be visible from the generated module,
+and at least as visible as the generated items exposing them. Without `paths`, it uses the bare
+names, so bring the types into scope where you include the files (e.g. `use crate::game::*;`).
+
+Your code only needs the generated items' public API: build systems with
+`PhysicsSystem::from(PhysicsSystemData { .. })` and components with `PositionComponent::new(..)`,
+and reach their data through `Deref`/`DerefMut`.
 
 The generated items carry their own lint allows, so the files compile without warnings under strict
 lint settings (`unsafe_code`, `unused_qualifications`, `clippy::pedantic`, ...) and need no allow
@@ -443,7 +462,7 @@ pub struct WgpuInitShaderSystemData {
 
 impl CreateSystem<WgpuInitShaderSystem> for SystemFactory {
     fn create(&self) -> WgpuInitShaderSystem {
-        WgpuInitShaderSystem(WgpuInitShaderSystemData::default())
+        WgpuInitShaderSystem::from(WgpuInitShaderSystemData::default())
     }
 }
 

@@ -382,6 +382,7 @@ mod tests {
             dependencies: Default::default(),
             postflight: false,
             stateless: false,
+            data_type: String::new(),
         };
         system.finish_dependencies();
         system

@@ -4,6 +4,7 @@ mod archetype;
 mod code;
 mod component;
 mod ecs;
+mod paths;
 mod state;
 mod system;
 mod system_scheduler;

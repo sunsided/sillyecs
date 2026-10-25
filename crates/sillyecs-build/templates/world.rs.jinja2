@@ -58,6 +58,10 @@ where
     T: WorldCommandSender<UserCommand = U> + WorldCommandReceiver<UserCommand = U>
 { }
 
+/// The map type locating entities in their archetypes, set by `paths.entity_location_map`.
+{{ lint_allows }}
+type EntityLocationMap<K, V> = {{ ecs.paths.entity_location_map }}<K, V>;
+
 {%- if ecs.any_phase_on_request %}
 
 /// Single-consumer request flags for on-request phases.
@@ -170,7 +174,7 @@ impl<E, Q> ::sillyecs::World for {{ world.name.type }}<E, Q> {
 ///
 /// It encapsulates ownership of and access to the following state types:
 /// {% for state in world.states %}
-/// - [`{{ state.name.type }}`]{%- endfor %}
+/// - [`{{ ecs.paths.states }}{{ state.name.type }}`]{%- endfor %}
 #[derive(Debug, Default)]
 {{ lint_allows }}
 pub struct {{ world.name.type }}States {
@@ -185,7 +189,7 @@ pub struct {{ world.name.type }}States {
     {%- for system in state.systems %}
     /// - [`{{system.type}}`]
     {%- endfor %}
-    pub {{ state.name.field }}: {{ state.name.type }},
+    pub {{ state.name.field }}: {{ ecs.paths.states }}{{ state.name.type }},
     {%- endfor %}
 }
 
@@ -194,7 +198,7 @@ pub struct {{ world.name.type }}States {
 impl {{ world.name.type }}States {
     pub const fn new(
         {%- for state in world.states %}
-        {{ state.name.field }}: {{ state.name.type }},
+        {{ state.name.field }}: {{ ecs.paths.states }}{{ state.name.type }},
         {%- endfor %}
     ) -> Self {
         Self {
@@ -213,11 +217,6 @@ impl {{ world.name.type }}States {
 {{ lint_allows }}
 struct {{ world.name.type }}Archetypes {
     /// The entity locator.
-    //
-    // Hashmap type not provided by design. Provide your own implementation such as fxhash::FxHashMap via type alias.
-    // Example:
-    //      type EntityLocationMap<K, V> = fxhash::FxHashMap<K, V>;
-    //
     entity_locations: EntityLocationMap<::sillyecs::EntityId, EntityArchetypeRef>,
 
     pub collection: {{ world.name.type }}ArchetypeCollection
@@ -245,16 +244,16 @@ pub struct {{ world.name.type }}Systems {
 impl {{ world.name.type }}Systems {
     {%- for system in world.systems %}
 
-    /// Gives immutable access to the [`{{ system.name.type }}Data`] of the [`{{ system.name.type }}`].
+    /// Gives immutable access to the [`{{ system.data_type }}`] of the [`{{ system.name.type }}`].
     #[inline]
-    pub fn as_{{ system.name.field }}_ref(&self) -> &{{ system.name.type }}Data {
+    pub fn as_{{ system.name.field }}_ref(&self) -> &{{ system.data_type }} {
         use core::ops::Deref;
         self.{{ system.name.field }}.deref()
     }
 
-    /// Gives mutable access to the [`{{ system.name.type }}Data`] of the [`{{ system.name.type }}`].
+    /// Gives mutable access to the [`{{ system.data_type }}`] of the [`{{ system.name.type }}`].
     #[inline]
-    pub fn as_{{ system.name.field }}_mut(&mut self) -> &mut {{ system.name.type }}Data {
+    pub fn as_{{ system.name.field }}_mut(&mut self) -> &mut {{ system.data_type }} {
         use core::ops::DerefMut;
         self.{{ system.name.field }}.deref_mut()
     }
@@ -263,17 +262,17 @@ impl {{ world.name.type }}Systems {
 {%- for system in world.systems %}
 
 {{ lint_allows }}
-impl AsRef<{{ system.name.type }}Data> for {{ world.name.type }}Systems {
+impl AsRef<{{ system.data_type }}> for {{ world.name.type }}Systems {
     #[inline]
-    fn as_ref(&self) -> &{{ system.name.type }}Data {
+    fn as_ref(&self) -> &{{ system.data_type }} {
         self.as_{{ system.name.field }}_ref()
     }
 }
 
 {{ lint_allows }}
-impl AsMut<{{ system.name.type }}Data> for {{ world.name.type }}Systems {
+impl AsMut<{{ system.data_type }}> for {{ world.name.type }}Systems {
     #[inline]
-    fn as_mut(&mut self) -> &mut {{ system.name.type }}Data {
+    fn as_mut(&mut self) -> &mut {{ system.data_type }} {
         self.as_{{ system.name.field }}_mut()
     }
 }

@@ -1,14 +1,18 @@
 // Hand-written user-side stubs for the `full_coverage` compile fixture. Pairs
 // with `ecs.yaml` in this directory; included from the synthetic library crate
 // built by `tests/compile_generated.rs`.
+//
+// This module is a *sibling* of the generated code, like in a real game, so it
+// only reaches the generated items' public API: systems are built with `From`,
+// not through their private tuple fields.
 
 use std::collections::{HashMap, VecDeque};
 use std::convert::Infallible;
 use std::sync::Mutex;
 
-// The world templates require the consumer to provide an `EntityLocationMap`
-// type alias (see the comment in `world.rs.jinja2`).
-pub type EntityLocationMap<K, V> = HashMap<K, V>;
+// Exercises `paths.entity_location_map` pointing into the user crate (think
+// `fxhash::FxHashMap`).
+pub type LocationMap<K, V> = HashMap<K, V>;
 
 // --- Component data structs ----------------------------------------------------
 //
@@ -55,19 +59,19 @@ pub struct DrawSystemData;
 
 impl Default for StepSystem {
     fn default() -> Self {
-        Self(StepSystemData)
+        Self::from(StepSystemData)
     }
 }
 
 impl Default for HealSystem {
     fn default() -> Self {
-        Self(HealSystemData)
+        Self::from(HealSystemData)
     }
 }
 
 impl Default for DrawSystem {
     fn default() -> Self {
-        Self(DrawSystemData)
+        Self::from(DrawSystemData)
     }
 }
 
