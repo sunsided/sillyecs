@@ -88,10 +88,10 @@ To use them, add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-sillyecs = "0.0.6"
+sillyecs = "0.0.7"
 
 [build-dependencies]
-sillyecs-build = "0.0.6"
+sillyecs-build = "0.0.7"
 ```
 
 ## Usage
