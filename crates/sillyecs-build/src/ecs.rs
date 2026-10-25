@@ -193,9 +193,13 @@ pub enum EcsError {
     #[error("View '{0}' has no components.")]
     ViewWithoutComponents(String),
     #[error(
-        "Invalid type path for `paths.{key}`: '{path}'. Expected a Rust path such as `crate::ecs::{key}`."
+        "Invalid type path for `paths.{key}`: '{path}'. Expected a Rust path such as `{example}`."
     )]
-    InvalidTypePath { key: &'static str, path: String },
+    InvalidTypePath {
+        key: &'static str,
+        path: String,
+        example: &'static str,
+    },
 }
 
 impl Ecs {
