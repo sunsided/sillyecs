@@ -4,6 +4,7 @@ use core::ops::Deref;
 use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Archetype {
     #[serde(skip_deserializing, default)]
     pub id: ArchetypeId,

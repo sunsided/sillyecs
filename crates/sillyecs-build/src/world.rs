@@ -11,6 +11,7 @@ use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::ops::Deref;
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct World {
     #[serde(skip_deserializing, default)]
     pub id: WorldId,

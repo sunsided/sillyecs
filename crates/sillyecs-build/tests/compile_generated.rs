@@ -132,8 +132,6 @@ path = "src/lib.rs"
 
 [dependencies]
 sillyecs = {{ path = "{path}" }}
-tracing = "0.1"
-rayon = "1"
 
 [workspace]
 "#,
@@ -146,6 +144,7 @@ const LIB_RS: &str = r#"//! Auto-generated fixture crate. See compile_generated.
 #![allow(dead_code)]
 #![allow(unused_imports)]
 #![allow(clippy::all)]
+#![deny(unreachable_patterns)]
 
 include!("generated/components_gen.rs");
 include!("generated/archetypes_gen.rs");

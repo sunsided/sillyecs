@@ -5,6 +5,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use std::ops::Deref;
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Component {
     #[serde(skip_deserializing, default)]
     pub id: ComponentId,

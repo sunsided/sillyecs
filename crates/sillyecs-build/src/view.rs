@@ -13,6 +13,7 @@ use std::ops::Deref;
 /// that perform a single entity-location lookup followed by a single archetype
 /// match, then return all view components by index without further lookups.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct View {
     pub name: ViewName,
     #[serde(default)]

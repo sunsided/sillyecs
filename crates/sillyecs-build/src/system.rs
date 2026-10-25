@@ -18,6 +18,7 @@ pub enum AccessType {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct System {
     /// The ID of the system. Automatically generatedd.
     #[serde(skip_deserializing, default)]
@@ -87,6 +88,7 @@ pub struct System {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct StateUse {
     /// The name of the state.
     #[serde(rename = "use")]
@@ -326,6 +328,7 @@ impl System {
 pub struct SystemId(pub(crate) u64);
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SystemPhase {
     /// The name of the phase.
     pub name: SystemPhaseName,

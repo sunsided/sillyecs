@@ -455,7 +455,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
 
     /// Runs a per-frame update of the frame context at the start of a frame.
     fn on_begin_frame(&mut self) {
-        self.context.current_frame_start = std::time::Instant::now();
+        self.context.current_frame_start = ::sillyecs::Instant::now();
         if self.context.frame_number == 0 {
             self.context.delta_time_secs = 0.0;
         } else {
@@ -472,7 +472,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
 
     /// Runs a per-frame update of the frame context at the start of a frame.
     fn on_begin_{{ phase.name.field }}_phase(&mut self) {
-        let now = std::time::Instant::now();
+        let now = ::sillyecs::Instant::now();
         let previous = self.delta_timers.previous_{{ phase.name.field }}_start;
         self.delta_timers.current_{{ phase.name.field }}_start = now;
         self.context.current_frame_start = now;
@@ -670,7 +670,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                 {%- endif %}
             {%- endfor %}
         )
-        .inspect_err(|error| tracing::error!(%error, "Failed to handle phase begin events"))
+        .inspect_err(|error| ::sillyecs::tracing::error!(%error, "Failed to handle phase begin events"))
         .ok();
 
         self.apply_system_phase_{{ phase.name.field }}_without_events();
@@ -692,7 +692,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                 {%- endif %}
             {%- endfor %}
         )
-        .inspect_err(|error| tracing::error!(%error, "Failed to handle phase end events"))
+        .inspect_err(|error| ::sillyecs::tracing::error!(%error, "Failed to handle phase end events"))
         .ok();
 
         // Process all commands.
@@ -749,7 +749,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                     {%- endif %}
                 {%- endfor %}
             )
-            .inspect_err(|error| tracing::error!(?error, "{{ system.name.type }}::on_begin_phase returned an error"))
+            .inspect_err(|error| ::sillyecs::tracing::error!(?error, "{{ system.name.type }}::on_begin_phase returned an error"))
             .is_ok()
         {
             // Preflight
@@ -911,7 +911,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                     {%- endif %}
                 {%- endfor %}
             )
-            .inspect_err(|error| tracing::error!(?error, "{{ system.name.type }}::on_end_phase returned an error"))
+            .inspect_err(|error| ::sillyecs::tracing::error!(?error, "{{ system.name.type }}::on_end_phase returned an error"))
             .ok();
         }
         {%- endfor %}
@@ -960,7 +960,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                 {%- endif %}
             {%- endfor %}
         )
-        .inspect_err(|error| tracing::error!(%error, "Failed to handle phase begin events"))
+        .inspect_err(|error| ::sillyecs::tracing::error!(%error, "Failed to handle phase begin events"))
         .ok();
 
         {%- if world.scheduled_systems[phase.name] | length == 0 %}
@@ -1009,13 +1009,13 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                     {%- endif %}
                 {%- endfor %}
             )
-            .inspect_err(|error| tracing::error!(%error, "{{ system.name.type }}::on_begin_phase returned an error"))
+            .inspect_err(|error| ::sillyecs::tracing::error!(%error, "{{ system.name.type }}::on_begin_phase returned an error"))
             .is_ok();
         {%- endfor %}
 
         {
             // TODO: Skip spawning thread here when there is only one system, or when all run in sequence
-            rayon::scope(|s| {
+            ::sillyecs::rayon::scope(|s| {
                 // TODO: Instead of parallelizing systems (and then have them access archetypes), parallelize archetypes and apply all systems. This should improve data parallelism because it keeps caches hot.
                 {%- for system in group %}
                 if is_{{ system.name.field }}_ready {
@@ -1185,7 +1185,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                 {%- endif %}
             {%- endfor %}
         )
-        .inspect_err(|error| tracing::error!(%error, "{{ system.name.type }}::on_end_phase returned an error"))
+        .inspect_err(|error| ::sillyecs::tracing::error!(%error, "{{ system.name.type }}::on_end_phase returned an error"))
         .ok();
         {%- endfor %}
 
@@ -1209,7 +1209,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                 {%- endif %}
             {%- endfor %}
         )
-        .inspect_err(|error| tracing::error!(%error, "Failed to handle phase end events"))
+        .inspect_err(|error| ::sillyecs::tracing::error!(%error, "Failed to handle phase end events"))
         .ok();
 
         // Process all commands.
@@ -1249,7 +1249,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                 Ok(None) => break,
                 Err(error) => {
                     // TODO: Make logging configurable.
-                    tracing::error!(?error, "Failed to dequeue world command");
+                    ::sillyecs::tracing::error!(?error, "Failed to dequeue world command");
                     break;
                 }
             }
@@ -1271,7 +1271,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
             {%- for archetype in world.archetypes %}
             ArchetypeEntityData::{{ archetype.name.raw }}(data) => {
                 let id = self.spawn_{{ archetype.name.field }}(data);
-                tracing::trace!(%id, "Spawned {{ archetype.name.raw }} entity");
+                ::sillyecs::tracing::trace!(%id, "Spawned {{ archetype.name.raw }} entity");
             },
             {%- endfor %}
             // TODO: Make it a non-panic on release builds?
@@ -1328,15 +1328,15 @@ struct FixedAccumulators {
 struct DeltaTimers {
     {%- for phase in ecs.phases %}
     /// The current start time for the [`{{ phase.name.raw }}`]({{ phase.name.type }}) phase.
-    current_{{ phase.name.field }}_start: std::time::Instant,
+    current_{{ phase.name.field }}_start: ::sillyecs::Instant,
     /// The previous start time for the [`{{ phase.name.raw }}`]({{ phase.name.type }}) phase.
-    previous_{{ phase.name.field }}_start: std::time::Instant,
+    previous_{{ phase.name.field }}_start: ::sillyecs::Instant,
     {%- endfor %}
 }
 
 impl Default for DeltaTimers {
     fn default() -> Self {
-        let now = std::time::Instant::now();
+        let now = ::sillyecs::Instant::now();
         Self {
             {%- for phase in ecs.phases %}
             current_{{ phase.name.field }}_start: now,
@@ -1650,7 +1650,7 @@ impl ComponentAccess for {{ world.name.type }}Archetypes {
             {%- for archetype in archetypes %}
             {{ archetype.type }}::ID => self.collection.{{ archetype.field }}.get_{{component.field}}_component_at(ear.index),
             {%- endfor %}
-            #[allow(dead_code)]
+            #[allow(unreachable_patterns)]
             _ => None
         }
     }
@@ -1671,7 +1671,7 @@ impl ComponentAccessMut for {{ world.name.type }}Archetypes {
             {%- for archetype in archetypes %}
             {{ archetype.type }}::ID => self.collection.{{ archetype.field }}.get_{{component.field}}_component_at_mut(ear.index),
             {%- endfor %}
-            #[allow(dead_code)]
+            #[allow(unreachable_patterns)]
             _ => None
         }
     }
