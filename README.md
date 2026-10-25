@@ -61,8 +61,8 @@ into your project.
 - **Flexible phase types.** Phases can be `manual` (caller drives them), `on_request` (atomic
   request flag, swap-on-read), or fixed-step with an accumulator loop (`60 Hz` / `0.016 s`
   syntax).
-- **Deferred world commands.** Spawn, despawn, and user-defined commands flow through a
-  pluggable `WorldCommandSender`/`WorldCommandReceiver`. Commands are drained before and after
+- **Deferred world commands.** Spawn, despawn, and user-defined commands flow through any queue
+  implementing the runtime `CommandSender`/`CommandReceiver` traits. Commands are drained before and after
   each phase, not between systems.
 - **`NonZeroU64` IDs.** `ArchetypeId`, `SystemId`, `WorldId`, and `EntityId` are niche-optimized
   enums with `const` value tables and `Display` impls.
@@ -318,57 +318,49 @@ let vel = world.get_velocity_component(entity_id);
 
 ### Command Queue and Application-Specific Commands
 
-You will have to implement a command queue. Below is an example for a queue based on
+The world takes a command queue for spawn, despawn and user commands. A queue implements the
+runtime traits `sillyecs::CommandSender` and `sillyecs::CommandReceiver` for the generated
+`WorldCommand<U>`; the generated `WorldCommandSender`/`WorldCommandReceiver` follow from blanket
+impls. Because the runtime traits don't mention any generated type, a generic queue can implement
+them once for any command type, e.g. in a support crate. Below is an example based on
 [`crossbeam-channel`](https://docs.rs/crossbeam/latest/crossbeam/channel):
 
 ```rust
-struct CommandQueue<UserCommand> {
-    sender: crossbeam_channel::Sender<WorldCommand<UserCommand>>,
-    receiver: crossbeam_channel::Receiver<WorldCommand<UserCommand>>,
+struct CommandQueue<C> {
+    sender: crossbeam_channel::Sender<C>,
+    receiver: crossbeam_channel::Receiver<C>,
 }
 
-impl<UserCommand> CommandQueue<UserCommand> {
+impl<C> CommandQueue<C> {
     pub fn new() -> Self {
         let (sender, receiver) = crossbeam_channel::unbounded();
-        Self {
-            sender,
-            receiver,
-        }
+        Self { sender, receiver }
     }
 }
 
-impl<UserCommand> WorldUserCommand for CommandQueue<UserCommand>
-where
-    UserCommand: Send + Debug
-{
-    type UserCommand = UserCommand;
-}
+impl<C> sillyecs::CommandSender for CommandQueue<C> {
+    type Command = C;
+    type Error = crossbeam_channel::SendError<C>;
 
-impl<UserCommand> WorldCommandReceiver for CommandQueue<UserCommand>
-where
-    UserCommand: Send + Debug
-{
-    type Error = TryRecvError;
-
-    fn recv(&self) -> Result<Option<WorldCommand>, Self::Error> {
-        match self.receiver.try_recv() {
-            Ok(cmd) => Ok(Some(cmd)),
-            Err(TryRecvError::Empty) => Ok(None),
-            Err(err) => Err(err),
-        }
-    }
-}
-
-impl<UserCommand> WorldCommandSender for CommandQueue<UserCommand>
-where
-    UserCommand: Send + Debug
-{
-    type Error = crossbeam_channel::SendError<WorldCommand>;
-
-    fn send(&self, command: WorldCommand) -> Result<(), Self::Error> {
+    fn send(&self, command: C) -> Result<(), Self::Error> {
         self.sender.send(command)
     }
 }
+
+impl<C> sillyecs::CommandReceiver for CommandQueue<C> {
+    type Command = C;
+    type Error = crossbeam_channel::TryRecvError;
+
+    fn recv(&self) -> Result<Option<C>, Self::Error> {
+        match self.receiver.try_recv() {
+            Ok(command) => Ok(Some(command)),
+            Err(crossbeam_channel::TryRecvError::Empty) => Ok(None),
+            Err(error) => Err(error),
+        }
+    }
+}
+
+type MyWorld = MainWorld<NoOpPhaseEvents, CommandQueue<WorldCommand<MyUserCommand>>>;
 ```
 
 For each world, the `WorldUserCommandHandler` trait must be implemented:

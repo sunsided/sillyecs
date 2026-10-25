@@ -155,11 +155,19 @@ pub enum UserCommand {
     Spawn,
 }
 
-pub struct CommandQueue {
-    queue: Mutex<VecDeque<WorldCommand<UserCommand>>>,
+// The queue is generic over its command type and implements only the runtime
+// traits from `sillyecs`, like a queue from a support crate would (e.g.
+// game-toolkit-ecs's `ChannelQueue`). The generated `WorldCommandSender` /
+// `WorldCommandReceiver` come from blanket impls.
+
+pub struct Queue<C> {
+    queue: Mutex<VecDeque<C>>,
 }
 
-impl CommandQueue {
+/// The fixture world's command queue.
+pub type CommandQueue = Queue<WorldCommand<UserCommand>>;
+
+impl<C> Queue<C> {
     pub fn new() -> Self {
         Self {
             queue: Mutex::new(VecDeque::new()),
@@ -167,7 +175,7 @@ impl CommandQueue {
     }
 }
 
-impl Default for CommandQueue {
+impl<C> Default for Queue<C> {
     fn default() -> Self {
         Self::new()
     }
@@ -184,14 +192,11 @@ impl std::fmt::Display for CommandQueueClosed {
 
 impl std::error::Error for CommandQueueClosed {}
 
-impl WorldUserCommand for CommandQueue {
-    type UserCommand = UserCommand;
-}
-
-impl WorldCommandSender for CommandQueue {
+impl<C> ::sillyecs::CommandSender for Queue<C> {
+    type Command = C;
     type Error = CommandQueueClosed;
 
-    fn send(&self, command: WorldCommand<Self::UserCommand>) -> Result<(), Self::Error> {
+    fn send(&self, command: C) -> Result<(), Self::Error> {
         self.queue
             .lock()
             .map_err(|_| CommandQueueClosed)?
@@ -200,10 +205,11 @@ impl WorldCommandSender for CommandQueue {
     }
 }
 
-impl WorldCommandReceiver for CommandQueue {
+impl<C> ::sillyecs::CommandReceiver for Queue<C> {
+    type Command = C;
     type Error = CommandQueueClosed;
 
-    fn recv(&self) -> Result<Option<WorldCommand<Self::UserCommand>>, Self::Error> {
+    fn recv(&self) -> Result<Option<C>, Self::Error> {
         Ok(self
             .queue
             .lock()
@@ -217,8 +223,18 @@ where
     Q: WorldUserCommand<UserCommand = UserCommand>,
 {
     fn handle_user_command(&mut self, command: Self::UserCommand) {
-        // Discard for the fixture; the goal is to compile, not to act.
-        let _ = command;
+        // Act on `Spawn` through the world's public API, so the runtime tests can
+        // see that user commands arrive (and that a handler outside the generated
+        // module can drive the world).
+        match command {
+            UserCommand::Spawn => {
+                self.spawn_particle_with(
+                    PositionComponent::new(PositionData::default()),
+                    VelocityComponent::new(VelocityData::default()),
+                );
+            }
+            UserCommand::Heal { .. } => {}
+        }
     }
 }
 

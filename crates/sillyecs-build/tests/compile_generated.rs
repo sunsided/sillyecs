@@ -40,10 +40,12 @@ const PATHS_MARKER: &str = "# --- paths";
 /// generated items' public API.
 #[derive(Clone, Copy)]
 enum Layout {
-    /// The YAML's `paths` block is used and the generated module imports nothing.
+    /// The YAML's `paths` block is used and the generated module imports nothing. The module is
+    /// public, so lints that only fire on exported items (`clippy::missing_safety_doc`) see it.
     Paths,
     /// The `paths` block is stripped, so the generated code names the user types by their bare
-    /// names, and the generated module glob-imports them (the setup before `paths` existed).
+    /// names, and the generated module glob-imports them (the setup before `paths` existed). The
+    /// module is private, so `dead_code` sees every generated item the fixture leaves unused.
     BareNames,
 }
 
@@ -67,8 +69,12 @@ fn run_fixture(fixture_name: &str, layout: Layout) {
         .unwrap_or_else(|e| panic!("read {}: {e}", user_path.display()));
     let runtime_rs = fs::read_to_string(fixture_dir.join("runtime.rs")).unwrap_or_default();
 
-    let (yaml, crate_name, ecs_imports) = match layout {
-        Layout::Paths => (&yaml[..], fixture_name.to_string(), ""),
+    let (yaml, crate_name, ecs_module) = match layout {
+        Layout::Paths => (
+            &yaml[..],
+            fixture_name.to_string(),
+            "/// The generated ECS.\npub mod ecs {\n",
+        ),
         Layout::BareNames => {
             let text = std::str::from_utf8(&yaml).expect("fixture YAML is UTF-8");
             let end = text
@@ -77,7 +83,7 @@ fn run_fixture(fixture_name: &str, layout: Layout) {
             (
                 &yaml[..end],
                 format!("{fixture_name}_bare_names"),
-                "    #[allow(clippy::wildcard_imports)]\n    use crate::user::*;\n",
+                "mod ecs {\n    #[allow(clippy::wildcard_imports)]\n    use crate::user::*;\n",
             )
         }
     };
@@ -114,7 +120,7 @@ fn run_fixture(fixture_name: &str, layout: Layout) {
     fs::write(src_dir.join("runtime.rs"), &runtime_rs).unwrap();
     fs::write(
         src_dir.join("lib.rs"),
-        LIB_RS.replace("    // ECS_IMPORTS\n", ecs_imports),
+        LIB_RS.replace("mod ecs {\n", ecs_module),
     )
     .unwrap();
     fs::write(crate_dir.join("Cargo.toml"), cargo_toml(&crate_name)).unwrap();
@@ -204,7 +210,6 @@ const LIB_RS: &str = r#"//! Auto-generated fixture crate. See `compile_generated
 )]
 
 mod ecs {
-    // ECS_IMPORTS
     include!("generated/components_gen.rs");
     include!("generated/archetypes_gen.rs");
     include!("generated/systems_gen.rs");
@@ -219,7 +224,7 @@ mod ecs {
     clippy::all,
     clippy::pedantic
 )]
-mod user {
+pub mod user {
     use crate::ecs::*;
     include!("user.rs");
 

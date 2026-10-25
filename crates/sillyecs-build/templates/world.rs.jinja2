@@ -13,12 +13,19 @@ pub enum WorldCommand<UserCommand> {
     User(UserCommand)
 }
 
+/// Provides the user command type of a [`WorldCommand`] queue (or of a world).
+///
+/// Implemented for every [`CommandReceiver`](::sillyecs::CommandReceiver) of `WorldCommand<U>`.
 {{ lint_allows }}
 pub trait WorldUserCommand {
     type UserCommand: core::marker::Send + core::fmt::Debug;
 }
 
 /// Sender of [`WorldCommand`] instances.
+///
+/// Implemented for every type implementing [`CommandSender`](::sillyecs::CommandSender) for
+/// `WorldCommand<U>` (and [`CommandReceiver`](::sillyecs::CommandReceiver), which provides `U`),
+/// so queues implement those runtime traits instead.
 #[allow(dead_code)]
 {{ lint_allows }}
 pub trait WorldCommandSender: WorldUserCommand {
@@ -28,7 +35,10 @@ pub trait WorldCommandSender: WorldUserCommand {
     fn send(&self, command: WorldCommand<Self::UserCommand>) -> Result<(), Self::Error>;
 }
 
-/// Sender of [`WorldCommand`] instances.
+/// Receiver of [`WorldCommand`] instances.
+///
+/// Implemented for every type implementing [`CommandReceiver`](::sillyecs::CommandReceiver) for
+/// `WorldCommand<U>`, so queues implement that runtime trait instead.
 #[allow(dead_code)]
 {{ lint_allows }}
 pub trait WorldCommandReceiver: WorldUserCommand {
@@ -37,6 +47,43 @@ pub trait WorldCommandReceiver: WorldUserCommand {
     /// Attempts to receive a message from the channel without blocking.
     /// Returns `Ok(None)` if no command was queued.
     fn recv(&self) -> Result<Option<WorldCommand<Self::UserCommand>>, Self::Error>;
+}
+
+{{ lint_allows }}
+impl<T, U> WorldUserCommand for T
+where
+    T: ::sillyecs::CommandReceiver<Command = WorldCommand<U>>,
+    U: core::marker::Send + core::fmt::Debug,
+{
+    type UserCommand = U;
+}
+
+{{ lint_allows }}
+impl<T, U> WorldCommandSender for T
+where
+    T: ::sillyecs::CommandSender<Command = WorldCommand<U>> + WorldUserCommand<UserCommand = U>,
+    U: core::marker::Send + core::fmt::Debug,
+{
+    type Error = <T as ::sillyecs::CommandSender>::Error;
+
+    #[inline]
+    fn send(&self, command: WorldCommand<U>) -> Result<(), Self::Error> {
+        ::sillyecs::CommandSender::send(self, command)
+    }
+}
+
+{{ lint_allows }}
+impl<T, U> WorldCommandReceiver for T
+where
+    T: ::sillyecs::CommandReceiver<Command = WorldCommand<U>>,
+    U: core::marker::Send + core::fmt::Debug,
+{
+    type Error = <T as ::sillyecs::CommandReceiver>::Error;
+
+    #[inline]
+    fn recv(&self) -> Result<Option<WorldCommand<U>>, Self::Error> {
+        ::sillyecs::CommandReceiver::recv(self)
+    }
 }
 
 /// Handler of a [`WorldCommand`]'s user command.
