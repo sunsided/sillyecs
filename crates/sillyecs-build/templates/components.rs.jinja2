@@ -118,7 +118,7 @@ pub trait Component: 'static + Send + Sync {
 /// A `{{ component.name.raw }}` component.
 {%- endif %}
 ///
-/// See also [`{{ component.name.raw }}Data`] for the actual data.
+/// See also [`{{ ecs.paths.components }}{{ component.name.raw }}Data`] for the actual data.
 {%- if component.affected_archetype_count > 0 %}
 ///
 /// # Archetype Use
@@ -135,13 +135,13 @@ pub trait Component: 'static + Send + Sync {
 {%- endif %}
 #[derive(Debug, Clone)]
 {{ lint_allows }}
-pub struct {{ component.name.type }}({{ component.name.raw }}Data);
+pub struct {{ component.name.type }}({{ ecs.paths.components }}{{ component.name.raw }}Data);
 
 #[allow(dead_code)]
 {{ lint_allows }}
 impl {{ component.name.type }} {
-    /// Creates a new [`{{ component.name.type }}`] instance from [`{{ component.name.raw }}Data`].
-    pub const fn new(data: {{ component.name.raw }}Data) -> Self {
+    /// Creates a new [`{{ component.name.type }}`] instance from [`{{ ecs.paths.components }}{{ component.name.raw }}Data`].
+    pub const fn new(data: {{ ecs.paths.components }}{{ component.name.raw }}Data) -> Self {
         Self(data)
     }
 }
@@ -161,8 +161,8 @@ impl PartialEq<ComponentId> for {{ component.name.type }} {
 
 #[automatically_derived]
 {{ lint_allows }}
-impl From<{{ component.name.raw }}Data> for {{ component.name.type }} {
-    fn from(data: {{ component.name.raw }}Data) -> Self {
+impl From<{{ ecs.paths.components }}{{ component.name.raw }}Data> for {{ component.name.type }} {
+    fn from(data: {{ ecs.paths.components }}{{ component.name.raw }}Data) -> Self {
         Self(data)
     }
 }
@@ -170,7 +170,7 @@ impl From<{{ component.name.raw }}Data> for {{ component.name.type }} {
 #[automatically_derived]
 {{ lint_allows }}
 impl core::ops::Deref for {{ component.name.type }} {
-    type Target = {{ component.name.raw }}Data;
+    type Target = {{ ecs.paths.components }}{{ component.name.raw }}Data;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -187,32 +187,32 @@ impl core::ops::DerefMut for {{ component.name.type }} {
 
 #[automatically_derived]
 {{ lint_allows }}
-impl core::convert::AsRef<{{ component.name.raw }}Data> for {{ component.name.type }} {
-    fn as_ref(&self) -> &{{ component.name.raw }}Data {
+impl core::convert::AsRef<{{ ecs.paths.components }}{{ component.name.raw }}Data> for {{ component.name.type }} {
+    fn as_ref(&self) -> &{{ ecs.paths.components }}{{ component.name.raw }}Data {
         &self.0
     }
 }
 
 #[automatically_derived]
 {{ lint_allows }}
-impl core::convert::AsMut<{{ component.name.raw }}Data> for {{ component.name.type }} {
-    fn as_mut(&mut self) -> &mut {{ component.name.raw }}Data {
+impl core::convert::AsMut<{{ ecs.paths.components }}{{ component.name.raw }}Data> for {{ component.name.type }} {
+    fn as_mut(&mut self) -> &mut {{ ecs.paths.components }}{{ component.name.raw }}Data {
         &mut self.0
     }
 }
 
 #[automatically_derived]
 {{ lint_allows }}
-impl core::borrow::Borrow<{{ component.name.raw }}Data> for {{ component.name.type }} {
-    fn borrow(&self) -> &{{ component.name.raw }}Data {
+impl core::borrow::Borrow<{{ ecs.paths.components }}{{ component.name.raw }}Data> for {{ component.name.type }} {
+    fn borrow(&self) -> &{{ ecs.paths.components }}{{ component.name.raw }}Data {
         &self.0
     }
 }
 
 #[automatically_derived]
 {{ lint_allows }}
-impl core::borrow::BorrowMut<{{ component.name.raw }}Data> for {{ component.name.type }} {
-    fn borrow_mut(&mut self) -> &mut {{ component.name.raw }}Data {
+impl core::borrow::BorrowMut<{{ ecs.paths.components }}{{ component.name.raw }}Data> for {{ component.name.type }} {
+    fn borrow_mut(&mut self) -> &mut {{ ecs.paths.components }}{{ component.name.raw }}Data {
         &mut self.0
     }
 }

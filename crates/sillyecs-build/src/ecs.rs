@@ -1,5 +1,6 @@
 use crate::archetype::{Archetype, ArchetypeId};
 use crate::component::{Component, ComponentId};
+use crate::paths::TypePaths;
 use crate::state::State;
 use crate::system::{System, SystemId, SystemPhase};
 use crate::view::View;
@@ -35,11 +36,15 @@ pub struct Ecs {
     /// Allow the generation of unsafe code.
     #[serde(default)]
     pub allow_unsafe: bool,
+    /// Where the generated code finds the user-defined types.
+    #[serde(default)]
+    pub paths: TypePaths,
 }
 
 impl Ecs {
     pub(crate) fn finish(&mut self) -> Result<(), EcsError> {
         self.assign_ids()?;
+        self.paths.finish()?;
 
         let cloned_archetypes = self.archetypes.clone();
         for archetype in &mut self.archetypes {
@@ -47,7 +52,7 @@ impl Ecs {
         }
 
         for system in &mut self.systems {
-            system.finish(&self.archetypes);
+            system.finish(&self.archetypes, &self.paths);
         }
 
         for component in &mut self.components {
@@ -187,6 +192,14 @@ pub enum EcsError {
     NoMatchingArchetypeForView(String),
     #[error("View '{0}' has no components.")]
     ViewWithoutComponents(String),
+    #[error(
+        "Invalid type path for `paths.{key}`: '{path}'. Expected a Rust path such as `{example}`."
+    )]
+    InvalidTypePath {
+        key: &'static str,
+        path: String,
+        example: &'static str,
+    },
 }
 
 impl Ecs {

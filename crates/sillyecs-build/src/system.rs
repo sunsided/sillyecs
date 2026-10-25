@@ -1,6 +1,7 @@
 use crate::Name;
 use crate::archetype::{Archetype, ArchetypeId, ArchetypeRef};
 use crate::component::{ComponentName, ComponentRef};
+use crate::paths::TypePaths;
 use crate::state::StateName;
 use crate::system_scheduler::{Access, Dependency, Resource};
 use serde::{Deserialize, Deserializer, Serialize};
@@ -86,6 +87,10 @@ pub struct System {
     /// The code to untuple component values. Available after a call to [`System::finish`](System::finish).
     #[serde(skip_deserializing, default)]
     pub component_untuple_code: String,
+    /// The path of the system's data type: local for stateless systems, otherwise in the
+    /// configured `paths.systems` module. Available after a call to [`System::finish`].
+    #[serde(skip_deserializing, default)]
+    pub data_type: String,
     /// The dependencies. Available after a call to [`System::finish_dependencies`](System::finish_dependencies) (e.g. via [`System::finish`](System::finish)).
     #[serde(skip)]
     pub dependencies: Vec<Dependency>,
@@ -197,7 +202,13 @@ impl System {
         }
     }
 
-    pub(crate) fn finish(&mut self, archetypes: &[Archetype]) {
+    pub(crate) fn finish(&mut self, archetypes: &[Archetype], paths: &TypePaths) {
+        self.data_type = if self.stateless {
+            format!("{}Data", self.name.type_name)
+        } else {
+            format!("{}{}Data", paths.systems, self.name.type_name)
+        };
+
         // Set dependencies after default states
         self.apply_state_defaults();
         self.finish_dependencies();

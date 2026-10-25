@@ -235,7 +235,7 @@ pub type {{ archetype.name.raw }}Entity = EntityWithIdAndData<{{ archetype.name.
 {{ lint_allows }}
 pub struct {{ archetype.name.raw }}EntityData {
     {%- for component_name in archetype.components %}
-    pub {{ component_name.field }}: {{ component_name.raw }}Data,
+    pub {{ component_name.field }}: {{ ecs.paths.components }}{{ component_name.raw }}Data,
     {%- endfor %}
 }
 

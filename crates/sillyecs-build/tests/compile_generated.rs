@@ -32,12 +32,32 @@ const FIXTURE_ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures"
 /// manifest dir so the test works no matter where `cargo` is invoked from.
 const SILLYECS_RUNTIME_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../sillyecs");
 
-#[test]
-fn full_coverage_fixture_compiles() {
-    run_fixture("full_coverage");
+/// Marks the start of a fixture's `paths:` block; [`Layout::BareNames`] drops everything from here.
+const PATHS_MARKER: &str = "# --- paths";
+
+/// How the fixture crate wires the generated code to the user code. In both layouts the user
+/// code is a sibling module of the generated code, as in a real game, so it can only use the
+/// generated items' public API.
+#[derive(Clone, Copy)]
+enum Layout {
+    /// The YAML's `paths` block is used and the generated module imports nothing.
+    Paths,
+    /// The `paths` block is stripped, so the generated code names the user types by their bare
+    /// names, and the generated module glob-imports them (the setup before `paths` existed).
+    BareNames,
 }
 
-fn run_fixture(fixture_name: &str) {
+#[test]
+fn full_coverage_fixture_compiles() {
+    run_fixture("full_coverage", Layout::Paths);
+}
+
+#[test]
+fn full_coverage_fixture_compiles_with_bare_names() {
+    run_fixture("full_coverage", Layout::BareNames);
+}
+
+fn run_fixture(fixture_name: &str, layout: Layout) {
     let fixture_dir = PathBuf::from(FIXTURE_ROOT).join(fixture_name);
     let yaml_path = fixture_dir.join("ecs.yaml");
     let user_path = fixture_dir.join("user.rs");
@@ -47,8 +67,23 @@ fn run_fixture(fixture_name: &str) {
         .unwrap_or_else(|e| panic!("read {}: {e}", user_path.display()));
     let runtime_rs = fs::read_to_string(fixture_dir.join("runtime.rs")).unwrap_or_default();
 
-    let code = EcsCode::generate(BufReader::new(&yaml[..]))
-        .unwrap_or_else(|e| panic!("EcsCode::generate failed for {fixture_name}: {e:?}"));
+    let (yaml, crate_name, ecs_imports) = match layout {
+        Layout::Paths => (&yaml[..], fixture_name.to_string(), ""),
+        Layout::BareNames => {
+            let text = std::str::from_utf8(&yaml).expect("fixture YAML is UTF-8");
+            let end = text
+                .find(PATHS_MARKER)
+                .unwrap_or_else(|| panic!("{fixture_name}/ecs.yaml has no `{PATHS_MARKER}` line"));
+            (
+                &yaml[..end],
+                format!("{fixture_name}_bare_names"),
+                "    #[allow(clippy::wildcard_imports)]\n    use crate::user::*;\n",
+            )
+        }
+    };
+
+    let code = EcsCode::generate(BufReader::new(yaml))
+        .unwrap_or_else(|e| panic!("EcsCode::generate failed for {crate_name}: {e:?}"));
 
     // Stable, per-fixture workspace location so cargo's incremental cache
     // survives across test runs. Cleaned and rewritten every invocation so
@@ -56,7 +91,7 @@ fn run_fixture(fixture_name: &str) {
     let workspace_target = workspace_target_dir();
     let crate_dir = workspace_target
         .join("sillyecs-compile-fixtures")
-        .join(fixture_name);
+        .join(&crate_name);
     let src_dir = crate_dir.join("src");
     let generated_dir = src_dir.join("generated");
 
@@ -77,8 +112,12 @@ fn run_fixture(fixture_name: &str) {
 
     fs::write(src_dir.join("user.rs"), &user_rs).unwrap();
     fs::write(src_dir.join("runtime.rs"), &runtime_rs).unwrap();
-    fs::write(src_dir.join("lib.rs"), LIB_RS).unwrap();
-    fs::write(crate_dir.join("Cargo.toml"), cargo_toml(fixture_name)).unwrap();
+    fs::write(
+        src_dir.join("lib.rs"),
+        LIB_RS.replace("    // ECS_IMPORTS\n", ecs_imports),
+    )
+    .unwrap();
+    fs::write(crate_dir.join("Cargo.toml"), cargo_toml(&crate_name)).unwrap();
 
     let target_dir = workspace_target.join("sillyecs-compile-fixtures-target");
 
@@ -103,7 +142,7 @@ fn run_fixture(fixture_name: &str) {
 
         if !output.status.success() {
             panic!(
-                "`cargo {}` failed for the generated code from fixture `{fixture_name}`.\n\
+                "`cargo {}` failed for the generated code from fixture `{crate_name}`.\n\
                  crate at: {}\n\
                  --- stdout ---\n{}\n--- stderr ---\n{}",
                 args.join(" "),
@@ -153,8 +192,8 @@ sillyecs = {{ path = "{path}" }}
 const LIB_RS: &str = r#"//! Auto-generated fixture crate. See `compile_generated.rs` in `sillyecs-build`.
 //!
 //! The generated code must not need any allows from its user, so the lint levels here are
-//! deliberately strict and apply to the generated files unchanged. The user stubs live in a child
-//! module (so they can reach private fields) and opt out on their own.
+//! deliberately strict and apply to the generated files unchanged. The user code is a sibling
+//! module of the generated code, as in a real game, and opts out of the lints on its own.
 #![deny(warnings)]
 #![warn(
     unsafe_code,
@@ -165,32 +204,30 @@ const LIB_RS: &str = r#"//! Auto-generated fixture crate. See `compile_generated
 )]
 
 mod ecs {
-    #[allow(clippy::wildcard_imports)]
-    use user::*;
-
+    // ECS_IMPORTS
     include!("generated/components_gen.rs");
     include!("generated/archetypes_gen.rs");
     include!("generated/systems_gen.rs");
     include!("generated/world_gen.rs");
+}
 
-    #[allow(
-        dead_code,
-        unused_imports,
-        unused_qualifications,
-        missing_docs,
-        clippy::all,
-        clippy::pedantic
-    )]
-    pub mod user {
-        use super::*;
-        include!("user.rs");
+#[allow(
+    dead_code,
+    unused_imports,
+    unused_qualifications,
+    missing_docs,
+    clippy::all,
+    clippy::pedantic
+)]
+mod user {
+    use crate::ecs::*;
+    include!("user.rs");
 
-        #[cfg(test)]
-        mod runtime {
-            include!("runtime.rs");
-        }
+    #[cfg(test)]
+    mod runtime {
+        include!("runtime.rs");
     }
 }
 
-pub use ecs::user::smoke;
+pub use user::smoke;
 "#;
