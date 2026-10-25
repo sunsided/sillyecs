@@ -12,7 +12,7 @@ repository.workspace = true
 authors.workspace = true
 
 [dependencies]
-minijinja = { version = "2.20.0", default-features = false, features = ["builtins", "serde"] }
-serde = { version = "1.0.228", features = ["derive"] }
+minijinja = { version = "3.0.3", default-features = false, features = ["builtins", "serde"] }
+serde = { version = "1.0.229", features = ["derive"] }
 serde_yaml = "0.9.34"
-thiserror = "2.0.18"
+thiserror = "2.0.21"

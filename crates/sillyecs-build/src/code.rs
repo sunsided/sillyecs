@@ -1,5 +1,6 @@
 use crate::ecs::{Ecs, EcsError};
 use crate::{doc_lines_filter, snake_case_filter};
+use minijinja::value::{Serde, Value};
 use minijinja::{Environment, context};
 use std::fs::File;
 use std::io::{BufReader, Write};
@@ -52,20 +53,23 @@ impl EcsCode {
         )?;
         env.add_template("systems", include_str!("../templates/systems.rs.jinja2"))?;
 
+        // Serialize the ECS once; `Value` clones share the same data.
+        let ecs = Value::from(Serde(&ecs));
+
         let world_code = env.get_template("world")?.render(context! {
-            ecs => ecs,
+            ecs => ecs.clone(),
         })?;
 
         let component_code = env.get_template("components")?.render(context! {
-            ecs => ecs,
+            ecs => ecs.clone(),
         })?;
 
         let archetype_code = env.get_template("archetypes")?.render(context! {
-            ecs => ecs,
+            ecs => ecs.clone(),
         })?;
 
         let system_code = env.get_template("systems")?.render(context! {
-            ecs => ecs,
+            ecs => ecs.clone(),
         })?;
 
         Ok(EcsCode {

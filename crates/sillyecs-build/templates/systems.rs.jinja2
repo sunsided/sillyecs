@@ -214,7 +214,7 @@ impl System{{ phase.name.type }}Events for NoOpPhaseEvents {
         &mut self,
         _context: &::sillyecs::FrameContext,
         {%- for state in phase.states %}
-            {%- set access = state.begin_phase | default(value="none") %}
+            {%- set access = state.begin_phase | default("none") %}
             {%- if access == "none" %}
                 {# skip #}
             {%- elif access == "read" %}
@@ -235,7 +235,7 @@ impl System{{ phase.name.type }}Events for NoOpPhaseEvents {
         _result: Option<Self::Result>,
         _context: &::sillyecs::FrameContext,
         {%- for state in phase.states %}
-            {%- set access = state.end_phase | default(value="none") %}
+            {%- set access = state.end_phase | default("none") %}
             {%- if access == "none" %}
                 {# skip #}
             {%- elif access == "read" %}
@@ -263,7 +263,7 @@ pub trait System{{ phase.name.type }}Events {
         &mut self,
         context: &::sillyecs::FrameContext,
         {%- for state in phase.states %}
-            {%- set access = state.begin_phase | default(value="none") %}
+            {%- set access = state.begin_phase | default("none") %}
             {%- if access == "none" %}
                 {# skip #}
             {%- elif access == "read" %}
@@ -285,7 +285,7 @@ pub trait System{{ phase.name.type }}Events {
         result: Option<Self::Result>,
         context: &::sillyecs::FrameContext,
         {%- for state in phase.states %}
-            {%- set access = state.end_phase | default(value="none") %}
+            {%- set access = state.end_phase | default("none") %}
             {%- if access == "none" %}
                 {# skip #}
             {%- elif access == "read" %}
@@ -348,7 +348,7 @@ pub trait Apply{{ system.name.type }}: System {
         context: &::sillyecs::FrameContext,
         {%- endif %}
         {%- for state in system.states %}
-            {%- set access = state.check | default(value="none") %}
+            {%- set access = state.check | default("none") %}
             {%- if access == "none" %}
                 {# skip #}
             {%- elif access == "read" %}
@@ -375,7 +375,7 @@ pub trait Apply{{ system.name.type }}: System {
         context: &::sillyecs::FrameContext,
         {%- endif %}
         {%- for state in system.states %}
-            {%- set access = state.begin_phase | default(value="none") %}
+            {%- set access = state.begin_phase | default("none") %}
             {%- if access == "none" %}
                 {# skip #}
             {%- elif access == "read" %}
@@ -402,7 +402,7 @@ pub trait Apply{{ system.name.type }}: System {
         context: &::sillyecs::FrameContext,
         {%- endif %}
         {%- for state in system.states %}
-            {%- set access = state.end_phase | default(value="none") %}
+            {%- set access = state.end_phase | default("none") %}
             {%- if access == "none" %}
                 {# skip #}
             {%- elif access == "read" %}
@@ -440,7 +440,7 @@ pub trait Apply{{ system.name.type }}: System {
         lookup: &dyn {{system.name.raw}}ComponentLookup,
         {%- endif -%}
         {%- for state in system.states %}
-            {%- set access = state.preflight | default(value="none") %}
+            {%- set access = state.preflight | default("none") %}
             {%- if access == "none" %}
                 {# skip #}
             {%- elif access == "read" %}
@@ -489,7 +489,7 @@ pub trait Apply{{ system.name.type }}: System {
         lookup: &dyn {{system.name.raw}}ComponentLookup,
         {%- endif -%}
         {%- for state in system.states %}
-            {%- set access = state.postflight | default(value="none") %}
+            {%- set access = state.postflight | default("none") %}
             {%- if access == "none" %}
                 {# skip #}
             {%- elif access == "read" %}
@@ -534,7 +534,7 @@ pub trait Apply{{ system.name.type }}: System {
         context: &::sillyecs::FrameContext,
         {%- endif %}
         {%- for state in system.states %}
-            {%- set access = state.system | default(value="none") %}
+            {%- set access = state.system | default("none") %}
             {%- if access == "none" %}
                 {# skip #}
             {%- elif access == "read" %}
@@ -576,7 +576,7 @@ pub trait Apply{{ system.name.type }}: System {
         context: &::sillyecs::FrameContext,
         {%- endif %}
         {%- for state in system.states %}
-            {%- set access = state.system | default(value="none") %}
+            {%- set access = state.system | default("none") %}
             {%- if access == "none" %}
                 {# skip #}
             {%- elif access == "read" %}
@@ -607,7 +607,7 @@ pub trait Apply{{ system.name.type }}: System {
                 context,
                 {%- endif %}
                 {%- for state in system.states %}
-                    {%- set access = state.system | default(value="none") %}
+                    {%- set access = state.system | default("none") %}
                     {%- if access == "none" %}
                         {# skip #}
                     {%- else %}
@@ -647,7 +647,7 @@ pub trait Apply{{ system.name.type }}: System {
         context: &::sillyecs::FrameContext,
         {%- endif %}
         {%- for state in system.states %}
-            {%- set access = state.system | default(value="none") %}
+            {%- set access = state.system | default("none") %}
             {%- if access == "none" %}
                 {# skip #}
             {%- elif access == "read" %}
@@ -679,7 +679,7 @@ pub trait Apply{{ system.name.type }}: System {
                 context,
                 {%- endif %}
                 {%- for state in system.states %}
-                    {%- set access = state.system | default(value="none") %}
+                    {%- set access = state.system | default("none") %}
                     {%- if access == "none" %}
                         {# skip #}
                     {%- else %}
@@ -721,7 +721,7 @@ impl {{ system.name.type }} {
         context: &::sillyecs::FrameContext,
         {%- endif %}
         {%- for state in system.states %}
-            {%- set access = state.system | default(value="none") %}
+            {%- set access = state.system | default("none") %}
             {%- if access == "none" %}{# skip #}
             {%- elif access == "read" %}
         {{ state.use.field }}: &{{ state.use.type }},
@@ -751,7 +751,7 @@ impl {{ system.name.type }} {
             context,
             {%- endif %}
             {%- for state in system.states %}
-                {%- set access = state.system | default(value="none") %}
+                {%- set access = state.system | default("none") %}
                 {%- if access == "none" %}{# skip #}
                 {%- else %}
             {{ state.use.field }},
@@ -789,7 +789,7 @@ impl {{ system.name.type }} {
         context: &::sillyecs::FrameContext,
         {%- endif %}
         {%- for state in system.states %}
-            {%- set access = state.system | default(value="none") %}
+            {%- set access = state.system | default("none") %}
             {%- if access == "none" %}{# skip #}
             {%- elif access == "read" %}
         {{ state.use.field }}: &{{ state.use.type }},
@@ -819,7 +819,7 @@ impl {{ system.name.type }} {
                 context,
                 {%- endif %}
                 {%- for state in system.states %}
-                    {%- set access = state.system | default(value="none") %}
+                    {%- set access = state.system | default("none") %}
                     {%- if access == "none" %}{# skip #}
                     {%- else %}
                 {{ state.use.field }},

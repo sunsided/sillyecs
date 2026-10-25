@@ -658,7 +658,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
             &mut self.events,
             &self.context,
             {%- for state in phase.states %}
-                {%- set access = state.begin_phase | default(value="none") %}
+                {%- set access = state.begin_phase | default("none") %}
                 {%- if access == "none" %}
                     {# skip #}
                 {%- elif access == "read" %}
@@ -680,7 +680,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
             result,
             &self.context,
             {%- for state in phase.states %}
-                {%- set access = state.end_phase | default(value="none") %}
+                {%- set access = state.end_phase | default("none") %}
                 {%- if access == "none" %}
                     {# skip #}
                 {%- elif access == "read" %}
@@ -720,7 +720,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                &self.context,
                {%- endif %}
                {%- for state in system.states %}
-                   {%- set access = state.check | default(value="none") %}
+                   {%- set access = state.check | default("none") %}
                    {%- if access == "none" %}
                        {# skip #}
                    {%- elif access == "read" %}
@@ -737,7 +737,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                 &self.context,
                 {%- endif %}
                 {%- for state in system.states %}
-                    {%- set access = state.begin_phase | default(value="none") %}
+                    {%- set access = state.begin_phase | default("none") %}
                     {%- if access == "none" %}
                         {# skip #}
                     {%- elif access == "read" %}
@@ -765,7 +765,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                     &self.archetypes,
                     {%- endif -%}
                     {%- for state in system.states %}
-                        {%- set access = state.preflight | default(value="none") %}
+                        {%- set access = state.preflight | default("none") %}
                         {%- if access == "none" %}
                             {# skip #}
                         {%- elif access == "read" %}
@@ -825,7 +825,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                     &self.context,
                     {%- endif %}
                     {%- for state in system.states %}
-                        {%- set access = state.system | default(value="none") %}
+                        {%- set access = state.system | default("none") %}
                         {%- if access == "none" %}
                             {# skip #}
                         {%- elif access == "read" %}
@@ -864,7 +864,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                     &self.archetypes,
                     {%- endif -%}
                     {%- for state in system.states %}
-                        {%- set access = state.postflight | default(value="none") %}
+                        {%- set access = state.postflight | default("none") %}
                         {%- if access == "none" %}
                             {# skip #}
                         {%- elif access == "read" %}
@@ -899,7 +899,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                 &self.context,
                 {%- endif %}
                 {%- for state in system.states %}
-                    {%- set access = state.end_phase | default(value="none") %}
+                    {%- set access = state.end_phase | default("none") %}
                     {%- if access == "none" %}
                         {# skip #}
                     {%- elif access == "read" %}
@@ -948,7 +948,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
             &mut self.events,
             &self.context,
             {%- for state in phase.states %}
-                {%- set access = state.begin_phase | default(value="none") %}
+                {%- set access = state.begin_phase | default("none") %}
                 {%- if access == "none" %}
                     {# skip #}
                 {%- elif access == "read" %}
@@ -979,7 +979,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                &self.context,
                {%- endif %}
                {%- for state in system.states %}
-                   {%- set access = state.check | default(value="none") %}
+                   {%- set access = state.check | default("none") %}
                    {%- if access == "none" %}
                        {# skip #}
                    {%- elif access == "read" %}
@@ -997,7 +997,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                 &self.context,
                 {%- endif %}
                 {%- for state in system.states %}
-                    {%- set access = state.begin_phase | default(value="none") %}
+                    {%- set access = state.begin_phase | default("none") %}
                     {%- if access == "none" %}
                         {# skip #}
                     {%- elif access == "read" %}
@@ -1033,7 +1033,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                                 &self.archetypes,
                                 {%- endif -%}
                                 {%- for state in system.states %}
-                                    {%- set access = state.preflight | default(value="none") %}
+                                    {%- set access = state.preflight | default("none") %}
                                     {%- if access == "none" %}
                                         {# skip #}
                                     {%- elif access == "read" %}
@@ -1093,7 +1093,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                                 &self.context,
                                 {%- endif %}
                                 {%- for state in system.states %}
-                                    {%- set access = state.system | default(value="none") %}
+                                    {%- set access = state.system | default("none") %}
                                     {%- if access == "none" %}
                                         {# skip #}
                                     {%- elif access == "read" %}
@@ -1132,7 +1132,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
                                 &self.archetypes,
                                 {%- endif -%}
                                 {%- for state in system.states %}
-                                    {%- set access = state.postflight | default(value="none") %}
+                                    {%- set access = state.postflight | default("none") %}
                                     {%- if access == "none" %}
                                         {# skip #}
                                     {%- elif access == "read" %}
@@ -1173,7 +1173,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
             &self.context,
             {%- endif %}
             {%- for state in system.states %}
-                {%- set access = state.end_phase | default(value="none") %}
+                {%- set access = state.end_phase | default("none") %}
                 {%- if access == "none" %}
                     {# skip #}
                 {%- elif access == "read" %}
@@ -1197,7 +1197,7 @@ impl<E, Q> {{ world.name.type }}<E, Q> {
             result,
             &self.context,
             {%- for state in phase.states %}
-                {%- set access = state.end_phase | default(value="none") %}
+                {%- set access = state.end_phase | default("none") %}
                 {%- if access == "none" %}
                     {# skip #}
                 {%- elif access == "read" %}
