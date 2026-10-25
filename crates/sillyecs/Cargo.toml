@@ -13,7 +13,7 @@ authors.workspace = true
 
 [dev-dependencies]
 criterion = "0.8.2"
-rand = "0.10.1"
+rand = "0.10.3"
 
 [[bench]]
 name = "flatten_slices"
