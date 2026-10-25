@@ -223,8 +223,18 @@ where
     Q: WorldUserCommand<UserCommand = UserCommand>,
 {
     fn handle_user_command(&mut self, command: Self::UserCommand) {
-        // Discard for the fixture; the goal is to compile, not to act.
-        let _ = command;
+        // Act on `Spawn` through the world's public API, so the runtime tests can
+        // see that user commands arrive (and that a handler outside the generated
+        // module can drive the world).
+        match command {
+            UserCommand::Spawn => {
+                self.spawn_particle_with(
+                    PositionComponent::new(PositionData::default()),
+                    VelocityComponent::new(VelocityData::default()),
+                );
+            }
+            UserCommand::Heal { .. } => {}
+        }
     }
 }
 

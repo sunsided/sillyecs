@@ -62,5 +62,9 @@ fn queued_commands_are_applied_by_the_next_phase_run() {
     assert_eq!(world.len(), 1, "commands are deferred");
 
     world.apply_system_phases();
-    assert!(world.is_empty());
+    assert!(
+        world.get_particle_entity(id).is_none(),
+        "the despawn is applied"
+    );
+    assert_eq!(world.len(), 1, "the handler spawned a particle for the user command");
 }
