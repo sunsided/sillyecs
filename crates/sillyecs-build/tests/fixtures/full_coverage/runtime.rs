@@ -45,3 +45,22 @@ fn despawning_moves_the_last_entity_into_the_hole() {
     world.despawn_by_id(middle).expect("despawn remaining entity");
     assert!(world.is_empty());
 }
+
+/// Commands travel through the user's queue, which only implements the runtime
+/// `CommandSender`/`CommandReceiver`, and are applied on the next phase run.
+#[test]
+fn queued_commands_are_applied_by_the_next_phase_run() {
+    let mut world = world();
+    let id = spawn_particle(&mut world);
+
+    world
+        .command(WorldCommand::DespawnEntity(id))
+        .expect("queue despawn");
+    world
+        .command(WorldCommand::User(UserCommand::Spawn))
+        .expect("queue user command");
+    assert_eq!(world.len(), 1, "commands are deferred");
+
+    world.apply_system_phases();
+    assert!(world.is_empty());
+}
